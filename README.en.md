@@ -90,6 +90,10 @@ Replace the example path with an existing `.cap` file. To operate the app instea
 
 ## Example requests
 
+The MCP exposes workflow instructions, strict graph-request schemas, and tool annotations. Read the graph and a fresh screenshot before fitting; pass its `data_signature` as `expected_data_signature` to reject changed source/run/unit bindings. This signature does not detect live sample changes or a moved graph. Results include explicit native solver status and a machine-readable next action.
+
+Saved-file and explicit-sample OLS also return residual, leverage, Cook's-distance, and adjacent-residual-correlation diagnostics. Per-sample arrays are limited to the first 256 observations, with explicit truncation metadata; calculations use all observations. Influence flags are descriptive, not significance tests or instructions to remove data. These diagnostics are computed by the MCP, not Capstone's native solver.
+
 **Analyze data**
 
 > Add a graph to the open Capstone experiment, select data from the same run, and compare linear and quadratic fits. Report Capstone's own coefficients and errors.

@@ -1,6 +1,7 @@
 # Copyright 2026 Capstone MCP contributors.
 """Operate native graph pages using current screenshot anchors and UI menus."""
 
+from _ctypes import COMError
 from typing import Final
 
 import win32clipboard
@@ -126,7 +127,11 @@ def ready_graph_menu(app: Capstone, before: set[int], name: str) -> Snapshot | N
     for window in app.windows():
         if window.handle in before:
             continue
-        snapshot = app.snapshot(window.handle, 5, 500)
+        try:
+            snapshot = app.snapshot(window.handle, 5, 500)
+        except (COMError, AutomationError):
+            # Qt can remove a popup or shadow between enumeration and observation.
+            continue
         if any(c.name == name and c.control_type == "MenuItem"
                and c.enabled and c.visible
                for c in snapshot.controls):
@@ -216,7 +221,10 @@ def _fit_menu(app: Capstone, before: set[int]) -> Snapshot | None:
     for window in app.windows():
         if window.handle in before or window.title != "PASCO Capstone":
             continue
-        snapshot = app.snapshot(window.handle, 3, 100)
+        try:
+            snapshot = app.snapshot(window.handle, 3, 100)
+        except (COMError, AutomationError):
+            continue
         items = [c for c in snapshot.controls if c.control_type == "MenuItem"]
         if (
             len(items) == 1 and not items[0].name
@@ -301,6 +309,7 @@ def set_graph_fits(
 ) -> GraphFitOutcome:
     """Apply an exact model set and verify it against Capstone's own graph XML."""
     before = read_graph(app, handle, allow_foreground=request.allow_foreground)
+    verify_graph_binding(before, request.expected_data_signature)
     desired = {FIT_TYPES[model] for model in request.models}
     current = set(before.selected_types)
     unknown = current.difference(FIT_ROWS)
@@ -357,10 +366,29 @@ def analyze_graph(
     app: Capstone, handle: int, request: GraphAnalysisRequest,
 ) -> GraphFitOutcome:
     """Assign requested native axes, then set and read verified native fits."""
+    fitting = request.fitting
+    if request.x is not None or request.y is not None:
+        before = read_graph(app, handle, allow_foreground=fitting.allow_foreground)
+        verify_graph_binding(before, fitting.expected_data_signature)
     for axis in (request.x, request.y):
         if axis is not None:
             _ = select_graph_measurement(
                 app, handle, axis.point, axis.menu_path,
                 allow_foreground=request.fitting.allow_foreground,
             )
-    return set_graph_fits(app, handle, request.fitting)
+    if request.x is not None or request.y is not None:
+        current = read_graph(app, handle)
+        fitting = fitting.model_copy(update={
+            "expected_data_signature": current.data_signature,
+        })
+    return set_graph_fits(app, handle, fitting)
+
+
+def verify_graph_binding(state: GraphState, expected: str | None) -> None:
+    """Reject stale data identity before changing axes or fit selections."""
+    if expected is not None and state.data_signature != expected:
+        msg = (
+            "Graph data bindings changed. Call capstone_read_graph and inspect "
+            "the source, dataset and unit IDs before issuing a new request."
+        )
+        raise AutomationError(msg)

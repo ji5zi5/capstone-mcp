@@ -5,6 +5,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 from enum import StrEnum
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Final
@@ -12,6 +14,7 @@ from xml.etree.ElementTree import Element, ParseError
 
 from defusedxml.common import DefusedXmlException
 from defusedxml.ElementTree import fromstring
+from pydantic import computed_field
 
 from capstone_mcp.models import Model
 
@@ -23,6 +26,12 @@ MAX_GRAPH_XML_NODES: Final = 100_000
 # IDA 0x14087AF80: convergence, small residual, small step, or both.
 FIT_SUCCESS_STATUSES: Final = frozenset((0, 1, 2, 3))
 USER_DEFINED_FIT: Final = 16
+FIT_STATUS_NAMES: Final = (
+    "SUCCESS_CONVERGENCE", "SUCCESS_SUM_SQUARES_SMALL", "SUCCESS_ERROR_SMALL",
+    "SUCCESS_SUM_AND_ERROR_SMALL", "FAIL_ORTHO", "FAIL_MAX_ITERATONS",
+    "FAIL_SUM_SQUARES_UNDERFLOW", "FAIL_ERROR_UNDERFLOW", "FAIL_ORTHO_UNDERFLOW",
+    "FAIL_MEMORY", "INVALID_INPUT", "USER_CANCELED", "IN_PROGRESS",
+)
 
 
 class FitModel(StrEnum):
@@ -94,6 +103,22 @@ class NativeFit(Model):
     parameters: list[FitParameter]
     metrics: list[FitMetric]
 
+    @computed_field
+    @property
+    def status(self) -> str:
+        """Expose the observed native solver status without making AI guess codes."""
+        if self.error_status < 0:
+            return "USER_CANCELED"
+        if self.error_status < len(FIT_STATUS_NAMES):
+            return FIT_STATUS_NAMES[self.error_status]
+        return "UNDEFINED"
+
+    @computed_field
+    @property
+    def successful(self) -> bool:
+        """Native convergence statuses 0 through 3 are successful."""
+        return self.error_status in FIT_SUCCESS_STATUSES
+
 
 class GraphInput(Model):
     """One direct renderer input and its native identifiers."""
@@ -118,6 +143,21 @@ class GraphState(Model):
     fit_enabled: bool
     selected_types: list[int]
     series: list[GraphSeries]
+
+    @computed_field
+    @property
+    def data_signature(self) -> str:
+        """Fingerprint data bindings, not fit selections or unobserved sample values."""
+        bindings = [
+            (series.renderer_id, [
+                (item.index, item.source_id, item.dataset_id, item.unit_id)
+                for item in sorted(series.inputs, key=lambda item: item.index)
+            ])
+            for series in sorted(self.series, key=lambda series: series.renderer_id)
+        ]
+        return hashlib.sha256(json.dumps(
+            bindings, separators=(",", ":"), ensure_ascii=True,
+        ).encode()).hexdigest()
 
 
 class GraphStateError(ValueError):

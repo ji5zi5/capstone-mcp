@@ -6,6 +6,7 @@ from unittest.mock import Mock
 import pytest
 import win32gui
 import win32process
+from pydantic import ValidationError
 
 from capstone_mcp import graph_workflows
 from capstone_mcp.desktop import AutomationError, Capstone
@@ -109,6 +110,29 @@ def test_native_menu_is_not_ready_until_entry_is_enabled_and_visible(
     observed = graph_workflows.ready_graph_menu(app, {1}, "Copy Display")
     # Then: event-driven callers keep waiting until the entry is usable.
     assert (observed is not None) == ready
+
+
+def test_disappearing_popup_does_not_hide_the_ready_menu(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Given: a Qt shadow disappeared after window enumeration.
+    app = Capstone()
+    bounds = Bounds(left=0, top=0, right=100, bottom=100)
+    vanished = Window(handle=2, title="", process_id=1, bounds=bounds)
+    current = Window(handle=3, title="menu", process_id=1, bounds=bounds)
+    snapshot = Snapshot(
+        window=current, truncated=False,
+        controls=[Control(
+            ref="copy", parent=None, name="Copy Display", control_type="MenuItem",
+            automation_id="", enabled=True, visible=True, bounds=bounds,
+        )],
+    )
+    monkeypatch.setattr(app, "windows", Mock(return_value=[vanished, current]))
+    monkeypatch.setattr(app, "snapshot", Mock(
+        side_effect=[AutomationError("popup disappeared"), snapshot],
+    ))
+    # When / Then: only observation is repeated; no application input is sent.
+    assert graph_workflows.ready_graph_menu(app, {1}, "Copy Display") == snapshot
 
 
 def test_menu_click_does_not_reactivate_the_transient_popup(
@@ -244,3 +268,47 @@ def test_selected_model_with_native_fit_error_is_not_numerical_success(
     assert not result.changed
     assert not result.fits_successful
     assert result.after.series[0].fits[0].error_status == 7
+    assert result.next_action == "inspect_fit_status"
+
+
+def test_stale_data_signature_prevents_fit_input(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Given: the graph selection changed after the AI inspected it.
+    original = _fit_state([1])
+    changed = GraphState(
+        fit_enabled=True, selected_types=[1],
+        series=[GraphSeries(renderer_id="different-run", inputs=[], fits=[])],
+    )
+    monkeypatch.setattr(
+        graph_workflows, "read_graph", Mock(return_value=changed),
+    )
+    toggle = Mock()
+    monkeypatch.setattr(graph_workflows, "_toggle_fit", toggle)
+    request = GraphFitRequest(
+        menu_point=Point(x=10, y=20), models=[FitModel.QUADRATIC],
+        expected_data_signature=original.data_signature,
+    )
+    # When / Then: an outdated plan cannot modify the newly selected run.
+    with pytest.raises(AutomationError):
+        _ = set_graph_fits(Capstone(), 1, request)
+    toggle.assert_not_called()
+
+
+def test_data_signature_survives_model_changes() -> None:
+    # Given / When: only the selected fits changed, not their input bindings.
+    before = _fit_state([1])
+    after = _fit_state([1, 2])
+    # Then: repeating the same guarded request remains valid.
+    assert before.data_signature == after.data_signature
+
+
+def test_misspelled_graph_request_keys_are_rejected() -> None:
+    # Given: silently ignoring this typo would remove existing models.
+    request = {
+        "menu_point": {"x": 10, "y": 20}, "models": ["linear"],
+        "preserve_existing_models": True,
+    }
+    # When / Then: the AI must resolve the contract instead of guessing an option.
+    with pytest.raises(ValidationError):
+        _ = GraphFitRequest.model_validate(request)

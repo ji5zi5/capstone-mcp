@@ -54,6 +54,8 @@ NATIVE GRAPHS AND FITTING
    actual fit configuration, per-run IDs, unit IDs, coefficients and metrics.
    This replaces the Windows clipboard, but does not save the experiment.
    Preserve native decimal strings and distinguish source IDs from dataset IDs.
+   Keep data_signature and copy it into fitting.expected_data_signature.
+   It guards graph/run/unit bindings, not changing live samples or screen layout.
 4. capstone_fit_models lists the 23 built-in choices. capstone_set_graph_fits
    takes request.models as the EXACT desired set, not toggles. Repeating the
    same request preserves existing fits; [] removes all selected models.
@@ -68,6 +70,30 @@ NATIVE GRAPHS AND FITTING
    after.series contains per-renderer inputs and native fit parameters/metrics.
    Invalid metrics and failed-fit values are not usable results.
    Inspect the final screenshot too, and save only to the requested new path.
+
+TOOL CALL CONTRACT
+- For native fitting use this order: capstone_read_graph, capstone_screenshot,
+  capstone_fit_models when needed, then capstone_set_graph_fits. Use the observed
+  handle, original screenshot pixels, returned model enum names, and signature.
+- Models is the complete target set. To keep existing fits, include their desired
+  model names explicitly. Never invent preserve_existing_models or other options;
+  graph requests reject unknown fields. Use menu_point, not fit_menu_point.
+- If data bindings changed, read the graph again and resolve source/run/unit
+  identity before retrying. If layout changed, take a new screenshot. Do not reuse
+  a failed click or retry an uncertain native write without observing its result.
+- next_action=inspect_fit_status means inspect each fit.status and successful.
+  IN_PROGRESS is not a valid result yet; do not relaunch the same fit blindly.
+  no_fits_requested means an empty requested model set, not evidence of a good fit.
+- A high correlation or low error alone does not establish a valid model.
+  Compare identical source/run/unit selections and consider model complexity.
+  Do not silently drop outliers, rank different datasets as competing fits, or
+  present externally calculated diagnostics as values produced by Capstone.
+- File/sample OLS includes diagnostics: residuals, leverage, Cook's distance,
+  influential_indices and lag1_residual_correlation. Read sample_count/truncated:
+  per-sample arrays contain only the first 256 observations; influential_indices
+  is separately capped, with influential_count recording the full count.
+  The 4/n Cook threshold is descriptive, not a statistical test or deletion rule.
+  Lag-1 refers to supplied order, not necessarily time. Undefined values are null.
 
 WINDOWS AND IDENTIFIERS
 - capstone_attach returns windows; capstone_windows refreshes them. List results

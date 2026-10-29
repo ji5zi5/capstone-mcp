@@ -9,6 +9,7 @@ from uuid import UUID
 
 import anyio
 from mcp.server.fastmcp import FastMCP, Image
+from mcp.types import ToolAnnotations
 from pydantic import Field, JsonValue, TypeAdapter
 
 from capstone_mcp.acquisition import (
@@ -102,7 +103,10 @@ class ExportedData(Model):
     data: CsvPage
 
 
-@MCP.tool()
+@MCP.tool(annotations=ToolAnnotations(
+    title="Insert a graph in Capstone", readOnlyHint=False,
+    destructiveHint=False, idempotentHint=False, openWorldHint=False,
+))
 async def capstone_create_graph(
     handle: int, *, allow_foreground: bool = True,
 ) -> Result:
@@ -135,7 +139,10 @@ async def capstone_select_graph_measurement(
     ), mutates=True))
 
 
-@MCP.tool()
+@MCP.tool(annotations=ToolAnnotations(
+    title="Inspect selected graph and native results", readOnlyHint=False,
+    destructiveHint=False, idempotentHint=True, openWorldHint=False,
+))
 async def capstone_read_graph(
     handle: int, *, allow_foreground: bool = True,
 ) -> GraphState:
@@ -144,19 +151,27 @@ async def capstone_read_graph(
     Uses Display > Copy Display and replaces the Windows clipboard with the
     selected graph. Does not save or modify the experiment. Select exactly one
     graph and close menus first. Values come from Capstone, not an external fit.
+    Copy data_signature into the next fitting request to guard source/run/unit
+    identity. It does not fingerprint live sample contents or screenshot layout.
     """
     return GraphState.model_validate(await _native(NativeRequest(
         operation="read_graph", handle=handle, allow_foreground=allow_foreground,
     ), mutates=True))
 
 
-@MCP.tool()
+@MCP.tool(annotations=ToolAnnotations(
+    title="List accepted native fitting model names", readOnlyHint=True,
+    destructiveHint=False, idempotentHint=True, openWorldHint=False,
+))
 def capstone_fit_models() -> list[FitModel]:
     """List supported built-in native models; custom-expression editing is excluded."""
     return list(FitModel)
 
 
-@MCP.tool()
+@MCP.tool(annotations=ToolAnnotations(
+    title="Set and verify exact native fitting models", readOnlyHint=False,
+    destructiveHint=True, idempotentHint=True, openWorldHint=False,
+))
 async def capstone_set_graph_fits(
     handle: int, request: GraphFitRequest,
 ) -> GraphFitOutcome:
@@ -167,6 +182,9 @@ async def capstone_set_graph_fits(
     master_point (fit icon, needed when fitting is disabled).
     Copies the graph before/after actions, replacing the Windows clipboard.
     Numerical failure is reported separately from verified model selection.
+    First read_graph and screenshot. Copy data_signature to
+    request.expected_data_signature; do not fabricate coordinates or model names.
+    Check next_action and each fit's status/successful, not changed alone.
     """
     return GraphFitOutcome.model_validate(await _native(NativeRequest(
         operation="set_graph_fits", handle=handle,
@@ -174,7 +192,10 @@ async def capstone_set_graph_fits(
     ), mutates=True))
 
 
-@MCP.tool()
+@MCP.tool(annotations=ToolAnnotations(
+    title="Configure graph axes and analyze native fits", readOnlyHint=False,
+    destructiveHint=True, idempotentHint=False, openWorldHint=False,
+))
 async def capstone_analyze_graph(
     handle: int, request: GraphAnalysisRequest,
 ) -> GraphFitOutcome:
@@ -183,6 +204,8 @@ async def capstone_analyze_graph(
     Create/select a graph and inspect its screenshot first. This combines named
     measurement selection with idempotent native fitting in one worker session.
     Uses the clipboard for verification. Existing unrelated displays are retained.
+    fitting.expected_data_signature checks the original graph before changing
+    either axis; the updated bindings are then verified for the fitting stage.
     """
     return GraphFitOutcome.model_validate(await _native(NativeRequest(
         operation="analyze_graph", handle=handle,

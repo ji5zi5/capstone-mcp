@@ -32,6 +32,10 @@ MCP 연결을 마쳤다면 AI 클라이언트의 채팅창에서 작업을 요�
 
 ### 선형 피팅과 회차 비교
 
+파일 피팅(`capstone_fit_file`)과 수치 피팅(`capstone_linear_fit`)은 `diagnostics`에 잔차, 레버리지, Cook의 거리, 영향이 큰 표본의 인덱스와 인접 잔차 상관을 반환합니다. 파일 피팅에서는 `fit.diagnostics`에 들어 있습니다. 이는 MCP가 계산한 OLS 진단이며 Capstone 네이티브 피팅 결과와 구분합니다.
+
+표본별 배열은 입력 순서의 앞 256개까지만 반환하고 `sample_count`·`truncated`로 범위를 표시합니다. 회귀 계산과 영향도 검색은 전체 표본을 사용합니다. `influential_indices`도 최대 256개이며 전체 개수는 `influential_count`입니다. Cook의 거리 `4/n` 기준은 검토할 표본을 표시하는 경험적 기준이지 유의성 검정이나 자동 삭제 규칙이 아닙니다. 인접 잔차 상관 역시 입력 순서에 대한 설명값이며 시간적 독립성을 증명하지 않습니다.
+
 목록에서 x축과 y축 데이터셋을 확인한 뒤 `capstone_fit_file`에 전달합니다. 아래 인덱스는 설명용이며, 실제 파일에서 같은 좌표에 대응하는 두 수치 데이터셋을 골라야 합니다.
 
 ```json
@@ -83,6 +87,17 @@ MCP 연결을 마쳤다면 AI 클라이언트의 채팅창에서 작업을 요�
 그래프 상태는 저장 파일이나 외부 회귀 계산이 아니라 **Capstone의 Copy Display XML**에서 읽습니다. 이 과정에서 Windows 클립보드는 선택한 그래프로 바뀌지만 실험 파일은 저장되지 않습니다. `after.series[].inputs[]`는 각 렌더러의 소스·회차·단위 ID를 보존하며, 계수의 소수 문자열을 임의로 반올림하지 않습니다. 메뉴 동작 후 읽은 상태가 요청과 다르면 중단하고 불확실한 입력을 자동 재전송하지 않습니다.
 
 `capstone_plot`과 파일 피팅은 별도 결과를 만드는 보조 도구입니다. Capstone 페이지에 결과를 반영해 달라는 요청을 이 도구만으로 완료 처리하지 않습니다.
+
+### AI 클라이언트의 호출 순서와 확인 기준
+
+- `capstone_read_graph` → 최신 `capstone_screenshot` → 필요하면 `capstone_fit_models` → `capstone_set_graph_fits` 순서로 호출합니다.
+- 읽은 그래프의 `data_signature`를 `request.expected_data_signature`에 그대로 전달합니다. 소스·회차·단위 연결이 바뀌면 피팅을 건드리기 전에 거부합니다. 이 값은 실시간 샘플 내용이나 화면 배치의 변경까지 감지하는 값은 아닙니다.
+- `capstone_analyze_graph`에서는 같은 서명을 `request.fitting.expected_data_signature`에 넣습니다. 축을 바꾸기 전의 그래프를 확인하고, 새 축 연결은 피팅 단계에서 다시 확인합니다.
+- `models`는 추가할 모델이 아니라 **남길 모델의 전체 목록**입니다. 임의의 `preserve_existing_models` 같은 옵션이나 오타가 있는 요청은 무시하지 않고 오류로 반환합니다.
+- 결과의 `next_action`이 `inspect_fit_status`이면 각 피팅의 `status`와 `successful`을 확인합니다. `IN_PROGRESS`나 계산 실패를 정상 계수로 설명하지 않습니다. `no_fits_requested`는 모델 목록이 비었다는 뜻입니다.
+- MCP 메타데이터에는 조회·변경·반복 호출 특성을 표시합니다. 안내 문구는 모델 선택을 돕는 힌트이며, 사용자의 작업 범위를 넓히는 권한은 아닙니다.
+
+서로 다른 회차나 단위를 섞어서 모델의 오차를 비교하지 마세요. 오차가 작거나 상관계수가 높다는 이유만으로 모델이 적절하다고 결론 내리지 않으며, 이상치를 자동으로 제거하지 않습니다.
 
 ### 센서와 샘플링 속도
 
