@@ -13,7 +13,9 @@ CHOOSE THE WORKFLOW
 - Saved .cap file: use file tools directly. No app attachment, foreground input,
   sensor connection or debugging port is required.
 - Open experiment: attach, inspect the target window, then use the dedicated
-  sensor, recording, save or export tool. Prefer these over raw clicks.
+  graph, sensor, recording, save or export tool. Prefer these over raw clicks.
+- When asked to create a graph or analyze the open experiment, modify Capstone
+  itself using the graph workflow below. A standalone PNG is not a substitute.
 - Live metadata/current values and repeated acquisition require Capstone started
   with QTWEBENGINE_REMOTE_DEBUGGING=127.0.0.1:9223 (or the chosen debug_port).
   Do not restart an experiment with unsaved work to enable this setting.
@@ -35,8 +37,27 @@ SAVED DATA AND ANALYSIS
    missing/unreadable values with zero. sample_indices and independent_kind=index
    are not seconds. Units are not automatically converted.
 5. Use capstone_plot for a separate PNG from extracted paired values, with axis
-   labels from known metadata. Fits/plots do not modify Capstone pages.
+   labels from known metadata. These file-analysis tools do not modify pages;
+   use the native graph tools when the user wants the result in Capstone.
    Return source/run/unit information with the result, not just coefficients.
+
+NATIVE GRAPHS AND LINEAR FITTING
+1. Attach and inspect the current experiment. Preserve existing displays; use
+   the observed Add Page button if a separate analysis page is appropriate.
+   capstone_create_graph inserts a real graph into the active page.
+2. Get a fresh capstone_screenshot. Custom graph controls are not in the UIA
+   tree. Supply client-area screenshot pixel coordinates, not desktop points,
+   to capstone_select_graph_measurement(axis_point, menu_path).
+   Choose each axis by its exact measurement menu labels, including units.
+   Use screenshot scaling correctly and reacquire anchors after layout changes.
+3. Verify both axis labels and the intended run/data in a fresh screenshot.
+   capstone_toggle_linear_fit takes fit_menu_point at the dropdown arrow beside
+   the curve-fit icon. It toggles Linear, so do not call when it is already on
+   unless the user wants it removed. The full native 24-row menu must fit.
+4. Inspect the resulting graph, fit annotation and errors. Read coefficients
+   from Capstone's rendered result, retaining its precision and uncertainty.
+   delivered=true alone is not proof of a valid fit. Never report an external
+   regression as if Capstone calculated it. Save only to the requested new path.
 
 WINDOWS AND IDENTIFIERS
 - capstone_attach returns windows; capstone_windows refreshes them. List results

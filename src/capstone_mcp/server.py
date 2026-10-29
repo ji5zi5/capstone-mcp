@@ -96,6 +96,57 @@ class ExportedData(Model):
 
 
 @MCP.tool()
+async def capstone_create_graph(
+    handle: int, *, allow_foreground: bool = True,
+) -> Result:
+    """Insert a real graph into the active Capstone page, not a standalone PNG.
+
+    Inspect a fresh screenshot afterward. Custom graph axes are not exposed in
+    UIA; use their observed window-relative coordinates for measurement selection.
+    """
+    return Result.model_validate(await _native(NativeRequest(
+        operation="create_graph", handle=handle,
+        allow_foreground=allow_foreground,
+    ), mutates=True))
+
+
+@MCP.tool()
+async def capstone_select_graph_measurement(
+    handle: int, axis_point: Point, menu_path: list[str],
+    *, allow_foreground: bool = True,
+) -> Result:
+    """Assign an axis using its current screenshot anchor and exact menu labels.
+
+    axis_point uses the current client-area screenshot's pixel coordinates.
+    menu_path selects a measurement, optionally through nested native submenus.
+    Never reuse coordinates after moving/resizing the window or graph.
+    Inspect a fresh screenshot afterward to confirm the changed axis.
+    """
+    return Result.model_validate(await _native(NativeRequest(
+        operation="select_graph_measurement", handle=handle, point=axis_point,
+        menu_path=menu_path, allow_foreground=allow_foreground,
+    ), mutates=True))
+
+
+@MCP.tool()
+async def capstone_toggle_linear_fit(
+    handle: int, fit_menu_point: Point, *, allow_foreground: bool = True,
+) -> Result:
+    """Toggle Linear fitting in Capstone using the observed fit dropdown location.
+
+    Use a fresh screenshot's client-area pixel coordinates for the dropdown
+    arrow next to the curve-fit icon, not the icon itself. Assign both axes and
+    select the intended data run first. This native menu item is a toggle:
+    calling again removes an existing Linear fit. Inspect the resulting graph
+    and coefficient annotation before reporting success; no external fit is used.
+    """
+    return Result.model_validate(await _native(NativeRequest(
+        operation="toggle_linear_fit", handle=handle, point=fit_menu_point,
+        allow_foreground=allow_foreground,
+    ), mutates=True))
+
+
+@MCP.tool()
 async def capstone_save_experiment(
     handle: int, path: str, *, allow_foreground: bool = True,
 ) -> FileArtifact:

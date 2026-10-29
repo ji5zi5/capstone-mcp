@@ -3,7 +3,7 @@
 
 from typing import Literal
 
-from pydantic import JsonValue
+from pydantic import Field, JsonValue
 
 from capstone_mcp.models import Action, Button, Model, Point
 
@@ -14,6 +14,7 @@ type NativeOperation = Literal[
     "select_sensor", "configure_sensor",
     "recording_initialize", "recording_observe", "recording_change",
     "save_experiment", "export_data",
+    "create_graph", "select_graph_measurement", "toggle_linear_fit",
 ]
 
 
@@ -42,6 +43,7 @@ class NativeRequest(Model):
     step_limit: int = 128
     allow_foreground: bool = True
     plan: JsonValue = None
+    menu_path: list[str] = Field(default_factory=list)
 
 
 class RequestPacket(Model):
