@@ -50,12 +50,16 @@ async def exercise_protocol() -> None:
             assert initialized.instructions == INSTRUCTIONS
             tools = await session.list_tools()
             assert len(tools.tools) >= 9
+            assert {
+                "capstone_fit_models", "capstone_read_graph",
+                "capstone_set_graph_fits", "capstone_analyze_graph",
+            }.issubset({tool.name for tool in tools.tools})
             input_tools = {
                 "capstone_action", "capstone_click", "capstone_drag",
                 "capstone_scroll", "capstone_keys", "capstone_type_text",
                 "capstone_set_recording", "capstone_step_sampling_rate",
                 "capstone_create_graph", "capstone_select_graph_measurement",
-                "capstone_toggle_linear_fit",
+                "capstone_read_graph",
             }
             advertised = [tool for tool in tools.tools if tool.name in input_tools]
             assert {tool.name for tool in advertised} == input_tools

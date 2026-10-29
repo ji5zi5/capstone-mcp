@@ -41,7 +41,7 @@ SAVED DATA AND ANALYSIS
    use the native graph tools when the user wants the result in Capstone.
    Return source/run/unit information with the result, not just coefficients.
 
-NATIVE GRAPHS AND LINEAR FITTING
+NATIVE GRAPHS AND FITTING
 1. Attach and inspect the current experiment. Preserve existing displays; use
    the observed Add Page button if a separate analysis page is appropriate.
    capstone_create_graph inserts a real graph into the active page.
@@ -50,14 +50,24 @@ NATIVE GRAPHS AND LINEAR FITTING
    to capstone_select_graph_measurement(axis_point, menu_path).
    Choose each axis by its exact measurement menu labels, including units.
    Use screenshot scaling correctly and reacquire anchors after layout changes.
-3. Verify both axis labels and the intended run/data in a fresh screenshot.
-   capstone_toggle_linear_fit takes fit_menu_point at the dropdown arrow beside
-   the curve-fit icon. It toggles Linear, so do not call when it is already on
-   unless the user wants it removed. The full native 24-row menu must fit.
-4. Inspect the resulting graph, fit annotation and errors. Read coefficients
-   from Capstone's rendered result, retaining its precision and uncertainty.
-   delivered=true alone is not proof of a valid fit. Never report an external
-   regression as if Capstone calculated it. Save only to the requested new path.
+3. capstone_read_graph uses native Copy Display to read the selected graph's
+   actual fit configuration, per-run IDs, unit IDs, coefficients and metrics.
+   This replaces the Windows clipboard, but does not save the experiment.
+   Preserve native decimal strings and distinguish source IDs from dataset IDs.
+4. capstone_fit_models lists the 23 built-in choices. capstone_set_graph_fits
+   takes request.models as the EXACT desired set, not toggles. Repeating the
+   same request preserves existing fits; [] removes all selected models.
+   request.menu_point is the observed dropdown arrow; request.master_point is
+   the fit icon, required when fitting is disabled. The whole menu must fit.
+   Custom-expression editing is not supported.
+5. capstone_analyze_graph combines optional x/y axis requests with fitting in
+   one session. Each axis uses point and menu_path; fitting uses the same
+   GraphFitRequest fields. Create/select the graph and inspect anchors first.
+6. Read fits_successful separately from changed. A configured model may fail
+   numerically; report its native error_status rather than invent coefficients.
+   after.series contains per-renderer inputs and native fit parameters/metrics.
+   Invalid metrics and failed-fit values are not usable results.
+   Inspect the final screenshot too, and save only to the requested new path.
 
 WINDOWS AND IDENTIFIERS
 - capstone_attach returns windows; capstone_windows refreshes them. List results

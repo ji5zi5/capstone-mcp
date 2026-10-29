@@ -92,7 +92,7 @@ Replace the example path with an existing `.cap` file. To operate the app instea
 
 **Analyze data**
 
-> Add a graph to the open Capstone experiment, assign force and acceleration from the same run to its axes, and apply a linear fit in Capstone.
+> Add a graph to the open Capstone experiment, select data from the same run, and compare linear and quadratic fits. Report Capstone's own coefficients and errors.
 
 **Export data before saving**
 
@@ -134,7 +134,8 @@ This extra launch configuration is not needed for ordinary UI operations, saved-
 - UI operations may bring Capstone to the foreground. Use an unlocked desktop and avoid simultaneous control from multiple clients.
 - Saving and exporting never overwrite an existing file. Saving a new `.cap` file also changes the active experiment's file path.
 - CSV uses Capstone's display precision and aligns data by index, not necessarily by time. Extract values from a saved `.cap` file when you need the stored numerical precision.
-- Graph creation, axis selection, and linear fitting modify Capstone pages directly. Separate PNG and saved-file analysis tools are also available. Sample indices are not timestamps, and units are not converted automatically.
+- Graph creation, axis selection, and 23 built-in fitting models operate directly on Capstone pages. Repeating the same model configuration does not toggle existing fits off.
+- Graph verification uses Capstone's Copy Display data and replaces the Windows clipboard with the selected graph. Coefficients, uncertainties, metrics, and run IDs come from Capstone itself. Custom-expression editing is not included.
 - If native automation times out, the worker process is stopped without replaying the input. Check the app's recording and save state before reconnecting with `capstone_attach`.
 - The server uses internal interfaces and UI controls. Compatibility may vary with the Capstone version and screen configuration.
 

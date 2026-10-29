@@ -9,7 +9,7 @@ import pytest
 import win32gui
 
 from capstone_mcp.desktop import AutomationError
-from capstone_mcp.ui_events import StateChanges, WindowEvents
+from capstone_mcp.ui_events import WM_CLIPBOARDUPDATE, StateChanges, WindowEvents
 
 
 def test_notification_during_predicate_is_not_lost() -> None:
@@ -67,3 +67,24 @@ def test_real_native_event_reaches_process_filtered_listener() -> None:
         assert not events.thread.is_alive()
     finally:
         win32gui.DestroyWindow(handle)
+
+
+def test_clipboard_listener_receives_message_without_polling() -> None:
+    # Given: an owned message window; the user's clipboard is never modified.
+    user32 = ctypes.WinDLL("user32")
+    user32.PostMessageW.argtypes = (
+        wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM,
+    )
+    user32.PostMessageW.restype = wintypes.BOOL
+    with WindowEvents(os.getpid(), clipboard=True) as events:
+        generation = events.changes.generation
+        # When: deliver the exact clipboard-update message after subscription.
+        assert user32.PostMessageW(
+            events.clipboard_handle, WM_CLIPBOARDUPDATE, 0, 0,
+        )
+        observed = events.changes.until(
+            lambda: True if events.changes.generation > generation else None, 5,
+        )
+        # Then: the native message wakes the state observer.
+        assert observed
+    assert not events.thread.is_alive()

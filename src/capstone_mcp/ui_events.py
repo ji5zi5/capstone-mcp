@@ -9,11 +9,14 @@ from threading import Condition, Event, Thread
 from types import TracebackType
 from typing import Final, Self
 
+import win32gui
+
 from capstone_mcp.desktop import AutomationError
 
 EVENT_MIN: Final = 1
 EVENT_MAX: Final = 0x7FFFFFFF
 WM_QUIT: Final = 0x0012
+WM_CLIPBOARDUPDATE: Final = 0x031D
 READY_TIMEOUT: Final = 5
 
 
@@ -49,6 +52,7 @@ class StateChanges:
 
     def until[T](
         self, predicate: Callable[[], T | None], timeout: float,
+        *, description: str = "Expected Capstone state",
     ) -> T:
         """Evaluate immediately, then only after events, until a bounded deadline."""
         deadline = time.monotonic() + timeout
@@ -64,14 +68,14 @@ class StateChanges:
                     lambda previous=generation: self.generation != previous,
                     timeout=remaining,
                 ):
-                    msg = "Expected Capstone state was not confirmed before timeout."
+                    msg = f"{description} was not confirmed before timeout."
                     raise AutomationError(msg)
 
 
 class WindowEvents:
     """Subscribe before input; own the hook and message loop on one native thread."""
 
-    def __init__(self, process_id: int) -> None:
+    def __init__(self, process_id: int, *, clipboard: bool = False) -> None:
         """Filter native events to one attached process."""
         self.process_id: int = process_id
         self.changes: StateChanges = StateChanges()
@@ -79,6 +83,8 @@ class WindowEvents:
         self.thread: Thread = Thread(target=self._pump, daemon=True)
         self.thread_id: int = 0
         self.error: str | None = None
+        self.clipboard: bool = clipboard
+        self.clipboard_handle: int = 0
 
     def __enter__(self) -> Self:
         """Wait for hook registration before permitting the caller's input."""
@@ -146,9 +152,28 @@ class WindowEvents:
             self.error = str(ctypes.WinError(ctypes.get_last_error()))
             self.ready.set()
             return
+        if self.clipboard:
+            user32.AddClipboardFormatListener.argtypes = (wintypes.HWND,)
+            user32.AddClipboardFormatListener.restype = wintypes.BOOL
+            user32.RemoveClipboardFormatListener.argtypes = (wintypes.HWND,)
+            user32.RemoveClipboardFormatListener.restype = wintypes.BOOL
+            self.clipboard_handle = win32gui.CreateWindowEx(
+                0, "STATIC", "Capstone clipboard observer", 0,
+                0, 0, 0, 0, -3, 0, 0, None,
+            )
+            if not user32.AddClipboardFormatListener(self.clipboard_handle):
+                self.error = str(ctypes.WinError(ctypes.get_last_error()))
+                win32gui.DestroyWindow(self.clipboard_handle)
+                user32.UnhookWinEvent(hook)
+                self.ready.set()
+                return
         self.ready.set()
         try:
             while user32.GetMessageW(ctypes.byref(message), None, 0, 0) > 0:
-                pass
+                if message.message == WM_CLIPBOARDUPDATE:
+                    self.changes.notify()
         finally:
+            if self.clipboard_handle:
+                user32.RemoveClipboardFormatListener(self.clipboard_handle)
+                win32gui.DestroyWindow(self.clipboard_handle)
             user32.UnhookWinEvent(hook)

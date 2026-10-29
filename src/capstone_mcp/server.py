@@ -45,6 +45,12 @@ from capstone_mcp.experiment_analysis import (
     fit_cap_datasets,
 )
 from capstone_mcp.file_workflows import FileArtifact
+from capstone_mcp.graph_requests import (
+    GraphAnalysisRequest,
+    GraphFitOutcome,
+    GraphFitRequest,
+)
+from capstone_mcp.graph_state import FitModel, GraphState
 from capstone_mcp.models import Action, Button, Model, Point, Result, Snapshot, Window
 from capstone_mcp.plotting import PlotInput, render_plot
 from capstone_mcp.repetition import AcquisitionJobs, JobStatus, RepeatPlan
@@ -59,6 +65,7 @@ WORKER: Final = AutomationWorker()
 JOBS: Final = AcquisitionJobs()
 WINDOWS: Final = TypeAdapter(list[Window])
 TEXT: Final = TypeAdapter(str)
+JSON_VALUE: Final = TypeAdapter(JsonValue)
 
 
 @asynccontextmanager
@@ -129,20 +136,57 @@ async def capstone_select_graph_measurement(
 
 
 @MCP.tool()
-async def capstone_toggle_linear_fit(
-    handle: int, fit_menu_point: Point, *, allow_foreground: bool = True,
-) -> Result:
-    """Toggle Linear fitting in Capstone using the observed fit dropdown location.
+async def capstone_read_graph(
+    handle: int, *, allow_foreground: bool = True,
+) -> GraphState:
+    """Read selected graph's actual models, native coefficients and run/unit IDs.
 
-    Use a fresh screenshot's client-area pixel coordinates for the dropdown
-    arrow next to the curve-fit icon, not the icon itself. Assign both axes and
-    select the intended data run first. This native menu item is a toggle:
-    calling again removes an existing Linear fit. Inspect the resulting graph
-    and coefficient annotation before reporting success; no external fit is used.
+    Uses Display > Copy Display and replaces the Windows clipboard with the
+    selected graph. Does not save or modify the experiment. Select exactly one
+    graph and close menus first. Values come from Capstone, not an external fit.
     """
-    return Result.model_validate(await _native(NativeRequest(
-        operation="toggle_linear_fit", handle=handle, point=fit_menu_point,
-        allow_foreground=allow_foreground,
+    return GraphState.model_validate(await _native(NativeRequest(
+        operation="read_graph", handle=handle, allow_foreground=allow_foreground,
+    ), mutates=True))
+
+
+@MCP.tool()
+def capstone_fit_models() -> list[FitModel]:
+    """List supported built-in native models; custom-expression editing is excluded."""
+    return list(FitModel)
+
+
+@MCP.tool()
+async def capstone_set_graph_fits(
+    handle: int, request: GraphFitRequest,
+) -> GraphFitOutcome:
+    """Set an exact native fit-model set and return verified native results.
+
+    Repeated requests preserve already selected fits; [] removes all models.
+    Use current screenshot anchors for menu_point (dropdown arrow) and
+    master_point (fit icon, needed when fitting is disabled).
+    Copies the graph before/after actions, replacing the Windows clipboard.
+    Numerical failure is reported separately from verified model selection.
+    """
+    return GraphFitOutcome.model_validate(await _native(NativeRequest(
+        operation="set_graph_fits", handle=handle,
+        graph_request=JSON_VALUE.validate_json(request.model_dump_json()),
+    ), mutates=True))
+
+
+@MCP.tool()
+async def capstone_analyze_graph(
+    handle: int, request: GraphAnalysisRequest,
+) -> GraphFitOutcome:
+    """Configure optional X/Y axes, apply model choices, and read native results.
+
+    Create/select a graph and inspect its screenshot first. This combines named
+    measurement selection with idempotent native fitting in one worker session.
+    Uses the clipboard for verification. Existing unrelated displays are retained.
+    """
+    return GraphFitOutcome.model_validate(await _native(NativeRequest(
+        operation="analyze_graph", handle=handle,
+        graph_request=JSON_VALUE.validate_json(request.model_dump_json()),
     ), mutates=True))
 
 

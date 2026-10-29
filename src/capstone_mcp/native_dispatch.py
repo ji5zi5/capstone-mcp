@@ -15,10 +15,13 @@ from capstone_mcp.acquisition import (
 )
 from capstone_mcp.desktop import AutomationError, Capstone
 from capstone_mcp.file_workflows import export_data, save_experiment
+from capstone_mcp.graph_requests import GraphAnalysisRequest, GraphFitRequest
 from capstone_mcp.graph_workflows import (
+    analyze_graph,
     create_graph,
+    read_graph,
     select_graph_measurement,
-    toggle_linear_fit,
+    set_graph_fits,
 )
 from capstone_mcp.models import Result
 from capstone_mcp.repetition import NativeRecordingBackend, RepeatPlan
@@ -112,8 +115,16 @@ class NativeDesktop:
                 self.app, r.handle, r.point, r.menu_path,
                 allow_foreground=r.allow_foreground,
             )),
-            "toggle_linear_fit": lambda r: _json(toggle_linear_fit(
-                self.app, r.handle, r.point, allow_foreground=r.allow_foreground,
+            "read_graph": lambda r: _json(read_graph(
+                self.app, r.handle, allow_foreground=r.allow_foreground,
+            )),
+            "set_graph_fits": lambda r: _json(set_graph_fits(
+                self.app, r.handle,
+                GraphFitRequest.model_validate(r.graph_request),
+            )),
+            "analyze_graph": lambda r: _json(analyze_graph(
+                self.app, r.handle,
+                GraphAnalysisRequest.model_validate(r.graph_request),
             )),
         }
 

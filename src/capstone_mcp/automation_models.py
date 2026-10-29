@@ -14,7 +14,8 @@ type NativeOperation = Literal[
     "select_sensor", "configure_sensor",
     "recording_initialize", "recording_observe", "recording_change",
     "save_experiment", "export_data",
-    "create_graph", "select_graph_measurement", "toggle_linear_fit",
+    "create_graph", "select_graph_measurement",
+    "read_graph", "set_graph_fits", "analyze_graph",
 ]
 
 
@@ -44,6 +45,7 @@ class NativeRequest(Model):
     allow_foreground: bool = True
     plan: JsonValue = None
     menu_path: list[str] = Field(default_factory=list)
+    graph_request: JsonValue = None
 
 
 class RequestPacket(Model):
