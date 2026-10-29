@@ -9,7 +9,7 @@ from uuid import UUID
 
 import anyio
 from mcp.server.fastmcp import FastMCP, Image
-from mcp.types import ToolAnnotations
+from mcp.types import CallToolResult, ImageContent, TextContent, ToolAnnotations
 from pydantic import Field, JsonValue, TypeAdapter
 
 from capstone_mcp.acquisition import (
@@ -46,6 +46,8 @@ from capstone_mcp.experiment_analysis import (
     fit_cap_datasets,
 )
 from capstone_mcp.file_workflows import FileArtifact
+from capstone_mcp.graph_execution import GraphCapture, GraphFailure
+from capstone_mcp.graph_report import GraphAnalysisReport, summarize_graph
 from capstone_mcp.graph_requests import (
     GraphAnalysisRequest,
     GraphFitOutcome,
@@ -123,20 +125,82 @@ async def capstone_create_graph(
 
 @MCP.tool()
 async def capstone_select_graph_measurement(
-    handle: int, axis_point: Point, menu_path: list[str],
+    handle: int, axis_point: Point, menu_path: list[str], frame_id: str,
     *, allow_foreground: bool = True,
 ) -> Result:
     """Assign an axis using its current screenshot anchor and exact menu labels.
 
     axis_point uses the current client-area screenshot's pixel coordinates.
+    frame_id must come from capstone_observe_graph in this worker session.
     menu_path selects a measurement, optionally through nested native submenus.
     Never reuse coordinates after moving/resizing the window or graph.
     Inspect a fresh screenshot afterward to confirm the changed axis.
     """
     return Result.model_validate(await _native(NativeRequest(
         operation="select_graph_measurement", handle=handle, point=axis_point,
-        menu_path=menu_path, allow_foreground=allow_foreground,
+        menu_path=menu_path, allow_foreground=allow_foreground, frame_id=frame_id,
     ), mutates=True))
+
+
+@MCP.tool(structured_output=False, annotations=ToolAnnotations(
+    title="Capture graph image and one-use frame receipt", readOnlyHint=False,
+    destructiveHint=False, idempotentHint=False, openWorldHint=False,
+))
+async def capstone_observe_graph(handle: int) -> CallToolResult:
+    """Return an original-size PNG and JSON frame_id for the next graph input.
+
+    Activates the graph window and captures its visible client-area screen pixels.
+    Use coordinates from this exact image, without resizing. Graph input rejects
+    changed pixels or window bounds before starting; animation or live updates
+    can therefore require a new capture. A receipt is consumed by one request.
+    Capture again after each graph operation or any failed input request.
+    """
+    capture = GraphCapture.model_validate(await _native(NativeRequest(
+        operation="observe_graph", handle=handle,
+    ), mutates=True))
+    frame_json = capture.frame.model_dump_json()
+    return CallToolResult(
+        content=[
+            ImageContent(type="image", data=capture.png_base64, mimeType="image/png"),
+            TextContent(type="text", text=frame_json),
+        ],
+        structuredContent=TypeAdapter(dict[str, JsonValue]).validate_json(frame_json),
+    )
+
+
+@MCP.tool(annotations=ToolAnnotations(
+    title="Read the last structured graph failure", readOnlyHint=True,
+    destructiveHint=False, idempotentHint=True, openWorldHint=False,
+))
+def capstone_graph_recovery() -> GraphFailure | None:
+    """Read failure stage, confirmed steps and safe next action without replay.
+
+    This is the last graph failure, not a claim about a later successful call.
+    Correlate request_id and operation. If graph_input_may_have_been_sent is true,
+    inspect the app before another write; never automatically replay the request.
+    """
+    return WORKER.last_graph_failure
+
+
+@MCP.tool(annotations=ToolAnnotations(
+    title="Compare native fits within matching data bindings", readOnlyHint=False,
+    destructiveHint=False, idempotentHint=True, openWorldHint=False,
+))
+async def capstone_graph_report(
+    handle: int, *, allow_foreground: bool = True,
+) -> GraphAnalysisReport:
+    """Read a selected graph and group fit comparisons by exact renderer/run/units.
+
+    Returns native parameters, free parameter counts, valid common metrics and
+    descriptive MSE/RMSE minima, never an overall best-model recommendation.
+    Missing sample count/residuals prevent AIC/BIC and residual-based conclusions.
+    request_model contains an accepted API enum when the native model is settable.
+    Uses Copy Display and replaces the clipboard; does not change fitted models.
+    """
+    state = GraphState.model_validate(await _native(NativeRequest(
+        operation="read_graph", handle=handle, allow_foreground=allow_foreground,
+    ), mutates=True))
+    return summarize_graph(state)
 
 
 @MCP.tool(annotations=ToolAnnotations(
@@ -182,12 +246,14 @@ async def capstone_set_graph_fits(
     master_point (fit icon, needed when fitting is disabled).
     Copies the graph before/after actions, replacing the Windows clipboard.
     Numerical failure is reported separately from verified model selection.
-    First read_graph and screenshot. Copy data_signature to
+    First read_graph, then capstone_observe_graph for a new one-use frame_id.
+    Copy data_signature to
     request.expected_data_signature; do not fabricate coordinates or model names.
     Check next_action and each fit's status/successful, not changed alone.
     """
     return GraphFitOutcome.model_validate(await _native(NativeRequest(
         operation="set_graph_fits", handle=handle,
+        frame_id=request.frame_id,
         graph_request=JSON_VALUE.validate_json(request.model_dump_json()),
     ), mutates=True))
 
@@ -206,9 +272,11 @@ async def capstone_analyze_graph(
     Uses the clipboard for verification. Existing unrelated displays are retained.
     fitting.expected_data_signature checks the original graph before changing
     either axis; the updated bindings are then verified for the fitting stage.
+    fitting.frame_id must be the latest capstone_observe_graph receipt.
     """
     return GraphFitOutcome.model_validate(await _native(NativeRequest(
         operation="analyze_graph", handle=handle,
+        frame_id=request.fitting.frame_id,
         graph_request=JSON_VALUE.validate_json(request.model_dump_json()),
     ), mutates=True))
 

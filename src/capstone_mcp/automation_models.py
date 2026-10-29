@@ -5,6 +5,7 @@ from typing import Literal
 
 from pydantic import Field, JsonValue
 
+from capstone_mcp.graph_execution import GraphFailure
 from capstone_mcp.models import Action, Button, Model, Point
 
 type NativeOperation = Literal[
@@ -15,7 +16,7 @@ type NativeOperation = Literal[
     "recording_initialize", "recording_observe", "recording_change",
     "save_experiment", "export_data",
     "create_graph", "select_graph_measurement",
-    "read_graph", "set_graph_fits", "analyze_graph",
+    "read_graph", "set_graph_fits", "analyze_graph", "observe_graph",
 ]
 
 
@@ -46,6 +47,7 @@ class NativeRequest(Model):
     plan: JsonValue = None
     menu_path: list[str] = Field(default_factory=list)
     graph_request: JsonValue = None
+    frame_id: str = ""
 
 
 class RequestPacket(Model):
@@ -61,3 +63,4 @@ class NativeReply(Model):
     identifier: str
     result: JsonValue = None
     error: str | None = None
+    graph_failure: GraphFailure | None = None

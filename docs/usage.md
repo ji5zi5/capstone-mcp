@@ -72,13 +72,13 @@ MCP 연결을 마쳤다면 AI 클라이언트의 채팅창에서 작업을 요�
 
 1. 현재 페이지를 확인합니다. 기존 표시를 보존하려면 `Add Page` 버튼으로 분석용 페이지를 추가합니다.
 2. `capstone_create_graph(handle)`로 실제 그래프를 삽입합니다.
-3. `capstone_screenshot(handle)`으로 축 선택 위치를 확인한 뒤, 각 축에 `capstone_select_graph_measurement(handle, axis_point, menu_path)`를 호출합니다. `menu_path`는 `["Index"]`, `["Init. Red v (m/s)"]`처럼 화면에서 확인한 정확한 메뉴 이름의 목록입니다.
+3. `capstone_observe_graph(handle)`이 반환한 이미지에서 축 선택 위치를 확인한 뒤, `capstone_select_graph_measurement(handle, axis_point, menu_path, frame_id)`를 호출합니다. `menu_path`는 `["Index"]`, `["Init. Red v (m/s)"]`처럼 화면에서 확인한 정확한 메뉴 이름의 목록입니다. 다음 축을 조작하기 전에는 다시 관찰합니다.
 4. `capstone_read_graph(handle)`으로 선택한 그래프의 실제 축 입력·회차·피팅 상태를 읽습니다. `capstone_fit_models()`로 지원 모델 이름을 조회합니다.
-5. `capstone_set_graph_fits(handle, request)`에 `models` 목록과 `menu_point`(피팅 드롭다운 화살표), `master_point`(피팅 아이콘) 위치를 전달합니다. `["linear", "quadratic"]`는 두 모델만 남기는 요청이고, `[]`는 모두 제거하는 요청입니다. 이미 원하는 상태이면 모델을 다시 클릭하지 않습니다.
+5. 새로 `capstone_observe_graph`를 호출하고, `capstone_set_graph_fits(handle, request)`에 반환된 `frame_id`, `models` 목록과 `menu_point`(피팅 드롭다운 화살표), `master_point`(피팅 아이콘) 위치를 전달합니다. `["linear", "quadratic"]`는 두 모델만 남기는 요청이고, `[]`는 모두 제거하는 요청입니다. 이미 원하는 상태이면 모델을 다시 클릭하지 않습니다.
 6. `fits_successful`과 `after.series[].fits[]`를 확인합니다. 모델 선택 성공과 수치 계산 성공은 다릅니다. 각 결과에는 Capstone의 `error_status`, 계수·불확도, 유효한 r·MSE·RMSE 등이 들어 있습니다. 실패한 피팅이나 유효하지 않은 통계값은 사용할 수 있는 숫자로 반환하지 않습니다.
 7. 새 스크린샷에서 그래프와 주석을 확인합니다. 저장이 필요하면 `capstone_save_experiment`로 새 경로에 저장합니다.
 
-축과 피팅 위치는 현재 클라이언트 영역 스크린샷의 원본 픽셀 좌표입니다. 창이나 그래프를 이동·크기 변경한 뒤에는 다시 확인해야 합니다. 그래프 내부 컨트롤은 UIA 트리에 나타나지 않으므로 고정 좌표를 재사용하지 않습니다.
+축과 피팅 위치는 현재 클라이언트 영역 스크린샷의 원본 픽셀 좌표입니다. `capstone_observe_graph`는 창을 활성화하고 실제 보이는 화면을 캡처합니다. 창이나 그래프를 이동·크기 변경한 뒤에는 다시 확인해야 합니다. 그래프 내부 컨트롤은 UIA 트리에 나타나지 않으므로 고정 좌표를 재사용하지 않습니다.
 
 비례·선형·가중 선형·2차·3차·다항식·멱함수·역함수·지수·로그·사인·감쇠 사인·가우시안 계열 등 **23개 내장 모델**을 선택할 수 있습니다. 사용자 정의 식 편집은 포함하지 않습니다. 전체 24행이 보이는 네이티브 메뉴를 기준으로 하므로 메뉴가 잘리지 않게 창을 충분히 크게 사용하세요. 특정 데이터에서 모든 모델이 수렴하는 것은 아니며, 네이티브 오류 상태를 그대로 확인해야 합니다.
 
@@ -90,7 +90,10 @@ MCP 연결을 마쳤다면 AI 클라이언트의 채팅창에서 작업을 요�
 
 ### AI 클라이언트의 호출 순서와 확인 기준
 
-- `capstone_read_graph` → 최신 `capstone_screenshot` → 필요하면 `capstone_fit_models` → `capstone_set_graph_fits` 순서로 호출합니다.
+- `capstone_read_graph` → 최신 `capstone_observe_graph` → 필요하면 `capstone_fit_models` → `capstone_set_graph_fits` 순서로 호출합니다.
+- 비교 보고서도 화면 관찰 전에 읽습니다. `capstone_read_graph`와 `capstone_graph_report`의 메뉴 조작은 이미 발급된 화면을 바꿀 수 있습니다.
+- `frame_id`는 한 요청에만 사용할 수 있습니다. 요청 시작 전 창 위치·크기와 이미지 픽셀이 달라지면 `STALE_FRAME`으로 차단합니다. 실시간 데이터나 애니메이션도 변경으로 판정되므로 오래된 좌표로 강행하지 않습니다. 실행 도중의 사용자 조작까지 잠그는 기능은 아니며, 일반 저수준 클릭 도구에는 이 가드가 적용되지 않습니다.
+- 실패하면 `capstone_graph_recovery()`에서 실패 단계, 확인된 단계, 입력이 전달됐을 가능성, 다음 행동을 읽습니다. 일부 입력이 전달됐을 수 있으면 상태부터 확인하고 새 프레임을 받습니다. `request_id`로 마지막 실패를 구분하며, 나중에 성공한 호출의 현재 상태와 혼동하지 않습니다. 워커 시간 초과처럼 실행 내역을 받지 못한 경우에는 단계 목록이 비어 있어도 아무 작업도 하지 않았다는 뜻이 아닙니다.
 - 읽은 그래프의 `data_signature`를 `request.expected_data_signature`에 그대로 전달합니다. 소스·회차·단위 연결이 바뀌면 피팅을 건드리기 전에 거부합니다. 이 값은 실시간 샘플 내용이나 화면 배치의 변경까지 감지하는 값은 아닙니다.
 - `capstone_analyze_graph`에서는 같은 서명을 `request.fitting.expected_data_signature`에 넣습니다. 축을 바꾸기 전의 그래프를 확인하고, 새 축 연결은 피팅 단계에서 다시 확인합니다.
 - `models`는 추가할 모델이 아니라 **남길 모델의 전체 목록**입니다. 임의의 `preserve_existing_models` 같은 옵션이나 오타가 있는 요청은 무시하지 않고 오류로 반환합니다.
@@ -98,6 +101,12 @@ MCP 연결을 마쳤다면 AI 클라이언트의 채팅창에서 작업을 요�
 - MCP 메타데이터에는 조회·변경·반복 호출 특성을 표시합니다. 안내 문구는 모델 선택을 돕는 힌트이며, 사용자의 작업 범위를 넓히는 권한은 아닙니다.
 
 서로 다른 회차나 단위를 섞어서 모델의 오차를 비교하지 마세요. 오차가 작거나 상관계수가 높다는 이유만으로 모델이 적절하다고 결론 내리지 않으며, 이상치를 자동으로 제거하지 않습니다.
+
+### 같은 데이터의 모델 비교 보고서
+
+`capstone_graph_report(handle)`는 선택한 그래프를 읽어 렌더러별로 모델·계수·유효한 오차 지표를 정리합니다. `groups[].provenance`의 소스·회차·단위 연결을 보존하고 다른 그룹을 한 순위로 합치지 않습니다. 각 행의 `request_model`은 다시 피팅을 요청할 때 쓸 수 있는 모델 이름이며, 사용자 정의 모델처럼 설정 대상이 아니면 비어 있습니다.
+
+`parameter_count`와 `free_parameter_count`는 각각 전체·잠기지 않은 매개변수 개수입니다. 같은 그룹의 성공한 모델들에 공통으로 있는 유효한 MSE/RMSE만 최소값과 동률을 표시합니다. 이는 기술적인 값 비교이며 “최고 모델” 선정이 아닙니다. 표본 수와 잔차 원자료가 없으므로 AIC/BIC나 잔차 검정을 만들어 내지 않으며, 이런 제약은 `limitations` 코드로 반환합니다.
 
 ### 센서와 샘플링 속도
 

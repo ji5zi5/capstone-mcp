@@ -1,10 +1,11 @@
 # Copyright 2026 Capstone MCP contributors.
 """Capstone-scoped Windows UI Automation adapter."""
 
+import ctypes
 from io import BytesIO
 from itertools import islice
 from pathlib import Path
-from typing import Final, assert_never
+from typing import TYPE_CHECKING, Final, assert_never
 from uuid import uuid4
 
 import win32gui
@@ -16,6 +17,9 @@ from pywinauto.controls.uiawrapper import UIAWrapper
 from pywinauto.findwindows import find_windows
 
 from capstone_mcp.models import Action, Bounds, Control, Result, Snapshot, Window
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 EXECUTABLE: Final = Path("C:/Program Files/PASCO scientific/Capstone/Capstone.exe")
 
@@ -213,6 +217,38 @@ class Capstone:
                 "and the interactive desktop is available, then retry."
             )
             raise AutomationError(msg) from error
+
+    def flush_paint(self, handle: int) -> None:
+        """Complete pending native painting before issuing a coordinate receipt."""
+        _ = self.window(handle)
+        win32gui.RedrawWindow(handle, None, None, 0x0001 | 0x0080 | 0x0100)
+        function = ctypes.WinDLL("dwmapi")["DwmFlush"]
+        function.argtypes = ()
+        function.restype = ctypes.c_long
+        flush: Callable[[], int] = function
+        if flush() < 0:
+            msg = "Windows compositor could not confirm the graph frame."
+            raise AutomationError(msg)
+
+    def graph_screenshot(self, handle: int, *, activate: bool = False) -> bytes:
+        """Capture the actual foreground client pixels used for coordinate input."""
+        _ = self.window(handle)
+        if win32gui.IsIconic(handle):
+            msg = "Restore the graph window before observing coordinates."
+            raise AutomationError(msg)
+        if activate:
+            _ = self.focus_window(handle)
+            self.flush_paint(handle)
+        if win32gui.GetForegroundWindow() != handle:
+            msg = "The graph window is no longer foreground; observe it again."
+            raise AutomationError(msg)
+        left, top = win32gui.ClientToScreen(handle, (0, 0))
+        _, _, width, height = win32gui.GetClientRect(handle)
+        with BytesIO() as output, ImageGrab.grab(
+            bbox=(left, top, left + width, top + height),
+        ) as image:
+            image.save(output, format="PNG")
+            return output.getvalue()
 
     def keys(
         self, handle: int, keys: str, *, allow_foreground: bool = True,

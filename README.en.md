@@ -92,6 +92,10 @@ Replace the example path with an existing `.cap` file. To operate the app instea
 
 The MCP exposes workflow instructions, strict graph-request schemas, and tool annotations. Read the graph and a fresh screenshot before fitting; pass its `data_signature` as `expected_data_signature` to reject changed source/run/unit bindings. This signature does not detect live sample changes or a moved graph. Results include explicit native solver status and a machine-readable next action.
 
+Use `capstone_observe_graph` for the image and required one-use `frame_id` before graph input. Changed window bounds or image pixels reject the request before execution; this also rejects live-update changes and is not a lock against concurrent desktop input. `capstone_graph_recovery` exposes the last failed stage, confirmed steps and possible partial input without replaying it. `capstone_graph_report` compares native results only within matching renderer/run/unit groups, reports parameter complexity and descriptive MSE/RMSE minima, and never invents missing AIC/BIC or declares an overall best model.
+
+Frame observation activates the graph and captures its visible client area. Read graph data or comparison reports before capturing a frame; their menus may otherwise invalidate the image.
+
 Saved-file and explicit-sample OLS also return residual, leverage, Cook's-distance, and adjacent-residual-correlation diagnostics. Per-sample arrays are limited to the first 256 observations, with explicit truncation metadata; calculations use all observations. Influence flags are descriptive, not significance tests or instructions to remove data. These diagnostics are computed by the MCP, not Capstone's native solver.
 
 **Analyze data**

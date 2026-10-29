@@ -21,6 +21,10 @@ class GraphFitRequest(GraphRequest):
     menu_point: Point = Field(description=(
         "Dropdown arrow in a fresh client-area screenshot, at original pixel scale."
     ))
+    frame_id: str = Field(
+        min_length=1,
+        description="Copy the frame_id returned with capstone_observe_graph's image.",
+    )
     models: list[FitModel] = Field(description=(
         "Exact desired model set. Unlisted existing models are removed; [] removes all."
     ))

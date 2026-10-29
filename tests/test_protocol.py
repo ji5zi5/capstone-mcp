@@ -13,6 +13,7 @@ from mcp.types import ImageContent
 from pydantic import BaseModel
 
 from capstone_mcp.agent_instructions import INSTRUCTIONS
+from capstone_mcp.graph_execution import GraphFrame
 from capstone_mcp.models import Snapshot, Window
 
 ROOT: Final = str(Path(__file__).resolve().parents[1])
@@ -80,6 +81,18 @@ async def exercise_protocol() -> None:
                 "capstone_screenshot", {"handle": handle},
             )
             assert not captured.isError, captured.content
+            graph_capture = await session.call_tool(
+                "capstone_observe_graph", {"handle": handle},
+            )
+            assert not graph_capture.isError, graph_capture.content
+            frame = GraphFrame.model_validate(graph_capture.structuredContent)
+            assert frame.handle == handle
+            assert frame.width > 0
+            assert frame.height > 0
+            assert frame.frame_id
+            assert len([
+                item for item in graph_capture.content if isinstance(item, ImageContent)
+            ]) == 1
             invalid = await session.call_tool(
                 "capstone_action", {"ref": "stale:0", "action": "invoke"},
             )

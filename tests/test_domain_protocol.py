@@ -13,6 +13,7 @@ from pydantic import Field, JsonValue
 
 from capstone_mcp.analysis import LinearFit
 from capstone_mcp.capfile_models import CapDatasetPage, CapDatasetSummary
+from capstone_mcp.graph_execution import GraphFailure
 from capstone_mcp.graph_state import FitModel
 from capstone_mcp.models import Model
 
@@ -36,6 +37,11 @@ class RequestDefinition(Model):
         default=None, alias="additionalProperties",
     )
     properties: dict[str, JsonValue] = Field(default_factory=dict)
+    required: list[str] = Field(default_factory=list)
+
+
+class RecoveryResult(Model):
+    result: GraphFailure
 
 
 class GraphToolSchema(Model):
@@ -124,6 +130,7 @@ async def exercise_ai_graph_contract() -> None:
             request = schema.definitions["GraphFitRequest"]
             assert request.additional_properties is False
             assert "expected_data_signature" in request.properties
+            assert "frame_id" in request.required
             # When: discover a valid model, then submit an invented option.
             response = await session.call_tool("capstone_fit_models", {})
             choices = FitChoices.model_validate(response.structuredContent).result
@@ -131,6 +138,7 @@ async def exercise_ai_graph_contract() -> None:
             invalid = await session.call_tool("capstone_set_graph_fits", {
                 "handle": 0,
                 "request": {
+                    "frame_id": "not-an-issued-frame",
                     "menu_point": {"x": 0, "y": 0},
                     "models": [FitModel.QUADRATIC.value],
                     "preserve_existing_models": True,
@@ -138,6 +146,19 @@ async def exercise_ai_graph_contract() -> None:
             })
             # Then: reject the invented contract before native app input.
             assert invalid.isError
+            no_frame = await session.call_tool(
+                "capstone_select_graph_measurement", {
+                    "handle": 0, "axis_point": {"x": 0, "y": 0},
+                    "menu_path": ["Index"], "frame_id": "not-issued",
+                },
+            )
+            assert no_frame.isError
+            recovery = await session.call_tool("capstone_graph_recovery", {})
+            failure = RecoveryResult.model_validate(recovery.structuredContent).result
+            assert failure.code == "FRAME_REQUIRED"
+            assert failure.request_id
+            assert not failure.graph_input_may_have_been_sent
+            assert failure.next_action == "observe_graph"
 
 
 def test_ai_graph_contract_over_mcp() -> None:

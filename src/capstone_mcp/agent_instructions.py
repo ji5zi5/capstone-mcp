@@ -45,11 +45,15 @@ NATIVE GRAPHS AND FITTING
 1. Attach and inspect the current experiment. Preserve existing displays; use
    the observed Add Page button if a separate analysis page is appropriate.
    capstone_create_graph inserts a real graph into the active page.
-2. Get a fresh capstone_screenshot. Custom graph controls are not in the UIA
+2. Get a fresh capstone_observe_graph. Custom graph controls are not in the UIA
    tree. Supply client-area screenshot pixel coordinates, not desktop points,
-   to capstone_select_graph_measurement(axis_point, menu_path).
+   to capstone_select_graph_measurement(axis_point, menu_path, frame_id).
    Choose each axis by its exact measurement menu labels, including units.
    Use screenshot scaling correctly and reacquire anchors after layout changes.
+   observe_graph returns both the original PNG and a one-use frame_id. Supply it
+   as request.frame_id for fitting or request.fitting.frame_id for analysis.
+   Capture again before the next graph input, even if the prior request was a no-op.
+   Observation activates the graph and captures its visible client-area pixels.
 3. capstone_read_graph uses native Copy Display to read the selected graph's
    actual fit configuration, per-run IDs, unit IDs, coefficients and metrics.
    This replaces the Windows clipboard, but does not save the experiment.
@@ -58,7 +62,7 @@ NATIVE GRAPHS AND FITTING
    It guards graph/run/unit bindings, not changing live samples or screen layout.
 4. capstone_fit_models lists the 23 built-in choices. capstone_set_graph_fits
    takes request.models as the EXACT desired set, not toggles. Repeating the
-   same request preserves existing fits; [] removes all selected models.
+   same model set preserves existing fits; [] removes all selected models.
    request.menu_point is the observed dropdown arrow; request.master_point is
    the fit icon, required when fitting is disabled. The whole menu must fit.
    Custom-expression editing is not supported.
@@ -71,10 +75,28 @@ NATIVE GRAPHS AND FITTING
    Invalid metrics and failed-fit values are not usable results.
    Inspect the final screenshot too, and save only to the requested new path.
 
+7. capstone_graph_report compares native results within each renderer's exact
+   run/source/unit bindings. Use row.request_model for accepted model names.
+   Parameter/free-parameter counts describe complexity. Descriptive MSE/RMSE
+   minima are not best-model recommendations. Read limitation codes: sample
+   count and residuals are unavailable, so do not invent AIC/BIC or residual tests.
+
 TOOL CALL CONTRACT
-- For native fitting use this order: capstone_read_graph, capstone_screenshot,
+- For native fitting use this order: capstone_read_graph, capstone_observe_graph,
   capstone_fit_models when needed, then capstone_set_graph_fits. Use the observed
   handle, original screenshot pixels, returned model enum names, and signature.
+- The frame guard compares window bounds and exact screenshot pixels BEFORE the
+  operation starts. Changed pixels, live updates, animation, or a moved window
+  require a new observation. It is not an atomic lock against concurrent user
+  input during the operation. Do not silently stop acquisition to stabilize it.
+- Run read_graph or graph_report BEFORE observe_graph: their menus can change
+  focus/rendering and invalidate an already issued frame.
+- On graph errors call capstone_graph_recovery. FRAME_REQUIRED/STALE_FRAME
+  prevent graph input. Read stage, completed_steps, request_id and
+  graph_input_may_have_been_sent for other failures. Inspect partial results,
+  then obtain a fresh frame; never automatically replay uncertain writes.
+  Recovery reports the last failure, not the state of a later successful call.
+  Do not bypass a rejected frame with raw capstone_click; observe a new frame.
 - Models is the complete target set. To keep existing fits, include their desired
   model names explicitly. Never invent preserve_existing_models or other options;
   graph requests reject unknown fields. Use menu_point, not fit_menu_point.

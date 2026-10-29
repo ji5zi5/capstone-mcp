@@ -46,6 +46,7 @@ def test_fit_refuses_disabled_foreground() -> None:
     with pytest.raises(AutomationError):
         _ = set_graph_fits(
             app, 1, GraphFitRequest(
+                frame_id="test-frame",
                 menu_point=Point(x=1, y=1), models=[], allow_foreground=False,
             ),
         )
@@ -220,6 +221,7 @@ def test_model_set_changes_only_difference_and_repeat_is_idempotent(
     monkeypatch.setattr(graph_workflows, "read_graph", read_graph)
     monkeypatch.setattr(graph_workflows, "_toggle_fit", toggle)
     request = GraphFitRequest(
+        frame_id="test-frame",
         menu_point=Point(x=10, y=20),
         models=[FitModel.LINEAR, FitModel.QUADRATIC],
     )
@@ -244,6 +246,7 @@ def test_unconfirmed_model_change_stops_without_retry(
     toggle = Mock(return_value=Result(detail="delivered"))
     monkeypatch.setattr(graph_workflows, "_toggle_fit", toggle)
     request = GraphFitRequest(
+        frame_id="test-frame",
         menu_point=Point(x=10, y=20), models=[FitModel.QUADRATIC],
     )
     # When / Then: no second click or compensating input is sent.
@@ -260,6 +263,7 @@ def test_selected_model_with_native_fit_error_is_not_numerical_success(
         return_value=_fit_state([1], error_status=7),
     ))
     request = GraphFitRequest(
+        frame_id="test-frame",
         menu_point=Point(x=10, y=20), models=[FitModel.LINEAR],
     )
     # When
@@ -286,6 +290,7 @@ def test_stale_data_signature_prevents_fit_input(
     toggle = Mock()
     monkeypatch.setattr(graph_workflows, "_toggle_fit", toggle)
     request = GraphFitRequest(
+        frame_id="test-frame",
         menu_point=Point(x=10, y=20), models=[FitModel.QUADRATIC],
         expected_data_signature=original.data_signature,
     )
@@ -306,6 +311,7 @@ def test_data_signature_survives_model_changes() -> None:
 def test_misspelled_graph_request_keys_are_rejected() -> None:
     # Given: silently ignoring this typo would remove existing models.
     request = {
+        "frame_id": "test-frame",
         "menu_point": {"x": 10, "y": 20}, "models": ["linear"],
         "preserve_existing_models": True,
     }
