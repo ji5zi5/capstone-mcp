@@ -273,6 +273,59 @@ def test_rate_unit_mismatch_does_not_deliver_input(
     assert app.rate_inputs == 0
 
 
+@pytest.mark.parametrize("fail_on_input", [1, 2])
+def test_post_click_read_failure_reports_uncertainty_without_reverse_input(
+    monkeypatch: pytest.MonkeyPatch, fail_on_input: int,
+) -> None:
+    app = SettingsAdapter()
+    app.rates = ["25 widget/s", "50 widget/s", "100 widget/s", "200 widget/s"]
+    install_observer(monkeypatch, app)
+    original_snapshot = app.snapshot
+
+    def snapshot(handle: int, depth: int, limit: int) -> Snapshot:
+        if app.rate_inputs == fail_on_input:
+            msg = "read failed after delivered input"
+            raise AutomationError(msg)
+        return original_snapshot(handle, depth, limit)
+
+    monkeypatch.setattr(app, "snapshot", snapshot)
+    with pytest.raises(AutomationError, match="Restoration was not verified") as exc:
+        _ = sensor_settings.target_sampling_rate(
+            app, 1,
+            sensor_settings.SamplingRateRequest(sensor="Blue", target="175 widget/s"),
+        )
+    assert app.rate_inputs == fail_on_input
+    assert app.rate_index == 1 + fail_on_input
+    assert isinstance(exc.value.__cause__, AutomationError)
+
+
+def test_failed_restore_reports_unverified_state(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    app = SettingsAdapter()
+    install_observer(monkeypatch, app)
+    original_act = app.act
+
+    def act(
+        ref: str, action: Action, *, allow_foreground: bool = False,
+    ) -> Result:
+        if ref == "decrease":
+            msg = "reverse input failed"
+            raise AutomationError(msg)
+        return original_act(ref, action, allow_foreground=allow_foreground)
+
+    monkeypatch.setattr(app, "act", act)
+    with pytest.raises(
+        AutomationError, match=r"restoration .* failed or is unverified",
+    ):
+        _ = sensor_settings.target_sampling_rate(
+            app, 1,
+            sensor_settings.SamplingRateRequest(sensor="Blue", target="75 widget/s"),
+        )
+    assert app.rate == "100 widget/s"
+    assert app.rate_inputs == 1
+
+
 def select_red(app: SettingsAdapter) -> sensor_settings.SensorSelection:
     return sensor_settings.select_sensor(
         app,

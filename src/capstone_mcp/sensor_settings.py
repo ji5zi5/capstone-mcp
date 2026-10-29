@@ -278,7 +278,6 @@ def target_sampling_rate(
     direction = "increase" if increasing else "decrease"
     reverse = "decrease" if increasing else "increase"
     previous: list[str] = []
-    reached = False
     try:
         for _ in range(request.step_limit):
             controls = _rate_controls(app, handle, request.sensor)
@@ -293,7 +292,6 @@ def target_sampling_rate(
             if after_unit != unit:
                 break
             if value == target:
-                reached = True
                 return _rate_result(request, initial, after, len(previous))
             if (
                 (increasing and (value <= current or value > target))
@@ -301,9 +299,23 @@ def target_sampling_rate(
             ):
                 break
             current = value
-    finally:
-        if not reached:
-            _restore_rate(app, handle, request, reverse, previous)
+    except Exception as error:
+        # A click may have succeeded even when its acknowledgement/read failed.
+        # Replaying inverse clicks from an incomplete history is unsafe.
+        msg = (
+            f"Sampling-rate traversal failed; the rate may have changed from "
+            f"{initial!r}. Restoration was not verified. Inspect Capstone before "
+            "retrying; no automatic reverse inputs were sent."
+        )
+        raise AutomationError(msg) from error
+    try:
+        _restore_rate(app, handle, request, reverse, previous)
+    except Exception as error:
+        msg = (
+            f"Sampling-rate restoration to {initial!r} failed or is unverified. "
+            "The rate may have changed; inspect Capstone before retrying."
+        )
+        raise AutomationError(msg) from error
     msg = (
         f"Sampling rate {request.target!r} is unsupported or exceeds the step limit "
         f"for sensor {request.sensor!r}; the original rate was restored."
