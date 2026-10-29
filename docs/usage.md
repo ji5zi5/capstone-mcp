@@ -9,6 +9,9 @@ MCP 연결을 마쳤다면 AI 클라이언트의 채팅창에서 작업을 요�
 파일 분석은 Capstone을 실행하거나 센서를 연결하지 않아도 사용할 수 있습니다. 파일 경로는 MCP 서버가 실행되는 Windows PC의 절대 경로로 지정하세요.
 
 1. `capstone_inspect_file`로 센서·실험 설정과 계산식 등을 확인합니다.
+   `hardware_interfaces`는 저장된 인터페이스별 센서이며,
+   `unconnected_sensors`는 파일의 `UnconnectedSensor` 아래 저장된 센서입니다.
+   두 목록은 저장 당시의 구성이며 현재 장치의 물리적 연결 상태를 증명하지 않습니다.
 2. `capstone_file_datasets`로 데이터셋의 이름, 인덱스, ID, 단위 ID, 샘플 수를 조회합니다.
 3. 분석할 데이터셋을 선택해 추출하거나 피팅·비교합니다.
 

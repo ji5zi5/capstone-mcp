@@ -7,7 +7,7 @@ import decimal
 from enum import StrEnum
 from typing import ClassVar, Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 type DecimalValue = decimal.Decimal
 
@@ -140,6 +140,7 @@ class CapConfiguration(CapFileModel):
     header: CapXmlNode | None
     hardware: CapXmlNode | None
     hardware_interfaces: list[CapHardwareInterface]
+    unconnected_sensors: list[CapHardwareSensor] = Field(default_factory=list)
     experiment_settings: list[CapExperimentSetting]
     data_sources: list[CapDataSource]
     workspace: CapXmlNode | None

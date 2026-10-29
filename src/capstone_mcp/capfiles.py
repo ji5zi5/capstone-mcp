@@ -312,6 +312,45 @@ def _ancestor(
     return None
 
 
+def _hardware_sensor(
+    sensor: Element, *, interface_euid: str | None,
+    channel: Element | None,
+) -> CapHardwareSensor:
+    return CapHardwareSensor(
+        euid=sensor.attrib.get("EUID"),
+        sensor_id=sensor.attrib.get("ID"),
+        name=sensor.attrib.get("Name"),
+        sample_period=_decimal(
+            sensor.attrib.get("SamplePeriod"), context="Sensor.SamplePeriod",
+        ),
+        interface_euid=interface_euid,
+        channel_index=_integer(
+            None if channel is None else channel.attrib.get("Index"),
+            context="Channel.Index",
+        ),
+        attributes=dict(sensor.attrib),
+        measurements=[
+            CapHardwareMeasurement(
+                euid=measurement.attrib.get("EUID"),
+                measurement_id=measurement.attrib.get("ID"),
+                name=measurement.attrib.get("Name"),
+                attributes=dict(measurement.attrib),
+            )
+            for measurement in sensor.iter("Measurement")
+        ],
+    )
+
+
+def _unconnected_sensors(hardware: Element | None) -> list[CapHardwareSensor]:
+    if hardware is None:
+        return []
+    return [
+        _hardware_sensor(sensor, interface_euid=None, channel=None)
+        for group in hardware.iter("UnconnectedSensor")
+        for sensor in group.findall("Sensor")
+    ]
+
+
 def _hardware_interfaces(
     hardware: Element | None,
     parent_by_child: dict[Element, Element],
@@ -326,31 +365,10 @@ def _hardware_interfaces(
             if nearest_interface is not interface:
                 continue
             channel = _ancestor(sensor, parent_by_child, "Channel")
-            measurements = [
-                CapHardwareMeasurement(
-                    euid=measurement.attrib.get("EUID"),
-                    measurement_id=measurement.attrib.get("ID"),
-                    name=measurement.attrib.get("Name"),
-                    attributes=dict(measurement.attrib),
-                )
-                for measurement in sensor.iter("Measurement")
-            ]
             sensors.append(
-                CapHardwareSensor(
-                    euid=sensor.attrib.get("EUID"),
-                    sensor_id=sensor.attrib.get("ID"),
-                    name=sensor.attrib.get("Name"),
-                    sample_period=_decimal(
-                        sensor.attrib.get("SamplePeriod"),
-                        context="Sensor.SamplePeriod",
-                    ),
-                    interface_euid=interface.attrib.get("EUID"),
-                    channel_index=_integer(
-                        None if channel is None else channel.attrib.get("Index"),
-                        context="Channel.Index",
-                    ),
-                    attributes=dict(sensor.attrib),
-                    measurements=measurements,
+                _hardware_sensor(
+                    sensor, interface_euid=interface.attrib.get("EUID"),
+                    channel=channel,
                 ),
             )
         interfaces.append(
@@ -632,6 +650,7 @@ def _parse_archive(
         header=None if header is None else _xml_node(header),
         hardware=None if hardware is None else _xml_node(hardware),
         hardware_interfaces=_hardware_interfaces(hardware, parent_by_child),
+        unconnected_sensors=_unconnected_sensors(hardware),
         experiment_settings=[
             _experiment_setting(element)
             for element in root.iter("ExperimentSettings")
@@ -678,6 +697,7 @@ def read_cap_configuration(path: str | Path) -> CapConfiguration:
         file_name=parsed.file_name, root_tag=parsed.root_tag,
         header=parsed.header, hardware=parsed.hardware,
         hardware_interfaces=parsed.hardware_interfaces,
+        unconnected_sensors=parsed.unconnected_sensors,
         experiment_settings=parsed.experiment_settings,
         data_sources=parsed.data_sources,
         workspace=parsed.workspace, calculations=parsed.calculations,

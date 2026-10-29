@@ -154,6 +154,55 @@ def test_reads_numeric_values_and_complete_configuration(tmp_path: Path) -> None
     assert dataset.text_values is None
     assert dataset.sample_indices == [0, 1, 2]
     assert dataset.unit_id == 2048
+    assert parsed.unconnected_sensors == []
+
+
+@pytest.mark.parametrize("with_interface", [False, True])
+def test_unconnected_sensor_metadata_is_separate_and_complete(
+    tmp_path: Path, *, with_interface: bool,
+) -> None:
+    interface = (
+        """<Interface EUID="{interface}"><Channel Index="2">
+        <Sensor Name="Attached" EUID="{attached}" />
+        </Channel></Interface>"""
+        if with_interface else ""
+    )
+    xml = f"""<DSProExperiment><Hardware>
+      {interface}
+      <UnconnectedSensor>
+        <Sensor Name="Stored Sensor" ID="42" EUID="{{stored}}"
+                SamplePeriod="0.05" SensorZeroOnStart="TRUE">
+          <Measurement Name="Angle" ID="1" EUID="{{angle}}" />
+        </Sensor>
+        <Sensor Name="Second Sensor" EUID="{{second}}" />
+      </UnconnectedSensor>
+    </Hardware></DSProExperiment>""".encode()
+    path = tmp_path / "unconnected.cap"
+    _write_cap(path, xml=xml)
+    parsed = read_cap_file(path)
+    config = read_cap_configuration(path)
+    assert config.unconnected_sensors == parsed.unconnected_sensors
+    assert len(config.unconnected_sensors) == 2
+    sensor = config.unconnected_sensors[0]
+    assert (sensor.name, sensor.euid, sensor.sensor_id) == (
+        "Stored Sensor", "{stored}", "42",
+    )
+    assert sensor.sample_period == Decimal("0.05")
+    assert sensor.interface_euid is None
+    assert sensor.channel_index is None
+    assert sensor.attributes["SensorZeroOnStart"] == "TRUE"
+    assert sensor.measurements[0].name == "Angle"
+    assert sensor.measurements[0].euid == "{angle}"
+    attached = [s for i in config.hardware_interfaces for s in i.sensors]
+    assert [s.euid for s in attached] == (["{attached}"] if with_interface else [])
+    assert config.hardware is not None
+    assert any(n.tag == "UnconnectedSensor" for n in config.hardware.children)
+
+
+def test_missing_hardware_has_no_unconnected_sensors(tmp_path: Path) -> None:
+    path = tmp_path / "empty.cap"
+    _write_cap(path, xml=b"<DSProExperiment />")
+    assert read_cap_configuration(path).unconnected_sensors == []
 
 
 def test_preserves_text_values_that_look_numeric(tmp_path: Path) -> None:
