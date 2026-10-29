@@ -197,9 +197,22 @@ class Capstone:
     def screenshot(self, handle: int) -> bytes:
         """Capture the target HWND rather than unrelated overlapping windows."""
         window = self.window(handle)
-        with BytesIO() as output, ImageGrab.grab(window=window.handle) as image:
-            image.save(output, format="PNG")
-            return output.getvalue()
+        if win32gui.IsIconic(window.handle):
+            msg = (
+                "Capstone window is minimized. "
+                "Restore it before requesting a screenshot."
+            )
+            raise AutomationError(msg)
+        try:
+            with BytesIO() as output, ImageGrab.grab(window=window.handle) as image:
+                image.save(output, format="PNG")
+                return output.getvalue()
+        except OSError as error:
+            msg = (
+                "Capstone window capture failed. Ensure the window is restored "
+                "and the interactive desktop is available, then retry."
+            )
+            raise AutomationError(msg) from error
 
     def keys(
         self, handle: int, keys: str, *, allow_foreground: bool = True,

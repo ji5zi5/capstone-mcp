@@ -73,6 +73,7 @@ async def exercise_protocol() -> None:
             captured = await session.call_tool(
                 "capstone_screenshot", {"handle": handle},
             )
+            assert not captured.isError, captured.content
             invalid = await session.call_tool(
                 "capstone_action", {"ref": "stale:0", "action": "invoke"},
             )
