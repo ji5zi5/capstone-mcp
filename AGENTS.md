@@ -16,6 +16,8 @@ This repository contains the Model Context Protocol (MCP) server for PASCO Capst
 - **Pre-action Briefing**: Always output a brief 1-2 sentence message explaining what you are about to do before executing commands or launching tool sequences. Never run silent background actions without keeping the user informed.
 - **Direct CLI Invocations**: Use direct binary commands (`uv run ...`, `git ...`, `gh ...`) rather than wrapping inside `powershell -Command "..."` to prevent IDE approval popup loops.
 - **Offline Test Guards**: Live desktop GUI tests (e.g. `tests/test_protocol.py`) and external machine-dependent fixtures (e.g. `tests/test_golden_master.py`) must include fallback guards (`pytest.skip` / `pytestmark = pytest.mark.skipif(...)`), ensuring automated test suites pass deterministically in headless/CI environments.
+- **Remote CI Verification (Definition of Done)**: Never report work complete or close a cycle immediately after `git push`. A build or fix is only done when `gh run watch` or `gh run list` explicitly confirms that GitHub Actions CI has finished with `completed: success`.
+- **Branch Hygiene**: Merged or stale feature branches must be deleted locally (`git branch -d`) and on the remote (`git push origin --delete`) before closing a task.
 
 ## Agent skills
 
