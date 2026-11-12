@@ -7,6 +7,7 @@ This repository contains the Model Context Protocol (MCP) server for PASCO Capst
 - Package manager & tool runner: `uv`
 - Run test suite: `uv run --no-sync pytest`
 - Run linter: `uv run --no-sync ruff check src tests`
+- Run type checker: `uv run --no-sync basedpyright src`
 - Python runtime: Python 3.12+ (Windows x64)
 
 ## Agent Operational Guidelines
@@ -29,3 +30,11 @@ Five canonical triage roles mapped to standard GitHub labels (`needs-triage`, `n
 ### Domain docs
 
 Single-context repository layout (`GLOSSARY.md`, `docs/adr/`). See `docs/agents/domain.md`.
+
+### Architecture & Module Map
+
+FastMCP tool routers (`src/capstone_mcp/tools/`), deep numerics, and unified data sources. See `docs/architecture.md`.
+
+### Review standards
+
+Repo-specific judgement calls and review rules. See `CODING_STANDARDS.md`.

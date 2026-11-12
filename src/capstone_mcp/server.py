@@ -2,6 +2,7 @@
 """Stdio MCP entry point for Capstone UI inspection and operation."""
 
 import base64
+import json
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager, nullcontext
 from typing import Annotated, Final
@@ -400,7 +401,7 @@ def capstone_tutor_lessons_resource() -> str:
         }
         for exp in list_experiments()
     ]
-    return JSON_VALUE.dump_json(catalog, indent=2).decode("utf-8")
+    return json.dumps(catalog, indent=2)
 
 
 # ---------------------------------------------------------------------------
@@ -542,6 +543,8 @@ __all__ = [
     "capstone_run_experiment_macro",
     "capstone_tutor_get_lesson",
     "capstone_tutor_guide_step",
+    "capstone_tutor_lessons_resource",
     "http_main",
     "main",
+    "physics_lab_tutor",
 ]
