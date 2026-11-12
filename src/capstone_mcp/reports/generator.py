@@ -4,13 +4,18 @@
 from __future__ import annotations
 
 import contextlib
-import csv
 import json
 import math
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Final
 
+from capstone_mcp.data_sources.adapters.capfile import read_capfile_all_series
+from capstone_mcp.data_sources.adapters.csv_file import read_csv_all_columns
+from capstone_mcp.numerics import (
+    compute_series_summary,
+    fit_linear_series,
+)
 from capstone_mcp.reports.models import (
     DataSummary,
     ErrorAnalysisRow,
@@ -21,8 +26,6 @@ from capstone_mcp.reports.models import (
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
-
-    from capstone_mcp.capfile_models import CapDataSet
 
 # Fundamental physical constants (CODATA 2018 / 2022)
 PLANCK_CONSTANT: Final[float] = 6.62607015e-34  # J * s
@@ -64,29 +67,18 @@ def compute_data_summary(
             samples_preview=[],
         )
 
-    count = len(values)
-    mean = math.fsum(values) / count
-    min_val = min(values)
-    max_val = max(values)
-    peak_val = max(abs(v) for v in values)
-
-    if count > 1:
-        variance = math.fsum((v - mean) ** 2 for v in values) / (count - 1)
-        std_dev: float | None = math.sqrt(variance)
-    else:
-        std_dev = None
-
+    summary = compute_series_summary(values)
     preview = [float(v) for v in values[:MIN_PREVIEW_POINTS]]
 
     return DataSummary(
         variable_name=variable_name,
         unit=unit,
-        count=count,
-        mean=mean,
-        std_dev=std_dev,
-        min=min_val,
-        max=max_val,
-        peak_value=peak_val,
+        count=summary.count,
+        mean=summary.mean,
+        std_dev=summary.std_dev if summary.count > 1 else None,
+        min=summary.min_val,
+        max=summary.max_val,
+        peak_value=summary.peak_val,
         samples_preview=preview,
     )
 
@@ -118,41 +110,14 @@ def compute_linear_regression(
         )
         raise ValueError(msg)
 
-    n = len(x)
-    mean_x = math.fsum(x) / n
-    mean_y = math.fsum(y) / n
-
-    dx = [xi - mean_x for xi in x]
-    dy = [yi - mean_y for yi in y]
-
-    sxx = math.fsum(d * d for d in dx)
-    syy = math.fsum(d * d for d in dy)
-    sxy = math.fsum(xi * yi for xi, yi in zip(dx, dy, strict=True))
-
-    if sxx == 0.0:
-        msg = "Cannot fit linear regression with zero x variance"
-        raise ValueError(msg)
-
-    slope = sxy / sxx
-    intercept = mean_y - slope * mean_x
-
-    residuals = [yi - (slope * xi + intercept) for xi, yi in zip(x, y, strict=True)]
-    ss_res = math.fsum(r * r for r in residuals)
-
-    if syy > 0.0:
-        r_squared: float | None = max(0.0, min(1.0, 1.0 - (ss_res / syy)))
-    else:
-        r_squared = 1.0 if ss_res == 0.0 else 0.0
-
-    if n > MIN_REGRESSION_POINTS:
-        variance = max(0.0, ss_res / (n - MIN_REGRESSION_POINTS))
-        slope_error: float | None = math.sqrt(variance / sxx)
-        intercept_error: float | None = math.sqrt(
-            variance * ((1.0 / n) + (mean_x * mean_x / sxx)),
-        )
-    else:
-        slope_error = 0.0
-        intercept_error = 0.0
+    fit = fit_linear_series(x, y)
+    slope = fit.slope
+    intercept = fit.intercept
+    r_squared = fit.r_squared
+    slope_error = fit.std_err_slope if len(x) > MIN_REGRESSION_POINTS else 0.0
+    intercept_error = (
+        fit.std_err_intercept if len(x) > MIN_REGRESSION_POINTS else 0.0
+    )
 
     x_var, y_var = variable_names
     x_unit, y_unit = units
@@ -301,43 +266,13 @@ def generate_ascii_plot(
 
 
 def _load_csv_data(path: Path) -> dict[str, list[float]]:
-    series: dict[str, list[float]] = {}
-    with path.open("r", encoding="utf-8-sig") as f:
-        reader = csv.reader(f)
-        headers = next(reader, None)
-        if headers:
-            cols: list[list[float]] = [[] for _ in headers]
-            for row in reader:
-                for i, val in enumerate(row):
-                    if i < len(cols):
-                        with contextlib.suppress(ValueError):
-                            cols[i].append(float(val.strip()))
-            for h, col_data in zip(headers, cols, strict=False):
-                if col_data:
-                    series[h.strip()] = col_data
-    return series
+    return read_csv_all_columns(path)
 
 
 def _load_cap_data(path: Path) -> tuple[dict[str, list[float]], dict[str, str]]:
-    series: dict[str, list[float]] = {}
-    channels: dict[str, str] = {}
     with contextlib.suppress(Exception):
-        from capstone_mcp.capfiles import (  # noqa: PLC0415
-            extract_cap_datasets,
-            read_cap_configuration,
-        )
-
-        datasets: list[CapDataSet] = extract_cap_datasets(path)
-        for ds in datasets:
-            name = ds.name or ds.source_name or f"Series_{ds.data_set_id}"
-            if ds.numeric_values:
-                nums = [float(v) for v in ds.numeric_values if v is not None]
-                if nums:
-                    series[name] = nums
-        cfg = read_cap_configuration(path)
-        for iface in cfg.hardware_interfaces:
-            channels[f"Interface_{iface.euid}"] = iface.name or "PASCO Interface"
-    return series, channels
+        return read_capfile_all_series(path)
+    return {}, {}
 
 
 def _load_json_data(path: Path) -> dict[str, list[float]]:
