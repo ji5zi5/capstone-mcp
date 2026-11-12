@@ -17,7 +17,16 @@ type NativeOperation = Literal[
     "save_experiment", "export_data", "open_experiment",
     "create_graph", "select_graph_measurement",
     "read_graph", "set_graph_fits", "analyze_graph", "observe_graph",
-    "rename_run", "fit_graph",
+    "rename_run", "fit_graph", "create_calculation", "delete_run", "zero_sensor",
+    "create_table", "set_table_columns", "read_table",
+    "create_digits",
+    "toggle_graph_statistics", "measure_graph_area", "graph_delta",
+    "set_run_visibility",
+    "set_signal_generator", "read_signal_generator_status",
+    "create_scope", "set_scope_trigger", "create_fft", "read_fft_peaks",
+    "set_recording_condition", "set_sampling_mode", "keep_sample",
+    "scan_wireless_sensors", "connect_wireless_sensor", "calibrate_sensor",
+    "add_page", "set_page_layout",
 ]
 
 
@@ -60,6 +69,53 @@ class NativeRequest(Model):
     offset_x: int = 20
     offset_y: int = 20
     graph_name: str | None = None
+    expression: str = ""
+    unit: str | None = None
+    keep_open: bool = False
+    run_name: str = "last_run"
+    sensor_name: str | None = None
+    table_name: str | None = None
+    columns: list[str] = Field(default_factory=list)
+    page: int = 1
+    page_size: int = 50
+    include_statistics: bool = True
+    digits_name: str | None = None
+    measurement: str | None = None
+    enable: bool | None = None
+    point1: Point | None = None
+    point2: Point | None = None
+    runs: list[str] = Field(default_factory=list)
+    visible: bool = True
+    target_displays: list[str] | None = None
+    waveform: str = "Sine"
+    frequency: float | None = 1000.0
+    amplitude: float | None = 1.0
+    enabled: bool = True
+    generator_name: str | None = None
+    timebase: str | float | None = None
+    channel: str | None = None
+    scope_id: str | None = None
+    trigger_level: float = 0.0
+    trigger_slope: str = "rising"
+    trigger_mode: str = "auto"
+    trigger_source: str | None = None
+    frequency_range: str | None = None
+    fft_id: str | None = None
+    top_k: int = 5
+    start_condition: JsonValue = None
+    stop_condition: JsonValue = None
+    sampling_mode: str = "continuous"
+    sample_value: float | None = None
+    variable_name: str | None = None
+    timeout_seconds: float = 5.0
+    sensor_id: str = ""
+    measurement_type: str | None = None
+    calibration_type: str = "two_point"
+    standard_1: float = 0.0
+    standard_2: float | None = None
+    title: str = "New Page"
+    layout: str = "two_vertical"
+    page_name: str | None = None
 
 
 class RequestPacket(Model):

@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Final
 
 import anyio
+import pytest
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 from mcp.types import ImageContent
@@ -70,7 +71,8 @@ async def exercise_protocol() -> None:
             attached = await session.call_tool("capstone_attach")
             assert not attached.isError
             windows = WindowsResult.model_validate(attached.structuredContent).result
-            assert windows
+            if not windows:
+                pytest.skip("No running Capstone instance found on desktop")
             handle = windows[0].handle
             # When: request actual control state and image via the MCP wire.
             observed = await session.call_tool(

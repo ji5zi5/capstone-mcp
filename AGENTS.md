@@ -8,6 +8,12 @@ This repository contains the Model Context Protocol (MCP) server for PASCO Capst
 - Run test suite: `uv run pytest`
 - Python runtime: Python 3.12+ (Windows x64)
 
+## Agent Operational Guidelines
+
+- **Pre-action Briefing**: Always output a brief 1-2 sentence message explaining what you are about to do before executing commands or launching tool sequences. Never run silent background actions without keeping the user informed.
+- **Direct CLI Invocations**: Use direct binary commands (`uv run ...`, `git ...`, `gh ...`) rather than wrapping inside `powershell -Command "..."` to prevent IDE approval popup loops.
+- **Offline Test Guards**: Live desktop GUI tests (e.g. `tests/test_protocol.py`) must include fallback guards (`pytest.skip`) when no GUI instance is attached, ensuring automated test suites pass deterministically in headless/CI environments.
+
 ## Agent skills
 
 ### Issue tracker

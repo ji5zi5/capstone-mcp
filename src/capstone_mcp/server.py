@@ -29,6 +29,7 @@ from capstone_mcp.analysis import (
 from capstone_mcp.automation_models import NativeRequest
 from capstone_mcp.automation_worker import AutomationWorker
 from capstone_mcp.bridge import NativeInventory, read_inventory, read_measurement
+from capstone_mcp.calculator import CreateCalculationResult
 from capstone_mcp.capfile_models import (
     CapConfigurationView,
     CapDatasetPage,
@@ -42,6 +43,7 @@ from capstone_mcp.capfiles import (
 )
 from capstone_mcp.csv_data import CsvPage, read_csv_page
 from capstone_mcp.desktop import AutomationError
+from capstone_mcp.digits_display import CreateDigitsResult
 from capstone_mcp.experiment_analysis import (
     CapLinearFitRequest,
     CapLinearFitResult,
@@ -60,15 +62,54 @@ from capstone_mcp.graph_requests import (
     GraphFitRequest,
 )
 from capstone_mcp.graph_state import FitModel, GraphState
+from capstone_mcp.graph_toolbox import (
+    GraphDeltaResult,
+    MeasureGraphAreaResult,
+    ToggleGraphStatisticsResult,
+)
 from capstone_mcp.models import Action, Button, Model, Point, Result, Snapshot, Window
+from capstone_mcp.oscilloscope_fft import (
+    CreateFftResult,
+    CreateScopeResult,
+    ReadFftPeaksResult,
+    ScopeTriggerResult,
+)
 from capstone_mcp.plotting import PlotInput, render_plot
 from capstone_mcp.repetition import AcquisitionJobs, JobStatus, RepeatPlan
+from capstone_mcp.run_delete import DeleteRunResult
 from capstone_mcp.run_rename import RenameRunResult
+from capstone_mcp.run_visibility import SetRunVisibilityResult
 from capstone_mcp.sensor_settings import (
     SamplingRateRequest,
     SensorConfiguration,
     SensorSelection,
     SensorSelectionRequest,
+)
+from capstone_mcp.sensor_zero import ZeroSensorResult
+from capstone_mcp.signal_generator import (
+    SetSignalGeneratorResult,
+    SignalGeneratorStatusResult,
+)
+from capstone_mcp.smart_triggers import (
+    KeepSampleResult,
+    SamplingMode,
+    SetRecordingConditionResult,
+    SetSamplingModeResult,
+)
+from capstone_mcp.table_display import (
+    CreateTableResult,
+    ReadTableResult,
+    SetTableColumnsResult,
+)
+from capstone_mcp.wireless_calibration import (
+    CalibrateSensorResult,
+    ConnectWirelessSensorResult,
+    ScanWirelessSensorsResult,
+)
+from capstone_mcp.workbook_layout import (
+    AddPageResult,
+    PageLayoutTemplate,
+    SetPageLayoutResult,
 )
 
 DEFAULT_FIT_OFFSET: Final = Point(x=20, y=20)
@@ -791,6 +832,472 @@ async def capstone_rename_run(
     return RenameRunResult.model_validate(await _native(NativeRequest(
         operation="rename_run", handle=handle, old_name=old_name,
         new_name=new_name, allow_foreground=allow_foreground,
+    ), mutates=True))
+
+
+@MCP.tool()
+async def capstone_create_calculation(
+    expression: str,
+    handle: int = 0,
+    *,
+    unit: str | None = None,
+    allow_foreground: bool = True,
+    keep_open: bool = False,
+) -> CreateCalculationResult:
+    """Register a formula and optional unit in Capstone Calculator with auto-cleanup."""
+    return CreateCalculationResult.model_validate(await _native(NativeRequest(
+        operation="create_calculation", handle=handle, expression=expression,
+        unit=unit, allow_foreground=allow_foreground, keep_open=keep_open,
+    ), mutates=True))
+
+
+@MCP.tool()
+async def capstone_delete_run(
+    handle: int = 0,
+    *,
+    run_name: str = "last_run",
+    allow_foreground: bool = True,
+) -> DeleteRunResult:
+    """Delete a run from Data Summary, auto-confirming any modal dialog."""
+    return DeleteRunResult.model_validate(await _native(NativeRequest(
+        operation="delete_run", handle=handle, run_name=run_name,
+        allow_foreground=allow_foreground,
+    ), mutates=True))
+
+
+@MCP.tool()
+async def capstone_zero_sensor(
+    handle: int = 0,
+    *,
+    sensor_name: str | None = None,
+    allow_foreground: bool = True,
+) -> ZeroSensorResult:
+    """Execute zero/tare for all connected sensors or a specified target sensor."""
+    return ZeroSensorResult.model_validate(await _native(NativeRequest(
+        operation="zero_sensor", handle=handle, sensor_name=sensor_name,
+        allow_foreground=allow_foreground,
+    ), mutates=True))
+
+
+@MCP.tool()
+async def capstone_create_table(
+    handle: int = 0,
+    *,
+    table_name: str | None = None,
+    allow_foreground: bool = True,
+) -> CreateTableResult:
+    """Create a new Table display widget on the active workbook page."""
+    return CreateTableResult.model_validate(await _native(NativeRequest(
+        operation="create_table",
+        handle=handle,
+        table_name=table_name,
+        allow_foreground=allow_foreground,
+    ), mutates=True))
+
+
+@MCP.tool()
+async def capstone_set_table_columns(
+    columns: list[str],
+    handle: int = 0,
+    *,
+    table_name: str | None = None,
+    allow_foreground: bool = True,
+) -> SetTableColumnsResult:
+    """Configure columns and data bindings for a Table display."""
+    return SetTableColumnsResult.model_validate(await _native(NativeRequest(
+        operation="set_table_columns",
+        handle=handle,
+        columns=columns,
+        table_name=table_name,
+        allow_foreground=allow_foreground,
+    ), mutates=True))
+
+
+@MCP.tool()
+async def capstone_read_table(  # noqa: PLR0913
+    handle: int = 0,
+    *,
+    table_name: str | None = None,
+    page: int = 1,
+    page_size: int = 50,
+    include_statistics: bool = True,
+    allow_foreground: bool = True,
+) -> ReadTableResult:
+    """Read rendered table rows, pagination info, and summary statistics."""
+    return ReadTableResult.model_validate(await _native(NativeRequest(
+        operation="read_table",
+        handle=handle,
+        table_name=table_name,
+        page=page,
+        page_size=page_size,
+        include_statistics=include_statistics,
+        allow_foreground=allow_foreground,
+    ), mutates=False))
+
+
+@MCP.tool()
+async def capstone_create_digits(
+    handle: int = 0,
+    *,
+    measurement: str | None = None,
+    digits_name: str | None = None,
+    allow_foreground: bool = True,
+) -> CreateDigitsResult:
+    """Create a large Digits numeric display and optionally bind a measurement."""
+    return CreateDigitsResult.model_validate(await _native(NativeRequest(
+        operation="create_digits",
+        handle=handle,
+        measurement=measurement,
+        digits_name=digits_name,
+        allow_foreground=allow_foreground,
+    ), mutates=True))
+
+
+@MCP.tool()
+async def capstone_toggle_graph_statistics(
+    handle: int = 0,
+    *,
+    graph_name: str | None = None,
+    enable: bool | None = None,
+    allow_foreground: bool = True,
+) -> ToggleGraphStatisticsResult:
+    """Toggle graph statistics box (Σ) and read descriptive statistics."""
+    return ToggleGraphStatisticsResult.model_validate(await _native(NativeRequest(
+        operation="toggle_graph_statistics",
+        handle=handle,
+        graph_name=graph_name,
+        enable=enable,
+        allow_foreground=allow_foreground,
+    ), mutates=True))
+
+
+@MCP.tool()
+async def capstone_measure_graph_area(
+    handle: int = 0,
+    *,
+    graph_name: str | None = None,
+    enable: bool | None = None,
+    allow_foreground: bool = True,
+) -> MeasureGraphAreaResult:
+    """Toggle graph area tool (∫ydx) and extract integral value."""
+    return MeasureGraphAreaResult.model_validate(await _native(NativeRequest(
+        operation="measure_graph_area",
+        handle=handle,
+        graph_name=graph_name,
+        enable=enable,
+        allow_foreground=allow_foreground,
+    ), mutates=True))
+
+
+@MCP.tool()
+async def capstone_graph_delta(
+    handle: int = 0,
+    *,
+    graph_name: str | None = None,
+    point1: Point | None = None,
+    point2: Point | None = None,
+    allow_foreground: bool = True,
+) -> GraphDeltaResult:
+    """Activate delta crosshair tool and read coordinate differences (Δx, Δy)."""
+    return GraphDeltaResult.model_validate(await _native(NativeRequest(
+        operation="graph_delta",
+        handle=handle,
+        graph_name=graph_name,
+        point1=point1,
+        point2=point2,
+        allow_foreground=allow_foreground,
+    ), mutates=True))
+
+
+@MCP.tool()
+async def capstone_set_run_visibility(
+    runs: list[str],
+    handle: int = 0,
+    *,
+    visible: bool = True,
+    target_displays: list[str] | None = None,
+    allow_foreground: bool = True,
+) -> SetRunVisibilityResult:
+    """Control visibility (show/hide) of specific runs on displays."""
+    return SetRunVisibilityResult.model_validate(await _native(NativeRequest(
+        operation="set_run_visibility",
+        handle=handle,
+        runs=runs,
+        visible=visible,
+        target_displays=target_displays,
+        allow_foreground=allow_foreground,
+    ), mutates=True))
+
+
+@MCP.tool()
+async def capstone_set_signal_generator(  # noqa: PLR0913
+    handle: int = 0,
+    *,
+    waveform: str = "Sine",
+    frequency: float | None = 1000.0,
+    amplitude: float | None = 1.0,
+    enabled: bool = True,
+    generator_name: str | None = None,
+    allow_foreground: bool = True,
+    keep_open: bool = False,
+) -> SetSignalGeneratorResult:
+    """Configure signal generator waveform, frequency, amplitude, and power."""
+    return SetSignalGeneratorResult.model_validate(await _native(NativeRequest(
+        operation="set_signal_generator",
+        handle=handle,
+        waveform=waveform,
+        frequency=frequency,
+        amplitude=amplitude,
+        enabled=enabled,
+        generator_name=generator_name,
+        allow_foreground=allow_foreground,
+        keep_open=keep_open,
+    ), mutates=True))
+
+
+@MCP.tool()
+async def capstone_read_signal_generator_status(
+    handle: int = 0,
+    *,
+    generator_name: str | None = None,
+    allow_foreground: bool = True,
+    keep_open: bool = False,
+) -> SignalGeneratorStatusResult:
+    """Read current waveform, frequency, amplitude, and power of signal generator."""
+    return SignalGeneratorStatusResult.model_validate(await _native(NativeRequest(
+        operation="read_signal_generator_status",
+        handle=handle,
+        generator_name=generator_name,
+        allow_foreground=allow_foreground,
+        keep_open=keep_open,
+    ), mutates=True))
+
+
+@MCP.tool()
+async def capstone_create_scope(
+    handle: int = 0,
+    *,
+    timebase: str | float | None = None,
+    channel: str | None = None,
+    allow_foreground: bool = True,
+) -> CreateScopeResult:
+    """Create an Oscilloscope display widget on the active page."""
+    return CreateScopeResult.model_validate(await _native(NativeRequest(
+        operation="create_scope",
+        handle=handle,
+        timebase=str(timebase) if timebase is not None else None,
+        channel=channel,
+        allow_foreground=allow_foreground,
+    ), mutates=True))
+
+
+@MCP.tool()
+async def capstone_set_scope_trigger(  # noqa: PLR0913
+    handle: int = 0,
+    *,
+    scope_id: str | None = None,
+    trigger_level: float = 0.0,
+    trigger_slope: str = "rising",
+    trigger_mode: str = "auto",
+    trigger_source: str | None = None,
+    allow_foreground: bool = True,
+) -> ScopeTriggerResult:
+    """Configure oscilloscope trigger level, slope edge, mode, and source."""
+    return ScopeTriggerResult.model_validate(await _native(NativeRequest(
+        operation="set_scope_trigger",
+        handle=handle,
+        scope_id=scope_id,
+        trigger_level=trigger_level,
+        trigger_slope=trigger_slope,
+        trigger_mode=trigger_mode,
+        trigger_source=trigger_source,
+        allow_foreground=allow_foreground,
+    ), mutates=True))
+
+
+@MCP.tool()
+async def capstone_create_fft(
+    handle: int = 0,
+    *,
+    measurement: str | None = None,
+    frequency_range: str | None = None,
+    allow_foreground: bool = True,
+) -> CreateFftResult:
+    """Create an FFT frequency spectrum display widget."""
+    return CreateFftResult.model_validate(await _native(NativeRequest(
+        operation="create_fft",
+        handle=handle,
+        measurement=measurement,
+        frequency_range=frequency_range,
+        allow_foreground=allow_foreground,
+    ), mutates=True))
+
+
+@MCP.tool()
+async def capstone_read_fft_peaks(
+    handle: int = 0,
+    *,
+    fft_id: str | None = None,
+    top_k: int = 5,
+    allow_foreground: bool = True,
+) -> ReadFftPeaksResult:
+    """Read top peak frequencies and amplitudes from FFT display."""
+    return ReadFftPeaksResult.model_validate(await _native(NativeRequest(
+        operation="read_fft_peaks",
+        handle=handle,
+        fft_id=fft_id,
+        top_k=top_k,
+        allow_foreground=allow_foreground,
+    ), mutates=False))
+
+
+@MCP.tool()
+async def capstone_set_recording_condition(
+    handle: int = 0,
+    *,
+    start_condition: dict[str, JsonValue] | None = None,
+    stop_condition: dict[str, JsonValue] | None = None,
+    allow_foreground: bool = True,
+    keep_open: bool = False,
+) -> SetRecordingConditionResult:
+    """Configure start/stop recording conditions based on time or threshold."""
+    return SetRecordingConditionResult.model_validate(await _native(NativeRequest(
+        operation="set_recording_condition",
+        handle=handle,
+        start_condition=start_condition,
+        stop_condition=stop_condition,
+        allow_foreground=allow_foreground,
+        keep_open=keep_open,
+    ), mutates=True))
+
+
+@MCP.tool()
+async def capstone_set_sampling_mode(
+    mode: SamplingMode = "continuous",
+    handle: int = 0,
+    *,
+    allow_foreground: bool = True,
+) -> SetSamplingModeResult:
+    """Switch sampling mode between continuous, keep_sample, and fast_monitor."""
+    return SetSamplingModeResult.model_validate(await _native(NativeRequest(
+        operation="set_sampling_mode",
+        handle=handle,
+        sampling_mode=mode,
+        allow_foreground=allow_foreground,
+    ), mutates=True))
+
+
+@MCP.tool()
+async def capstone_keep_sample(
+    handle: int = 0,
+    *,
+    value: float | None = None,
+    variable_name: str | None = None,
+    allow_foreground: bool = True,
+) -> KeepSampleResult:
+    """Record one manual sample point in keep_sample mode."""
+    return KeepSampleResult.model_validate(await _native(NativeRequest(
+        operation="keep_sample",
+        handle=handle,
+        sample_value=value,
+        variable_name=variable_name,
+        allow_foreground=allow_foreground,
+    ), mutates=True))
+
+
+@MCP.tool()
+async def capstone_scan_wireless_sensors(
+    handle: int = 0,
+    *,
+    timeout_seconds: float = 5.0,
+    allow_foreground: bool = True,
+    keep_open: bool = False,
+) -> ScanWirelessSensorsResult:
+    """Scan for nearby wireless Bluetooth PASCO sensors."""
+    return ScanWirelessSensorsResult.model_validate(await _native(NativeRequest(
+        operation="scan_wireless_sensors",
+        handle=handle,
+        timeout_seconds=timeout_seconds,
+        allow_foreground=allow_foreground,
+        keep_open=keep_open,
+    ), mutates=True))
+
+
+@MCP.tool()
+async def capstone_connect_wireless_sensor(
+    sensor_id: str,
+    handle: int = 0,
+    *,
+    allow_foreground: bool = True,
+    keep_open: bool = False,
+) -> ConnectWirelessSensorResult:
+    """Pair and connect a discovered wireless sensor by sensor_id."""
+    return ConnectWirelessSensorResult.model_validate(await _native(NativeRequest(
+        operation="connect_wireless_sensor",
+        handle=handle,
+        sensor_id=sensor_id,
+        allow_foreground=allow_foreground,
+        keep_open=keep_open,
+    ), mutates=True))
+
+
+@MCP.tool()
+async def capstone_calibrate_sensor(  # noqa: PLR0913
+    sensor_name: str,
+    handle: int = 0,
+    *,
+    measurement_type: str | None = None,
+    calibration_type: str = "two_point",
+    standard_1: float = 0.0,
+    standard_2: float | None = None,
+    allow_foreground: bool = True,
+    keep_open: bool = False,
+) -> CalibrateSensorResult:
+    """Execute sensor calibration wizard with standard reference points."""
+    return CalibrateSensorResult.model_validate(await _native(NativeRequest(
+        operation="calibrate_sensor",
+        handle=handle,
+        sensor_name=sensor_name,
+        measurement_type=measurement_type,
+        calibration_type=calibration_type,
+        standard_1=standard_1,
+        standard_2=standard_2,
+        allow_foreground=allow_foreground,
+        keep_open=keep_open,
+    ), mutates=True))
+
+
+@MCP.tool()
+async def capstone_add_page(
+    handle: int = 0,
+    *,
+    title: str = "New Page",
+    allow_foreground: bool = True,
+) -> AddPageResult:
+    """Add a new page tab to the Capstone workbook."""
+    return AddPageResult.model_validate(await _native(NativeRequest(
+        operation="add_page",
+        handle=handle,
+        title=title,
+        allow_foreground=allow_foreground,
+    ), mutates=True))
+
+
+@MCP.tool()
+async def capstone_set_page_layout(
+    layout: PageLayoutTemplate = "two_vertical",
+    handle: int = 0,
+    *,
+    page_name: str | None = None,
+    allow_foreground: bool = True,
+) -> SetPageLayoutResult:
+    """Apply a multi-display split layout template to the active or target page."""
+    return SetPageLayoutResult.model_validate(await _native(NativeRequest(
+        operation="set_page_layout",
+        handle=handle,
+        layout=layout,
+        page_name=page_name,
+        allow_foreground=allow_foreground,
     ), mutates=True))
 
 

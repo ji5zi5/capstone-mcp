@@ -16,7 +16,9 @@ from capstone_mcp.acquisition import (
     request_recording,
     step_sampling_rate,
 )
+from capstone_mcp.calculator import CreateCalculationRequest, create_calculation
 from capstone_mcp.desktop import AutomationError, Capstone
+from capstone_mcp.digits_display import CreateDigitsRequest, create_digits
 from capstone_mcp.file_workflows import (
     export_data,
     open_experiment,
@@ -32,6 +34,14 @@ from capstone_mcp.graph_execution import (
     GraphProgress,
 )
 from capstone_mcp.graph_requests import GraphAnalysisRequest, GraphFitRequest
+from capstone_mcp.graph_toolbox import (
+    GraphDeltaRequest,
+    MeasureGraphAreaRequest,
+    ToggleGraphStatisticsRequest,
+    graph_delta,
+    measure_graph_area,
+    toggle_graph_statistics,
+)
 from capstone_mcp.graph_workflows import (
     analyze_graph,
     create_graph,
@@ -40,14 +50,64 @@ from capstone_mcp.graph_workflows import (
     set_graph_fits,
 )
 from capstone_mcp.models import Point, Result
+from capstone_mcp.oscilloscope_fft import (
+    CreateFftRequest,
+    CreateScopeRequest,
+    ReadFftPeaksRequest,
+    SetScopeTriggerRequest,
+    create_fft,
+    create_scope,
+    read_fft_peaks,
+    set_scope_trigger,
+)
 from capstone_mcp.repetition import NativeRecordingBackend, RepeatPlan
+from capstone_mcp.run_delete import DeleteRunRequest, delete_run
 from capstone_mcp.run_rename import RenameRunRequest, rename_run
+from capstone_mcp.run_visibility import SetRunVisibilityRequest, set_run_visibility
 from capstone_mcp.sensor_settings import (
     SamplingRateRequest,
     SensorConfiguration,
     SensorSelectionRequest,
     select_sensor,
     target_sampling_rate,
+)
+from capstone_mcp.sensor_zero import ZeroSensorRequest, zero_sensor
+from capstone_mcp.signal_generator import (
+    ReadSignalGeneratorStatusRequest,
+    SetSignalGeneratorRequest,
+    read_signal_generator_status,
+    set_signal_generator,
+)
+from capstone_mcp.smart_triggers import (
+    ConditionSpec,
+    KeepSampleRequest,
+    SetRecordingConditionRequest,
+    SetSamplingModeRequest,
+    keep_sample,
+    set_recording_condition,
+    set_sampling_mode,
+)
+from capstone_mcp.table_display import (
+    CreateTableRequest,
+    ReadTableRequest,
+    SetTableColumnsRequest,
+    create_table,
+    read_table,
+    set_table_columns,
+)
+from capstone_mcp.wireless_calibration import (
+    CalibrateSensorRequest,
+    ConnectWirelessSensorRequest,
+    ScanWirelessSensorsRequest,
+    calibrate_sensor,
+    connect_wireless_sensor,
+    scan_wireless_sensors,
+)
+from capstone_mcp.workbook_layout import (
+    AddPageRequest,
+    SetPageLayoutRequest,
+    add_page,
+    set_page_layout,
 )
 
 if TYPE_CHECKING:
@@ -166,6 +226,186 @@ class NativeDesktop:
                     handle=r.handle, mode=r.mode,
                     graph_name=r.target or r.graph_name,
                     offset=r.point if (r.point.x or r.point.y) else Point(x=20, y=20),
+                    allow_foreground=r.allow_foreground,
+                ),
+            )),
+            "create_calculation": lambda r: _json(create_calculation(
+                self.app, CreateCalculationRequest(
+                    handle=r.handle,
+                    expression=r.expression,
+                    unit=r.unit,
+                    allow_foreground=r.allow_foreground,
+                    keep_open=r.keep_open,
+                ),
+            )),
+            "delete_run": lambda r: _json(delete_run(
+                self.app, DeleteRunRequest(
+                    handle=r.handle,
+                    run_name=r.run_name,
+                    allow_foreground=r.allow_foreground,
+                ),
+            )),
+            "zero_sensor": lambda r: _json(zero_sensor(
+                self.app, ZeroSensorRequest(
+                    handle=r.handle,
+                    sensor_name=r.sensor_name,
+                    allow_foreground=r.allow_foreground,
+                ),
+            )),
+            "create_table": lambda r: _json(create_table(
+                self.app, CreateTableRequest(
+                    handle=r.handle, table_name=r.table_name,
+                    allow_foreground=r.allow_foreground,
+                ),
+            )),
+            "set_table_columns": lambda r: _json(set_table_columns(
+                self.app, SetTableColumnsRequest(
+                    handle=r.handle, columns=r.columns, table_name=r.table_name,
+                    allow_foreground=r.allow_foreground,
+                ),
+            )),
+            "read_table": lambda r: _json(read_table(
+                self.app, ReadTableRequest(
+                    handle=r.handle, table_name=r.table_name, page=r.page,
+                    page_size=r.page_size, include_statistics=r.include_statistics,
+                    allow_foreground=r.allow_foreground,
+                ),
+            )),
+            "create_digits": lambda r: _json(create_digits(
+                self.app, CreateDigitsRequest(
+                    handle=r.handle, measurement=r.measurement,
+                    digits_name=r.digits_name, allow_foreground=r.allow_foreground,
+                ),
+            )),
+            "toggle_graph_statistics": lambda r: _json(toggle_graph_statistics(
+                self.app, ToggleGraphStatisticsRequest(
+                    handle=r.handle, graph_name=r.graph_name, enable=r.enable,
+                    allow_foreground=r.allow_foreground,
+                ),
+            )),
+            "measure_graph_area": lambda r: _json(measure_graph_area(
+                self.app, MeasureGraphAreaRequest(
+                    handle=r.handle, graph_name=r.graph_name, enable=r.enable,
+                    allow_foreground=r.allow_foreground,
+                ),
+            )),
+            "graph_delta": lambda r: _json(graph_delta(
+                self.app, GraphDeltaRequest(
+                    handle=r.handle, graph_name=r.graph_name,
+                    point1=r.point1, point2=r.point2,
+                    allow_foreground=r.allow_foreground,
+                ),
+            )),
+            "set_run_visibility": lambda r: _json(set_run_visibility(
+                self.app, SetRunVisibilityRequest(
+                    handle=r.handle, runs=r.runs, visible=r.visible,
+                    target_displays=r.target_displays,
+                    allow_foreground=r.allow_foreground,
+                ),
+            )),
+            "set_signal_generator": lambda r: _json(set_signal_generator(
+                self.app, SetSignalGeneratorRequest(
+                    handle=r.handle, waveform=r.waveform,
+                    frequency=r.frequency, amplitude=r.amplitude,
+                    enabled=r.enabled, generator_name=r.generator_name,
+                    allow_foreground=r.allow_foreground, keep_open=r.keep_open,
+                ),
+            )),
+            "read_signal_generator_status": (
+                lambda r: _json(read_signal_generator_status(
+                    self.app, ReadSignalGeneratorStatusRequest(
+                        handle=r.handle, generator_name=r.generator_name,
+                        allow_foreground=r.allow_foreground, keep_open=r.keep_open,
+                    ),
+                ))
+            ),
+            "create_scope": lambda r: _json(create_scope(
+                self.app, CreateScopeRequest(
+                    handle=r.handle, timebase=r.timebase,
+                    channel=r.channel, allow_foreground=r.allow_foreground,
+                ),
+            )),
+            "set_scope_trigger": lambda r: _json(set_scope_trigger(
+                self.app, SetScopeTriggerRequest(
+                    handle=r.handle, scope_id=r.scope_id,
+                    trigger_level=r.trigger_level, trigger_slope=r.trigger_slope,
+                    trigger_mode=r.trigger_mode, trigger_source=r.trigger_source,
+                    allow_foreground=r.allow_foreground,
+                ),
+            )),
+            "create_fft": lambda r: _json(create_fft(
+                self.app, CreateFftRequest(
+                    handle=r.handle, measurement=r.measurement,
+                    frequency_range=r.frequency_range,
+                    allow_foreground=r.allow_foreground,
+                ),
+            )),
+            "read_fft_peaks": lambda r: _json(read_fft_peaks(
+                self.app, ReadFftPeaksRequest(
+                    handle=r.handle, fft_id=r.fft_id, top_k=r.top_k,
+                    allow_foreground=r.allow_foreground,
+                ),
+            )),
+            "set_recording_condition": lambda r: _json(set_recording_condition(
+                self.app, SetRecordingConditionRequest(
+                    handle=r.handle,
+                    start_condition=(
+                        ConditionSpec.model_validate(r.start_condition)
+                        if r.start_condition is not None
+                        else None
+                    ),
+                    stop_condition=(
+                        ConditionSpec.model_validate(r.stop_condition)
+                        if r.stop_condition is not None
+                        else None
+                    ),
+                    allow_foreground=r.allow_foreground, keep_open=r.keep_open,
+                ),
+            )),
+            "set_sampling_mode": lambda r: _json(set_sampling_mode(
+                self.app, SetSamplingModeRequest(
+                    handle=r.handle, mode=r.sampling_mode,  # type: ignore[arg-type]
+                    allow_foreground=r.allow_foreground,
+                ),
+            )),
+            "keep_sample": lambda r: _json(keep_sample(
+                self.app, KeepSampleRequest(
+                    handle=r.handle, value=r.sample_value,
+                    variable_name=r.variable_name,
+                    allow_foreground=r.allow_foreground,
+                ),
+            )),
+            "scan_wireless_sensors": lambda r: _json(scan_wireless_sensors(
+                self.app, ScanWirelessSensorsRequest(
+                    handle=r.handle, timeout_seconds=r.timeout_seconds,
+                    allow_foreground=r.allow_foreground, keep_open=r.keep_open,
+                ),
+            )),
+            "connect_wireless_sensor": lambda r: _json(connect_wireless_sensor(
+                self.app, ConnectWirelessSensorRequest(
+                    handle=r.handle, sensor_id=r.sensor_id,
+                    allow_foreground=r.allow_foreground, keep_open=r.keep_open,
+                ),
+            )),
+            "calibrate_sensor": lambda r: _json(calibrate_sensor(
+                self.app, CalibrateSensorRequest(
+                    handle=r.handle, sensor_name=r.sensor_name or "",
+                    measurement_type=r.measurement_type,
+                    calibration_type=r.calibration_type,
+                    standard_1=r.standard_1, standard_2=r.standard_2,
+                    allow_foreground=r.allow_foreground, keep_open=r.keep_open,
+                ),
+            )),
+            "add_page": lambda r: _json(add_page(
+                self.app, AddPageRequest(
+                    handle=r.handle, title=r.title,
+                    allow_foreground=r.allow_foreground,
+                ),
+            )),
+            "set_page_layout": lambda r: _json(set_page_layout(
+                self.app, SetPageLayoutRequest(
+                    handle=r.handle, layout=r.layout,  # type: ignore[arg-type]
+                    page_name=r.page_name,
                     allow_foreground=r.allow_foreground,
                 ),
             )),
