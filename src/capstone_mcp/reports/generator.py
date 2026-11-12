@@ -4,13 +4,14 @@
 from __future__ import annotations
 
 import contextlib
-import csv
 import json
 import math
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Final
 
+from capstone_mcp.data_sources.adapters.capfile import read_capfile_all_series
+from capstone_mcp.data_sources.adapters.csv_file import read_csv_all_columns
 from capstone_mcp.numerics import (
     compute_series_summary,
     fit_linear_series,
@@ -25,8 +26,6 @@ from capstone_mcp.reports.models import (
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
-
-    from capstone_mcp.capfile_models import CapDataSet
 
 # Fundamental physical constants (CODATA 2018 / 2022)
 PLANCK_CONSTANT: Final[float] = 6.62607015e-34  # J * s
@@ -267,43 +266,13 @@ def generate_ascii_plot(
 
 
 def _load_csv_data(path: Path) -> dict[str, list[float]]:
-    series: dict[str, list[float]] = {}
-    with path.open("r", encoding="utf-8-sig") as f:
-        reader = csv.reader(f)
-        headers = next(reader, None)
-        if headers:
-            cols: list[list[float]] = [[] for _ in headers]
-            for row in reader:
-                for i, val in enumerate(row):
-                    if i < len(cols):
-                        with contextlib.suppress(ValueError):
-                            cols[i].append(float(val.strip()))
-            for h, col_data in zip(headers, cols, strict=False):
-                if col_data:
-                    series[h.strip()] = col_data
-    return series
+    return read_csv_all_columns(path)
 
 
 def _load_cap_data(path: Path) -> tuple[dict[str, list[float]], dict[str, str]]:
-    series: dict[str, list[float]] = {}
-    channels: dict[str, str] = {}
     with contextlib.suppress(Exception):
-        from capstone_mcp.capfiles import (  # noqa: PLC0415
-            extract_cap_datasets,
-            read_cap_configuration,
-        )
-
-        datasets: list[CapDataSet] = extract_cap_datasets(path)
-        for ds in datasets:
-            name = ds.name or ds.source_name or f"Series_{ds.data_set_id}"
-            if ds.numeric_values:
-                nums = [float(v) for v in ds.numeric_values if v is not None]
-                if nums:
-                    series[name] = nums
-        cfg = read_cap_configuration(path)
-        for iface in cfg.hardware_interfaces:
-            channels[f"Interface_{iface.euid}"] = iface.name or "PASCO Interface"
-    return series, channels
+        return read_capfile_all_series(path)
+    return {}, {}
 
 
 def _load_json_data(path: Path) -> dict[str, list[float]]:
