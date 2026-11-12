@@ -51,6 +51,7 @@ from capstone_mcp.sensor_settings import (
     select_sensor,
     target_sampling_rate,
 )
+from capstone_mcp.sensor_zero import ZeroSensorRequest, zero_sensor
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping
@@ -184,6 +185,13 @@ class NativeDesktop:
                 self.app, DeleteRunRequest(
                     handle=r.handle,
                     run_name=r.run_name,
+                    allow_foreground=r.allow_foreground,
+                ),
+            )),
+            "zero_sensor": lambda r: _json(zero_sensor(
+                self.app, ZeroSensorRequest(
+                    handle=r.handle,
+                    sensor_name=r.sensor_name,
                     allow_foreground=r.allow_foreground,
                 ),
             )),

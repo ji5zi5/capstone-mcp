@@ -17,7 +17,7 @@ type NativeOperation = Literal[
     "save_experiment", "export_data", "open_experiment",
     "create_graph", "select_graph_measurement",
     "read_graph", "set_graph_fits", "analyze_graph", "observe_graph",
-    "rename_run", "fit_graph", "create_calculation", "delete_run",
+    "rename_run", "fit_graph", "create_calculation", "delete_run", "zero_sensor",
 ]
 
 
@@ -64,6 +64,7 @@ class NativeRequest(Model):
     unit: str | None = None
     keep_open: bool = False
     run_name: str = "last_run"
+    sensor_name: str | None = None
 
 
 class RequestPacket(Model):

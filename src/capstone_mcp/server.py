@@ -72,6 +72,7 @@ from capstone_mcp.sensor_settings import (
     SensorSelection,
     SensorSelectionRequest,
 )
+from capstone_mcp.sensor_zero import ZeroSensorResult
 
 DEFAULT_FIT_OFFSET: Final = Point(x=20, y=20)
 WORKER: Final = AutomationWorker()
@@ -822,6 +823,20 @@ async def capstone_delete_run(
     """Delete a run from Data Summary, auto-confirming any modal dialog."""
     return DeleteRunResult.model_validate(await _native(NativeRequest(
         operation="delete_run", handle=handle, run_name=run_name,
+        allow_foreground=allow_foreground,
+    ), mutates=True))
+
+
+@MCP.tool()
+async def capstone_zero_sensor(
+    handle: int = 0,
+    *,
+    sensor_name: str | None = None,
+    allow_foreground: bool = True,
+) -> ZeroSensorResult:
+    """Execute zero/tare for all connected sensors or a specified target sensor."""
+    return ZeroSensorResult.model_validate(await _native(NativeRequest(
+        operation="zero_sensor", handle=handle, sensor_name=sensor_name,
         allow_foreground=allow_foreground,
     ), mutates=True))
 
