@@ -17,6 +17,7 @@ from capstone_mcp.desktop import AutomationError, Capstone
 from capstone_mcp.file_workflows import export_data, save_experiment
 from capstone_mcp.models import Result
 from capstone_mcp.repetition import NativeRecordingBackend, RepeatPlan
+from capstone_mcp.run_rename import RenameRunRequest, rename_run
 from capstone_mcp.sensor_settings import (
     SamplingRateRequest,
     SensorConfiguration,
@@ -101,6 +102,12 @@ class NativeDesktop:
             )),
             "export_data": lambda r: _json(export_data(
                 self.app, r.handle, r.value, allow_foreground=r.allow_foreground,
+            )),
+            "rename_run": lambda r: _json(rename_run(
+                self.app, RenameRunRequest(
+                    handle=r.handle, old_name=r.old_name, new_name=r.new_name,
+                    allow_foreground=r.allow_foreground,
+                ),
             )),
         }
 

@@ -13,7 +13,7 @@ type NativeOperation = Literal[
     "recording_status", "set_recording", "step_sampling_rate",
     "select_sensor", "configure_sensor",
     "recording_initialize", "recording_observe", "recording_change",
-    "save_experiment", "export_data",
+    "save_experiment", "export_data", "rename_run",
 ]
 
 
@@ -39,6 +39,8 @@ class NativeRequest(Model):
     direction: Literal["increase", "decrease"] = "increase"
     sensor: str = ""
     target: str = ""
+    old_name: str = ""
+    new_name: str = ""
     step_limit: int = 128
     allow_foreground: bool = True
     scale: float = 1.0

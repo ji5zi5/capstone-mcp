@@ -48,6 +48,7 @@ from capstone_mcp.file_workflows import FileArtifact
 from capstone_mcp.models import Action, Button, Model, Point, Result, Snapshot, Window
 from capstone_mcp.plotting import PlotInput, render_plot
 from capstone_mcp.repetition import AcquisitionJobs, JobStatus, RepeatPlan
+from capstone_mcp.run_rename import RenameRunResult
 from capstone_mcp.sensor_settings import (
     SamplingRateRequest,
     SensorConfiguration,
@@ -510,6 +511,21 @@ async def capstone_type_text(
     return Result.model_validate(await _native(NativeRequest(
         operation="keys", handle=handle, value=escaped,
         allow_foreground=allow_foreground, unicode_input=True,
+    ), mutates=True))
+
+
+@MCP.tool()
+async def capstone_rename_run(
+    handle: int,
+    old_name: str,
+    new_name: str,
+    *,
+    allow_foreground: bool = True,
+) -> RenameRunResult:
+    """Rename a specific Run item in the Data Summary tree safely."""
+    return RenameRunResult.model_validate(await _native(NativeRequest(
+        operation="rename_run", handle=handle, old_name=old_name,
+        new_name=new_name, allow_foreground=allow_foreground,
     ), mutates=True))
 
 
