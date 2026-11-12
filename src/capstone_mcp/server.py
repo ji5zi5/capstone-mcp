@@ -4,6 +4,7 @@
 import base64
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager, nullcontext
+from pathlib import Path
 from typing import Annotated, Final, Literal
 from uuid import UUID
 
@@ -76,6 +77,11 @@ from capstone_mcp.oscilloscope_fft import (
 )
 from capstone_mcp.plotting import PlotInput, render_plot
 from capstone_mcp.repetition import AcquisitionJobs, JobStatus, RepeatPlan
+from capstone_mcp.reports import (
+    GenerateLabReportResult,
+    generate_report,
+    render_report,
+)
 from capstone_mcp.run_delete import DeleteRunResult
 from capstone_mcp.run_rename import RenameRunResult
 from capstone_mcp.run_visibility import SetRunVisibilityResult
@@ -1583,6 +1589,87 @@ async def capstone_set_page_layout(
         page_name=page_name,
         allow_foreground=allow_foreground,
     ), mutates=True))
+
+
+def _write_report_file(
+    out_path: str,
+    format_type: str,
+    md_text: str | None,
+    html_text: str | None,
+) -> None:
+    p = Path(out_path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    if format_type == "html":
+        p.write_text(html_text or "", encoding="utf-8")
+    elif format_type == "both":
+        if md_text:
+            p.write_text(md_text, encoding="utf-8")
+        if html_text:
+            p.with_suffix(".html").write_text(html_text, encoding="utf-8")
+    else:
+        p.write_text(md_text or "", encoding="utf-8")
+
+
+@MCP.tool()
+async def capstone_generate_lab_report(
+    file_path_or_run: str,
+    experiment_id: str = "generic",
+    *,
+    output_path: str | None = None,
+    format: Literal["markdown", "html", "both"] = "markdown",  # noqa: A002
+) -> GenerateLabReportResult:
+    """Generate a formal physics laboratory report from experiment data.
+
+    Ingests data from a .cap archive, CSV file, JSON payload, or active run,
+    computes summary statistics, regression parameters (slope, intercept, R^2),
+    performs error analysis against accepted theoretical physical constants
+    (e.g. Planck's constant h, resonant frequency f_0, adiabatic index gamma),
+    generates ASCII plots, and renders publication-ready Markdown and HTML.
+
+    Args:
+        file_path_or_run: Path to a .cap archive, CSV/JSON file, or active run name.
+        experiment_id: Canonical experiment identifier ('photoelectric_effect',
+            'rlc_resonance', 'forced_harmonic_oscillation', 'adiabatic_gas',
+            'slit_diffraction', or 'generic').
+        output_path: Optional path to save the generated report file.
+        format: Output format ('markdown', 'html', or 'both').
+
+    Returns:
+        GenerateLabReportResult containing the report model, rendered text, and status.
+    """
+    report = generate_report(
+        file_path_or_run=file_path_or_run,
+        experiment_id=experiment_id,
+    )
+    rendered = render_report(report, report_format=format)
+    md_text = rendered.get("markdown")
+    html_text = rendered.get("html")
+
+    if output_path:
+        await anyio.to_thread.run_sync(
+            _write_report_file,
+            output_path,
+            format,
+            md_text,
+            html_text,
+        )
+
+    summary_text = (
+        f"Generated {format} report for '{report.metadata.title}' with "
+        f"{len(report.data_summaries)} data summaries and "
+        f"{len(report.error_analysis)} error analyses."
+    )
+
+    return GenerateLabReportResult(
+        experiment_id=experiment_id,
+        title=report.metadata.title,
+        format=format,
+        output_path=output_path,
+        report_markdown=md_text,
+        report_html=html_text,
+        summary=summary_text,
+        lab_report=report,
+    )
 
 
 # ---------------------------------------------------------------------------
