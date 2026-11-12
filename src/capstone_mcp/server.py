@@ -45,8 +45,10 @@ from capstone_mcp.experiment_analysis import (
     fit_cap_datasets,
 )
 from capstone_mcp.file_workflows import FileArtifact
+from capstone_mcp.graph_control import FitGraphResult
 from capstone_mcp.models import Action, Button, Model, Point, Result, Snapshot, Window
 from capstone_mcp.plotting import PlotInput, render_plot
+from capstone_mcp.popup_selection import SelectMeasurementResult
 from capstone_mcp.repetition import AcquisitionJobs, JobStatus, RepeatPlan
 from capstone_mcp.run_rename import RenameRunResult
 from capstone_mcp.sensor_settings import (
@@ -56,6 +58,7 @@ from capstone_mcp.sensor_settings import (
     SensorSelectionRequest,
 )
 
+DEFAULT_FIT_OFFSET: Final = Point(x=20, y=20)
 WORKER: Final = AutomationWorker()
 JOBS: Final = AcquisitionJobs()
 WINDOWS: Final = TypeAdapter(list[Window])
@@ -511,6 +514,38 @@ async def capstone_type_text(
     return Result.model_validate(await _native(NativeRequest(
         operation="keys", handle=handle, value=escaped,
         allow_foreground=allow_foreground, unicode_input=True,
+    ), mutates=True))
+
+
+@MCP.tool()
+async def capstone_select_graph_measurement(
+    handle: int,
+    point: Point,
+    menu_path: list[str],
+    *,
+    allow_foreground: bool = True,
+) -> SelectMeasurementResult:
+    """Open popup menu at point and select target measurement with rollback."""
+    return SelectMeasurementResult.model_validate(await _native(NativeRequest(
+        operation="select_measurement", handle=handle, point=point,
+        menu_path=menu_path, allow_foreground=allow_foreground,
+    ), mutates=True))
+
+
+@MCP.tool()
+async def capstone_fit_graph(
+    handle: int = 0,
+    *,
+    mode: Literal["scale_to_fit", "manual_bounds"] = "scale_to_fit",
+    graph_name: str | None = None,
+    offset: Point = DEFAULT_FIT_OFFSET,
+    allow_foreground: bool = True,
+) -> FitGraphResult:
+    """Scale graph axes to fit all data or adjust bounds deterministically."""
+    return FitGraphResult.model_validate(await _native(NativeRequest(
+        operation="fit_graph", handle=handle, mode=mode,
+        target=graph_name or "", point=offset,
+        allow_foreground=allow_foreground,
     ), mutates=True))
 
 

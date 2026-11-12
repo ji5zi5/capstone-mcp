@@ -15,7 +15,12 @@ from capstone_mcp.acquisition import (
 )
 from capstone_mcp.desktop import AutomationError, Capstone
 from capstone_mcp.file_workflows import export_data, save_experiment
-from capstone_mcp.models import Result
+from capstone_mcp.graph_control import FitGraphRequest, fit_graph
+from capstone_mcp.models import Point, Result
+from capstone_mcp.popup_selection import (
+    SelectMeasurementRequest,
+    select_graph_measurement,
+)
 from capstone_mcp.repetition import NativeRecordingBackend, RepeatPlan
 from capstone_mcp.run_rename import RenameRunRequest, rename_run
 from capstone_mcp.sensor_settings import (
@@ -106,6 +111,22 @@ class NativeDesktop:
             "rename_run": lambda r: _json(rename_run(
                 self.app, RenameRunRequest(
                     handle=r.handle, old_name=r.old_name, new_name=r.new_name,
+                    allow_foreground=r.allow_foreground,
+                ),
+            )),
+            "select_measurement": lambda r: _json(select_graph_measurement(
+                self.app, SelectMeasurementRequest(
+                    handle=r.handle,
+                    point=r.point,
+                    menu_path=r.menu_path or [],
+                    allow_foreground=r.allow_foreground,
+                ),
+            )),
+            "fit_graph": lambda r: _json(fit_graph(
+                self.app, FitGraphRequest(
+                    handle=r.handle, mode=r.mode,
+                    graph_name=r.target or r.graph_name,
+                    offset=r.point if (r.point.x or r.point.y) else Point(x=20, y=20),
                     allow_foreground=r.allow_foreground,
                 ),
             )),

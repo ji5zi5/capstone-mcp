@@ -13,7 +13,7 @@ type NativeOperation = Literal[
     "recording_status", "set_recording", "step_sampling_rate",
     "select_sensor", "configure_sensor",
     "recording_initialize", "recording_observe", "recording_change",
-    "save_experiment", "export_data", "rename_run",
+    "save_experiment", "export_data", "rename_run", "fit_graph", "select_measurement",
 ]
 
 
@@ -46,6 +46,13 @@ class NativeRequest(Model):
     scale: float = 1.0
     crop_region: list[int] | None = None
     plan: JsonValue = None
+    graph_ref: str | None = None
+    graph_name: str | None = None
+    mode: str = "scale_to_fit"
+    offset_x: int = 20
+    offset_y: int = 20
+    menu_path: list[str] | None = None
+
 
 
 class RequestPacket(Model):
