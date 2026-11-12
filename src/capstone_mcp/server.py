@@ -763,21 +763,6 @@ async def capstone_type_text(
 
 
 @MCP.tool()
-async def capstone_select_graph_measurement(
-    handle: int,
-    point: Point,
-    menu_path: list[str],
-    *,
-    allow_foreground: bool = True,
-) -> SelectMeasurementResult:
-    """Open popup menu at point and select target measurement with rollback."""
-    return SelectMeasurementResult.model_validate(await _native(NativeRequest(
-        operation="select_measurement", handle=handle, point=point,
-        menu_path=menu_path, allow_foreground=allow_foreground,
-    ), mutates=True))
-
-
-@MCP.tool()
 async def capstone_fit_graph(
     handle: int = 0,
     *,

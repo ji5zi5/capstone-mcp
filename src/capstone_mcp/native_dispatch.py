@@ -169,7 +169,6 @@ class NativeDesktop:
                     allow_foreground=r.allow_foreground,
                 ),
             )),
-            )),
         }
 
     def dispatch(self, request: NativeRequest) -> JsonValue:

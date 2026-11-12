@@ -56,8 +56,6 @@ class NativeRequest(Model):
     menu_path: list[str] = Field(default_factory=list)
     graph_request: JsonValue = None
     frame_id: str = ""
-    old_name: str = ""
-    new_name: str = ""
     mode: str = "scale_to_fit"
     offset_x: int = 20
     offset_y: int = 20
