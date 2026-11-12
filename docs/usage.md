@@ -196,6 +196,124 @@ Remove-Item Env:QTWEBENGINE_REMOTE_DEBUGGING
 
 단일 시작·정지는 `capstone_set_recording`을 사용합니다. 응답의 `transition_pending`이 `true`라면 `capstone_recording_status`로 실제 상태를 다시 확인하세요.
 
+## 표(Table)와 대형 수치(Digits) 디스플레이
+
+실험 페이지에 표나 대형 디지털 수치 모니터를 생성하고 데이터를 추출할 수 있습니다.
+
+### 1. 표 생성 및 데이터 조회
+
+- `capstone_create_table`: 활성 페이지에 새 표 위젯을 배치합니다.
+- `capstone_set_table_columns`: 특정 측정값이나 계산식으로 열을 매핑합니다.
+- `capstone_read_table`: 표에 렌더링된 셀 데이터(페이지네이션 지원)와 열 요약 통계를 읽습니다.
+
+```json
+{
+  "table_name": "Table 1",
+  "page": 1,
+  "page_size": 20,
+  "include_statistics": true
+}
+```
+
+### 2. 대형 수치(Digits) 디스플레이
+
+- `capstone_create_digits`: 단일 센서 측정값이나 계산 결과를 거대한 글꼴로 모니터링하는 Digits 위젯을 추가합니다.
+
+```json
+{
+  "measurement": "Velocity",
+  "digits_name": "Speed Monitor"
+}
+```
+
+## 그래프 툴박스와 다중 회차(Run) 비교
+
+그래프 상단의 고급 분석 툴바 도구를 직접 토글하고 수치 계측값을 추출합니다.
+
+- `capstone_toggle_graph_statistics`: 평균(Mean), 표준편차(Std Dev), 최솟값, 최댓값, 표본 수 통계 상자(Σ)를 토글하고 통계치를 추출합니다.
+- `capstone_measure_graph_area`: 곡선 아래 면적 적분(∫y dx) 도구를 토글하고 적분값을 반환합니다 (예: v-t 그래프의 총 변위 계측).
+- `capstone_graph_delta`: 두 점 사이의 좌표 차이(Δx, Δy)와 기울기를 측정하는 델타 십자선 도구를 활성화합니다.
+- `capstone_set_run_visibility`: 그래프나 표에서 특정 회차(예: `["Run #1", "Run #2"]`)만 선택해 동시에 오버레이하여 비교하거나 이전 회차를 숨깁니다.
+
+```json
+{
+  "runs": ["Run #1", "Run #2"],
+  "visible": true
+}
+```
+
+## 함수발생기(Signal Generator) 제어
+
+PASCO 850 Universal Interface 또는 550 Interface의 내장 신호발생기 출력을 제어합니다.
+
+- `capstone_set_signal_generator`: 출력 파형(`Sine`, `Square`, `Triangle`, `Ramp Up`, `Ramp Down`, `DC`), 주파수(Hz), 진폭 전압(V), 전원 On/Off를 설정합니다.
+- `capstone_read_signal_generator_status`: 현재 출력 상태와 파형/전압/주파수를 조회합니다.
+
+```json
+{
+  "waveform": "Sine",
+  "frequency": 1000.0,
+  "amplitude": 2.5,
+  "enabled": true
+}
+```
+
+## 오실로스코프(Scope) 및 FFT 주파수 스펙트럼
+
+고속 샘플링 파형 관측과 주파수 도메인 분석을 위한 전용 디스플레이 도구입니다.
+
+- `capstone_create_scope`: 오실로스코프 디스플레이를 추가하고 타임베이스(예: `"1 ms/div"`)를 설정합니다.
+- `capstone_set_scope_trigger`: 트리거 전압 레벨, 슬로프 엣지(`rising`/`falling`), 트리거 모드(`auto`/`normal`/`single`), 소스 채널을 설정합니다.
+- `capstone_create_fft`: 주파수 스펙트럼을 분석하는 FFT 디스플레이를 생성합니다.
+- `capstone_read_fft_peaks`: FFT 스펙트럼에서 가장 강한 상위 `top_k`개의 피크 주파수(Hz)와 진폭을 자동으로 추출합니다.
+
+```json
+{
+  "fft_id": "FFT 1",
+  "top_k": 3
+}
+```
+
+## 지능형 기록 조건과 수동 샘플링(Keep Sample)
+
+- `capstone_set_recording_condition`: 시간 초과 또는 센서 측정값이 역치(Threshold)를 넘었을 때 자동으로 기록이 시작/정지되도록 트리거 조건을 설정합니다.
+- `capstone_set_sampling_mode`: 연속 기록(`continuous`), 수동 측정(`keep_sample`), 고속 모니터(`fast_monitor`) 모드 간 전환을 수행합니다.
+- `capstone_keep_sample`: 중화 적정이나 보일의 법칙 실험처럼 수동 측정 모드일 때 센서값 1점을 기록하고 대응하는 독립변수(부피, 압력 등)를 함께 기입합니다.
+
+```json
+{
+  "value": 25.0,
+  "variable_name": "Volume"
+}
+```
+
+## 무선 센서 페어링과 캘리브레이션
+
+- `capstone_scan_wireless_sensors`: 주변의 PASCO 무선(Bluetooth) 센서를 검색하여 장치 ID 목록을 반환합니다.
+- `capstone_connect_wireless_sensor`: 검색된 `sensor_id`를 지정해 무선 페어링을 수행합니다.
+- `capstone_calibrate_sensor`: 표준 기준물(Standard 1, Standard 2)을 이용한 1점 또는 2점 센서 교정 위저드를 자동 실행합니다.
+- `capstone_zero_sensor`: 센서 도구 서랍에서 지정된 측정값의 현재 읽기 값을 즉시 영점(0)으로 보정합니다.
+
+```json
+{
+  "sensor_name": "Force Sensor",
+  "calibration_type": "two_point",
+  "standard_1": 0.0,
+  "standard_2": 9.8
+}
+```
+
+## 워크북 페이지와 화면 분할 레이아웃
+
+- `capstone_add_page`: 실험 워크북에 새 탭 페이지를 추가합니다.
+- `capstone_set_page_layout`: 현재 페이지를 다중 디스플레이 템플릿(`two_vertical`, `two_horizontal`, `three_pane`, `four_grid`)으로 자동 분할 배치합니다.
+
+```json
+{
+  "layout": "two_vertical"
+}
+```
+
 ## HTTP 연결
 
 클라이언트가 Streamable HTTP 연결을 지원한다면 저장소 폴더에서 서버를 실행합니다.

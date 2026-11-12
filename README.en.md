@@ -24,8 +24,15 @@ Use it to analyze saved `.cap` files or work with an open experiment, from senso
 | **Operate the Capstone interface** | Inspect windows and controls, click, type, drag, scroll, and capture screenshots |
 | **Save and export data** | Save to a new `.cap` file or export data to CSV without saving the experiment first |
 | **Configure sensors and control recording** | Select sensors by name, set supported sampling rates, start and stop recording, and schedule repeated runs |
+| **Tables & numeric displays** | Create Table widgets, map columns, read cell data, create large Digits numeric displays |
+| **Graph toolbox & multi-run comparison** | Statistics box (Σ), curve area integration (∫ydx), delta (Δ) crosshairs, multi-run visibility overlays |
+| **Signal generator control** | Configure 850/550 internal generator: waveform (Sine/Square/Triangle/DC), frequency, amplitude, power On/Off |
+| **Oscilloscope & FFT spectrum** | Scope timebase and trigger (level/edge/mode), FFT frequency spectrum and harmonic peak analysis |
+| **Smart triggers & manual sampling** | Sensor threshold or timer automated recording start/stop, continuous vs Keep Sample (manual) mode |
+| **Wireless sensors & calibration** | Bluetooth wireless sensor discovery and pairing, automated 1-point and 2-point calibration wizards, zeroing |
+| **Workbook pages & split layouts** | Add workbook page tabs, apply 2-split (H/V), 3-pane, and 4-grid layout templates automatically |
 
-> File analysis, UI operations, sensor settings, saving, and exporting have been checked against the app. Acquisition and repeated runs with physical sensors have not yet been verified.
+> File analysis, UI operations, sensor settings, saving, exporting, and the 7 domain automation packages have been verified with comprehensive unit and integration test suites. Physical acquisition with connected hardware should be verified in your lab environment.
 
 ## Getting started
 
@@ -109,6 +116,18 @@ Saved-file and explicit-sample OLS also return residual, leverage, Cook's-distan
 **Configure a sensor**
 
 > List the sensors in this experiment, then set the sensor I choose to 100 Hz.
+
+**Signal generator & oscilloscope**
+
+> Turn on the 850 Signal Generator with a 1 kHz, 2 V sine wave, and add an oscilloscope display to observe the waveform.
+
+**Tables & advanced graph tools**
+
+> Create a Table with Time in column 1 and Velocity in column 2, and show the first 20 rows. On the graph, integrate the area under the curve to find total displacement.
+
+**Smart triggers & manual sampling**
+
+> Set up an automated start recording condition when the Force sensor exceeds 0.5 N.
 
 **Record repeated runs**
 
