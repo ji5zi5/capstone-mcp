@@ -29,6 +29,7 @@ from capstone_mcp.analysis import (
 from capstone_mcp.automation_models import NativeRequest
 from capstone_mcp.automation_worker import AutomationWorker
 from capstone_mcp.bridge import NativeInventory, read_inventory, read_measurement
+from capstone_mcp.calculator import CreateCalculationResult
 from capstone_mcp.capfile_models import (
     CapConfigurationView,
     CapDatasetPage,
@@ -791,6 +792,22 @@ async def capstone_rename_run(
     return RenameRunResult.model_validate(await _native(NativeRequest(
         operation="rename_run", handle=handle, old_name=old_name,
         new_name=new_name, allow_foreground=allow_foreground,
+    ), mutates=True))
+
+
+@MCP.tool()
+async def capstone_create_calculation(
+    expression: str,
+    handle: int = 0,
+    *,
+    unit: str | None = None,
+    allow_foreground: bool = True,
+    keep_open: bool = False,
+) -> CreateCalculationResult:
+    """Register a formula and optional unit in Capstone Calculator with auto-cleanup."""
+    return CreateCalculationResult.model_validate(await _native(NativeRequest(
+        operation="create_calculation", handle=handle, expression=expression,
+        unit=unit, allow_foreground=allow_foreground, keep_open=keep_open,
     ), mutates=True))
 
 

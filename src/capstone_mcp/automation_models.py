@@ -17,7 +17,7 @@ type NativeOperation = Literal[
     "save_experiment", "export_data", "open_experiment",
     "create_graph", "select_graph_measurement",
     "read_graph", "set_graph_fits", "analyze_graph", "observe_graph",
-    "rename_run", "fit_graph",
+    "rename_run", "fit_graph", "create_calculation",
 ]
 
 
@@ -60,6 +60,9 @@ class NativeRequest(Model):
     offset_x: int = 20
     offset_y: int = 20
     graph_name: str | None = None
+    expression: str = ""
+    unit: str | None = None
+    keep_open: bool = False
 
 
 class RequestPacket(Model):

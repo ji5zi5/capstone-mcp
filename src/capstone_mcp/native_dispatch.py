@@ -16,6 +16,7 @@ from capstone_mcp.acquisition import (
     request_recording,
     step_sampling_rate,
 )
+from capstone_mcp.calculator import CreateCalculationRequest, create_calculation
 from capstone_mcp.desktop import AutomationError, Capstone
 from capstone_mcp.file_workflows import (
     export_data,
@@ -167,6 +168,15 @@ class NativeDesktop:
                     graph_name=r.target or r.graph_name,
                     offset=r.point if (r.point.x or r.point.y) else Point(x=20, y=20),
                     allow_foreground=r.allow_foreground,
+                ),
+            )),
+            "create_calculation": lambda r: _json(create_calculation(
+                self.app, CreateCalculationRequest(
+                    handle=r.handle,
+                    expression=r.expression,
+                    unit=r.unit,
+                    allow_foreground=r.allow_foreground,
+                    keep_open=r.keep_open,
                 ),
             )),
         }
