@@ -64,6 +64,7 @@ from capstone_mcp.graph_state import FitModel, GraphState
 from capstone_mcp.models import Action, Button, Model, Point, Result, Snapshot, Window
 from capstone_mcp.plotting import PlotInput, render_plot
 from capstone_mcp.repetition import AcquisitionJobs, JobStatus, RepeatPlan
+from capstone_mcp.run_delete import DeleteRunResult
 from capstone_mcp.run_rename import RenameRunResult
 from capstone_mcp.sensor_settings import (
     SamplingRateRequest,
@@ -808,6 +809,20 @@ async def capstone_create_calculation(
     return CreateCalculationResult.model_validate(await _native(NativeRequest(
         operation="create_calculation", handle=handle, expression=expression,
         unit=unit, allow_foreground=allow_foreground, keep_open=keep_open,
+    ), mutates=True))
+
+
+@MCP.tool()
+async def capstone_delete_run(
+    handle: int = 0,
+    *,
+    run_name: str = "last_run",
+    allow_foreground: bool = True,
+) -> DeleteRunResult:
+    """Delete a run from Data Summary, auto-confirming any modal dialog."""
+    return DeleteRunResult.model_validate(await _native(NativeRequest(
+        operation="delete_run", handle=handle, run_name=run_name,
+        allow_foreground=allow_foreground,
     ), mutates=True))
 
 

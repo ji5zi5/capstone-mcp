@@ -42,6 +42,7 @@ from capstone_mcp.graph_workflows import (
 )
 from capstone_mcp.models import Point, Result
 from capstone_mcp.repetition import NativeRecordingBackend, RepeatPlan
+from capstone_mcp.run_delete import DeleteRunRequest, delete_run
 from capstone_mcp.run_rename import RenameRunRequest, rename_run
 from capstone_mcp.sensor_settings import (
     SamplingRateRequest,
@@ -177,6 +178,13 @@ class NativeDesktop:
                     unit=r.unit,
                     allow_foreground=r.allow_foreground,
                     keep_open=r.keep_open,
+                ),
+            )),
+            "delete_run": lambda r: _json(delete_run(
+                self.app, DeleteRunRequest(
+                    handle=r.handle,
+                    run_name=r.run_name,
+                    allow_foreground=r.allow_foreground,
                 ),
             )),
         }
