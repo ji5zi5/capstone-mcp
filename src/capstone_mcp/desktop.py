@@ -41,6 +41,21 @@ def describe(window: UIAWrapper) -> Window:
     )
 
 
+def tokenize_keys(keys_str: str) -> list[str]:
+    """Tokenize pywinauto key string into characters and braced tokens."""
+    tokens: list[str] = []
+    i = 0
+    while i < len(keys_str):
+        if keys_str[i] == "{" and "}" in keys_str[i:]:
+            end = keys_str.index("}", i) + 1
+            tokens.append(keys_str[i:end])
+            i = end
+        else:
+            tokens.append(keys_str[i])
+            i += 1
+    return tokens
+
+
 class Capstone:
     """Keep references for the latest snapshot; all calls run on one MCP thread."""
 
@@ -233,9 +248,39 @@ class Capstone:
         if not allow_foreground:
             msg = "Keyboard input changes focus. Set allow_foreground=true explicitly."
             raise AutomationError(msg)
-        _ = self.focus_window(handle).type_keys(
-            keys, with_spaces=True, set_foreground=False, pause=0,
-            vk_packet=unicode_input,
-        )
+        target = self.focus_window(handle)
+        if unicode_input:
+            initial_windows = {w.handle for w in self.windows()}
+            tokens = tokenize_keys(keys)
+            typed_tokens: list[str] = []
+            for token in tokens:
+                _ = target.type_keys(
+                    token, with_spaces=True, set_foreground=False, pause=0,
+                    vk_packet=True,
+                )
+                typed_tokens.append(token)
+                current_windows = self.windows()
+                new_popups = [
+                    w for w in current_windows if w.handle not in initial_windows
+                ]
+                if new_popups:
+                    self.refs.clear()
+                    typed_str = "".join(typed_tokens)
+                    popup = new_popups[0]
+                    return Result(
+                        delivered=True,
+                        interrupted=True,
+                        typed_text=typed_str,
+                        popup_window=popup,
+                        detail=(
+                            f"Typing interrupted by popup window '{popup.title}' "
+                            f"(handle {popup.handle})."
+                        ),
+                    )
+        else:
+            _ = target.type_keys(
+                keys, with_spaces=True, set_foreground=False, pause=0,
+                vk_packet=False,
+            )
         self.refs.clear()
         return Result(detail="Keys delivered; inspect the window to verify.")

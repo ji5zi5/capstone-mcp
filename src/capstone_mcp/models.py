@@ -83,3 +83,6 @@ class Result(Model):
 
     delivered: bool = True
     detail: str
+    interrupted: bool = False
+    typed_text: str | None = None
+    popup_window: Window | None = None
