@@ -147,7 +147,7 @@ def _decimal(
     *,
     context: str,
 ) -> Decimal | None:
-    if raw is None:
+    if raw is None or raw == "":
         return None
     try:
         value = Decimal(raw)
@@ -405,6 +405,15 @@ def _records(payload: bytes, count: int, *, member_name: str) -> list[str]:
         record_type = int.from_bytes(payload[offset : offset + 4], "little")
         value_size = int.from_bytes(payload[offset + 4 : offset + 8], "little")
         offset += RECORD_HEADER_SIZE
+        if record_type == 0:
+            if value_size != 0:
+                msg = (
+                    f"Unsupported non-zero size {value_size} for empty record "
+                    f"type 0 in {member_name!r}."
+                )
+                raise CapFileError(msg)
+            values.append("")
+            continue
         if record_type != TEXT_RECORD_TYPE:
             msg = (
                 f"Unsupported record type {record_type} in "
@@ -590,13 +599,10 @@ def _dataset(
         dependent_type != NUMERIC_STORAGE_TYPE
         and source.value_kind is CapValueKind.NUMERIC
     ):
-        numeric_values = []
-        for index, raw in enumerate(values):
-            numeric = _decimal(raw, context=f"{member_name} record {index}")
-            if numeric is None:
-                msg = f"Numeric dataset value {index} is missing."
-                raise CapFileError(msg)
-            numeric_values.append(numeric)
+        numeric_values = [
+            _decimal(raw, context=f"{member_name} record {index}")
+            for index, raw in enumerate(values)
+        ]
     elif (
         dependent_type != NUMERIC_STORAGE_TYPE
         and source.value_kind is CapValueKind.TEXT

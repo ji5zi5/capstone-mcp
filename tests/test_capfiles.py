@@ -302,6 +302,23 @@ def test_rejects_unsupported_payload_record_type(tmp_path: Path) -> None:
         _ = read_cap_file(cap_path)
 
 
+def test_reads_sparse_dataset_with_empty_records(tmp_path: Path) -> None:
+    cap_path = tmp_path / "sparse.cap"
+    payload = bytearray()
+    payload.extend(struct.pack("<II", 0, 0))
+    payload.extend(struct.pack("<II", 0, 0))
+    val1 = "1.25".encode("utf-16-le")
+    payload.extend(struct.pack("<II", 2, len(val1)))
+    payload.extend(val1)
+    val2 = "2.50".encode("utf-16-le")
+    payload.extend(struct.pack("<II", 2, len(val2)))
+    payload.extend(val2)
+
+    _write_cap(cap_path, xml=_xml(count=4), payload=bytes(payload))
+    ds = extract_cap_datasets(cap_path)[0]
+    assert ds.numeric_values == [None, None, Decimal("1.25"), Decimal("2.50")]
+
+
 def test_rejects_nonnumeric_value_from_numeric_source(tmp_path: Path) -> None:
     cap_path = tmp_path / "not-numeric.cap"
     _write_cap(
