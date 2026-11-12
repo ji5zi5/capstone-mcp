@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import hashlib
+import time
 from _ctypes import COMError
 from pathlib import Path
 from typing import TYPE_CHECKING, Final, Literal
@@ -19,6 +20,11 @@ if TYPE_CHECKING:
 
 MAX_OUTPUT_BYTES: Final = 64 * 1024 * 1024
 TRANSITION_SECONDS: Final = 15
+TITLE_SECONDS: Final = 3.0
+TITLE_POLL_SECONDS: Final = 0.1
+OPEN_SECONDS: Final = 40.0
+OPEN_STABLE_SECONDS: Final = 1.0
+OPEN_FIELD_ID: Final = "1148"
 
 
 class FileArtifact(Model):
@@ -31,6 +37,15 @@ class FileArtifact(Model):
     document_title_before: str
     document_title_after: str
     precision: Literal["native-cache", "capstone-export"]
+
+
+class OpenedExperiment(Model):
+    """A document opened through the native dialog and confirmed by its title."""
+
+    path: str
+    document_title_before: str
+    document_title_after: str
+    discarded_unsaved_changes: bool
 
 
 def _one(snapshot: Snapshot, predicate: Callable[[Control], bool]) -> Control:
@@ -177,6 +192,23 @@ def _prepare(
     return path, windows[0].title, windows[0].process_id
 
 
+def settled_title(
+    app: Capstone, handle: int, path: Path, kind: Literal["cap", "csv"],
+) -> str:
+    """Read the title after Save As renamed the document, within a short bound.
+
+    Capstone retitles the window shortly after the file is closed; an immediate
+    read returned the previous name. Export never renames the document.
+    """
+    deadline = time.monotonic() + TITLE_SECONDS
+    while True:
+        title = next(w.title for w in app.windows() if w.handle == handle)
+        renamed = title.startswith(path.name)
+        if kind != "cap" or renamed or time.monotonic() >= deadline:
+            return title
+        time.sleep(TITLE_POLL_SECONDS)
+
+
 def _artifact(
     app: Capstone, handle: int, path: Path, before: str,
     kind: Literal["cap", "csv"],
@@ -185,7 +217,7 @@ def _artifact(
     if size > MAX_OUTPUT_BYTES:
         msg = "Output was created but exceeds the 64 MiB extraction limit."
         raise AutomationError(msg)
-    after = next(w.title for w in app.windows() if w.handle == handle)
+    after = settled_title(app, handle, path, kind)
     return FileArtifact(
         path=str(path), format=kind, size_bytes=size,
         sha256=hashlib.sha256(path.read_bytes()).hexdigest(),
@@ -251,3 +283,114 @@ def export_data(
             TRANSITION_SECONDS,
         )
     return _artifact(app, handle, path, before, "csv")
+
+
+def _is_open_field(control: Control) -> bool:
+    return control.control_type == "Edit" and control.automation_id == OPEN_FIELD_ID
+
+
+def _is_discard(control: Control) -> bool:
+    return control.control_type == "Button" and control.name == "Discard"
+
+
+def await_opened(app: Capstone, handle: int, path: Path) -> str:
+    """Wait until only the experiment window remains and carries the file name.
+
+    The loading progress window can appear after the file dialog closes, so the
+    title must stay confirmed for a short stable period before it is accepted.
+    """
+    deadline = time.monotonic() + OPEN_SECONDS
+    stable_since: float | None = None
+    while time.monotonic() < deadline:
+        windows = app.windows()
+        title = next((w.title for w in windows if w.handle == handle), "")
+        if len(windows) == 1 and title.startswith(path.name):
+            if stable_since is None:
+                stable_since = time.monotonic()
+            if time.monotonic() - stable_since >= OPEN_STABLE_SECONDS:
+                return title
+        else:
+            stable_since = None
+        time.sleep(TITLE_POLL_SECONDS)
+    msg = (
+        "Open was requested but the experiment title did not confirm it in time. "
+        "Capstone may still be loading; inspect capstone_windows before more input."
+    )
+    raise AutomationError(msg)
+
+
+def _open_preconditions(
+    app: Capstone, handle: int, source: str, *, discard_unsaved: bool,
+) -> tuple[Path, str, int]:
+    path = Path(source).resolve()
+    if path.suffix.lower() != ".cap" or not path.is_file():
+        msg = "Choose an existing .cap file to open."
+        raise AutomationError(msg)
+    windows = app.windows()
+    if len(windows) != 1 or windows[0].handle != handle:
+        msg = (
+            "Close existing Capstone dialogs/menus before this workflow: "
+            + ", ".join(f"{w.handle}: {w.title}" for w in windows)
+        )
+        raise AutomationError(msg)
+    before = windows[0].title
+    if before.endswith("*") and not discard_unsaved:
+        msg = (
+            f"The open experiment has unsaved changes ({before}). Save it with "
+            "capstone_save_experiment first, or pass discard_unsaved=true to "
+            "drop them."
+        )
+        raise AutomationError(msg)
+    return path, before, windows[0].process_id
+
+
+def open_experiment(
+    app: Capstone, handle: int, source: str,
+    *, discard_unsaved: bool = False, allow_foreground: bool = True,
+) -> OpenedExperiment:
+    """Open an existing .cap through File > Open Experiment, replacing the document."""
+    if not allow_foreground:
+        msg = "Opening uses native dialog input; foreground input is disabled."
+        raise AutomationError(msg)
+    path, before, pid = _open_preconditions(
+        app, handle, source, discard_unsaved=discard_unsaved,
+    )
+    discarded = False
+    with WindowEvents(pid) as events:
+        previous = _open_command(app, events, handle, "mActionOpenExperiment")
+        dialog = events.changes.until(
+            lambda: _new_snapshot(
+                app, previous,
+                lambda s: any(_is_open_field(c) or _is_discard(c) for c in s.controls),
+                depth=12,
+            ),
+            TRANSITION_SECONDS, description="Open Experiment dialog",
+        )
+        if any(_is_discard(c) for c in dialog.controls):
+            if not discard_unsaved:
+                msg = (
+                    "Capstone asks whether to save the current experiment. Answer "
+                    "that prompt deliberately; nothing was opened or discarded."
+                )
+                raise AutomationError(msg)
+            _ = app.act(_one(dialog, _is_discard).ref, Action.INVOKE)
+            discarded = True
+            dialog = events.changes.until(
+                lambda: _new_snapshot(
+                    app, previous,
+                    lambda s: any(_is_open_field(c) for c in s.controls),
+                    depth=12,
+                ),
+                TRANSITION_SECONDS, description="Open Experiment file dialog",
+            )
+        _ = app.set_value(_one(dialog, _is_open_field).ref, str(path))
+        confirm = _one(
+            app.snapshot(dialog.window.handle, 12, 1500),
+            lambda c: c.control_type == "Button" and c.automation_id == "1",
+        )
+        _ = app.act(confirm.ref, Action.INVOKE)
+        after = await_opened(app, handle, path)
+    return OpenedExperiment(
+        path=str(path), document_title_before=before, document_title_after=after,
+        discarded_unsaved_changes=discarded,
+    )

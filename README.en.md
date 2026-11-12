@@ -90,9 +90,17 @@ Replace the example path with an existing `.cap` file. To operate the app instea
 
 ## Example requests
 
+The MCP exposes workflow instructions, strict graph-request schemas, and tool annotations. Read the graph and a fresh screenshot before fitting; pass its `data_signature` as `expected_data_signature` to reject changed source/run/unit bindings. This signature does not detect live sample changes or a moved graph. Results include explicit native solver status and a machine-readable next action.
+
+Use `capstone_observe_graph` for the image and required one-use `frame_id` before graph input. Changed window bounds or image pixels reject the request before execution; this also rejects live-update changes and is not a lock against concurrent desktop input. `capstone_graph_recovery` exposes the last failed stage, confirmed steps and possible partial input without replaying it. `capstone_graph_report` compares native results only within matching renderer/run/unit groups, reports parameter complexity and descriptive MSE/RMSE minima, and never invents missing AIC/BIC or declares an overall best model.
+
+Frame observation activates the graph and captures its visible client area. Read graph data or comparison reports before capturing a frame; their menus may otherwise invalidate the image.
+
+Saved-file and explicit-sample OLS also return residual, leverage, Cook's-distance, and adjacent-residual-correlation diagnostics. Per-sample arrays are limited to the first 256 observations, with explicit truncation metadata; calculations use all observations. Influence flags are descriptive, not significance tests or instructions to remove data. These diagnostics are computed by the MCP, not Capstone's native solver.
+
 **Analyze data**
 
-> Find the force and acceleration datasets from the same run in this file. Show a scatter plot and a linear fit.
+> Add a graph to the open Capstone experiment, select data from the same run, and compare linear and quadratic fits. Report Capstone's own coefficients and errors.
 
 **Export data before saving**
 
@@ -134,7 +142,8 @@ This extra launch configuration is not needed for ordinary UI operations, saved-
 - UI operations may bring Capstone to the foreground. Use an unlocked desktop and avoid simultaneous control from multiple clients.
 - Saving and exporting never overwrite an existing file. Saving a new `.cap` file also changes the active experiment's file path.
 - CSV uses Capstone's display precision and aligns data by index, not necessarily by time. Extract values from a saved `.cap` file when you need the stored numerical precision.
-- Plots and analysis results are returned to the AI client; they do not modify Capstone pages. Sample indices are not timestamps, and units are not converted automatically.
+- Graph creation, axis selection, and 23 built-in fitting models operate directly on Capstone pages. Repeating the same model configuration does not toggle existing fits off.
+- Graph verification uses Capstone's Copy Display data and replaces the Windows clipboard with the selected graph. Coefficients, uncertainties, metrics, and run IDs come from Capstone itself. Custom-expression editing is not included.
 - If native automation times out, the worker process is stopped without replaying the input. Check the app's recording and save state before reconnecting with `capstone_attach`.
 - The server uses internal interfaces and UI controls. Compatibility may vary with the Capstone version and screen configuration.
 

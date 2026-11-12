@@ -32,3 +32,37 @@ def test_successful_zero_remains_a_valid_measurement(
     value = bridge.read_measurement(9223, "{measurement}", 0)
     # Then
     assert value == 0
+
+
+def test_inventory_accepts_builds_without_codable_interfaces(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Given: the category set observed from Capstone 2.5.0, which reports no
+    # codableInterfaces key at all.
+    def capstone_2_5(_port: int, _expression: str) -> JsonValue:
+        return {
+            "accessories": [], "codeNodes": [], "controlNodes": [],
+            "measurements": [{"MeasurementName": "Voltage, Ch X1"}],
+            "outputs": [], "sensors": [{"SensorID": 20128}],
+        }
+
+    monkeypatch.setattr(bridge, "evaluate", capstone_2_5)
+    # When
+    inventory = bridge.read_inventory(9223)
+    # Then: the absent category is reported as absent rather than invented.
+    assert inventory.codable_interfaces is None
+    assert inventory.outputs == []
+    assert inventory.sensors == [{"SensorID": 20128}]
+
+
+def test_inventory_still_requires_sensors_and_measurements(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Given: a reply that is not a sensor inventory at all.
+    def unrelated(_port: int, _expression: str) -> JsonValue:
+        return {"accessories": []}
+
+    monkeypatch.setattr(bridge, "evaluate", unrelated)
+    # When / Then
+    with pytest.raises(ValueError, match="measurements"):
+        _ = bridge.read_inventory(9223)

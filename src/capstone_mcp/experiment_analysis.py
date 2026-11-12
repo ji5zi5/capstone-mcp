@@ -66,6 +66,8 @@ class CapDatasetProvenance(Model):
     dataset_index: int
     dataset_id: str | None
     dataset_name: str | None
+    run_name: str | None = None
+    run_number: int | None = None
     source_euid: str | None
     source_name: str | None
     unit_id: int | None
@@ -130,6 +132,8 @@ def _provenance(
         dataset_index=index,
         dataset_id=dataset.data_set_id,
         dataset_name=dataset.name,
+        run_name=dataset.run_name,
+        run_number=dataset.run_number,
         source_euid=dataset.source_euid,
         source_name=dataset.source_name,
         unit_id=dataset.unit_id,

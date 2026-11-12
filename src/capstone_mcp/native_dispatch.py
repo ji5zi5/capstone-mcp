@@ -4,8 +4,11 @@
 from __future__ import annotations
 
 import base64
+from io import BytesIO
 from typing import TYPE_CHECKING, Final
+from uuid import uuid4
 
+from PIL import Image
 from pydantic import BaseModel, JsonValue, TypeAdapter
 
 from capstone_mcp.acquisition import (
@@ -14,13 +17,29 @@ from capstone_mcp.acquisition import (
     step_sampling_rate,
 )
 from capstone_mcp.desktop import AutomationError, Capstone
-from capstone_mcp.file_workflows import export_data, save_experiment
-from capstone_mcp.graph_control import FitGraphRequest, fit_graph
-from capstone_mcp.models import Point, Result
-from capstone_mcp.popup_selection import (
-    SelectMeasurementRequest,
-    select_graph_measurement,
+from capstone_mcp.file_workflows import (
+    export_data,
+    open_experiment,
+    save_experiment,
 )
+from capstone_mcp.graph_control import FitGraphRequest, fit_graph
+from capstone_mcp.graph_execution import (
+    GRAPH_INPUT_OPERATIONS,
+    GraphCapture,
+    GraphFailure,
+    GraphFrame,
+    GraphOperationError,
+    GraphProgress,
+)
+from capstone_mcp.graph_requests import GraphAnalysisRequest, GraphFitRequest
+from capstone_mcp.graph_workflows import (
+    analyze_graph,
+    create_graph,
+    read_graph,
+    select_graph_measurement,
+    set_graph_fits,
+)
+from capstone_mcp.models import Point, Result
 from capstone_mcp.repetition import NativeRecordingBackend, RepeatPlan
 from capstone_mcp.run_rename import RenameRunRequest, rename_run
 from capstone_mcp.sensor_settings import (
@@ -50,6 +69,8 @@ class NativeDesktop:
         """Create no application until explicit attachment or initialization."""
         self.app: Capstone = Capstone()
         self.recording: NativeRecordingBackend | None = None
+        self.last_frame: GraphCapture | None = None
+        self.graph_progress: GraphProgress | None = None
         self.handlers: Mapping[
             NativeOperation, Callable[[NativeRequest], JsonValue],
         ] = {
@@ -59,9 +80,10 @@ class NativeDesktop:
                 )
             ],
             "windows": lambda _r: [_json(w) for w in self.app.windows()],
-            "snapshot": lambda r: _json(
-                self.app.snapshot(r.handle, r.depth, r.limit),
-            ),
+            "snapshot": lambda r: _json(self.app.matching_snapshot(
+                r.handle, r.depth, r.limit,
+                query=r.query, control_types=r.control_types,
+            )),
             "action": lambda r: _json(self.app.act(
                 r.ref, r.action, allow_foreground=r.allow_foreground,
             )),
@@ -72,6 +94,7 @@ class NativeDesktop:
                     r.handle, scale=r.scale, crop_region=r.crop_region,
                 ),
             ).decode("ascii"),
+            "observe_graph": self._observe_graph,
             "keys": lambda r: _json(self.app.keys(
                 r.handle, r.value, allow_foreground=r.allow_foreground,
                 unicode_input=r.unicode_input,
@@ -108,17 +131,33 @@ class NativeDesktop:
             "export_data": lambda r: _json(export_data(
                 self.app, r.handle, r.value, allow_foreground=r.allow_foreground,
             )),
+            "open_experiment": lambda r: _json(open_experiment(
+                self.app, r.handle, r.value, discard_unsaved=r.discard_unsaved,
+                allow_foreground=r.allow_foreground,
+            )),
+            "create_graph": lambda r: _json(create_graph(
+                self.app, r.handle, allow_foreground=r.allow_foreground,
+            )),
+            "select_graph_measurement": lambda r: _json(select_graph_measurement(
+                self.app, r.handle, r.point, r.menu_path,
+                allow_foreground=r.allow_foreground,
+            )),
+            "read_graph": lambda r: _json(read_graph(
+                self.app, r.handle, allow_foreground=r.allow_foreground,
+            )),
+            "set_graph_fits": lambda r: _json(set_graph_fits(
+                self.app, r.handle,
+                GraphFitRequest.model_validate(r.graph_request),
+                progress=self.graph_progress,
+            )),
+            "analyze_graph": lambda r: _json(analyze_graph(
+                self.app, r.handle,
+                GraphAnalysisRequest.model_validate(r.graph_request),
+                progress=self.graph_progress,
+            )),
             "rename_run": lambda r: _json(rename_run(
                 self.app, RenameRunRequest(
                     handle=r.handle, old_name=r.old_name, new_name=r.new_name,
-                    allow_foreground=r.allow_foreground,
-                ),
-            )),
-            "select_measurement": lambda r: _json(select_graph_measurement(
-                self.app, SelectMeasurementRequest(
-                    handle=r.handle,
-                    point=r.point,
-                    menu_path=r.menu_path or [],
                     allow_foreground=r.allow_foreground,
                 ),
             )),
@@ -130,11 +169,85 @@ class NativeDesktop:
                     allow_foreground=r.allow_foreground,
                 ),
             )),
+            )),
         }
 
     def dispatch(self, request: NativeRequest) -> JsonValue:
         """Route a validated allowlisted command on the owning COM thread."""
-        return self.handlers[request.operation](request)
+        if request.operation not in GRAPH_INPUT_OPERATIONS | {
+            "read_graph", "observe_graph", "create_graph",
+        }:
+            return self.handlers[request.operation](request)
+        self.graph_progress = GraphProgress()
+        try:
+            if request.operation in GRAPH_INPUT_OPERATIONS:
+                self._verify_frame(request)
+            if request.operation == "select_graph_measurement":
+                self.graph_progress.begin_input("select_measurement")
+            if request.operation == "create_graph":
+                self.graph_progress.begin_input("create_graph")
+            return self.handlers[request.operation](request)
+        except GraphOperationError:
+            raise
+        except Exception as error:
+            progress = self.graph_progress
+            raise GraphOperationError(GraphFailure(
+                code="UNVERIFIED_GRAPH_STATE" if progress.input_attempted
+                else "GRAPH_OBSERVATION_FAILED",
+                operation=request.operation, stage=progress.stage,
+                completed_steps=progress.completed_steps,
+                graph_input_may_have_been_sent=progress.input_attempted,
+                next_action="read_graph" if progress.input_attempted
+                else "inspect_windows",
+                detail=f"{type(error).__name__}: {error}",
+            )) from error
+        finally:
+            self.graph_progress = None
+
+    def _observe_graph(self, request: NativeRequest) -> JsonValue:
+        png = self.app.graph_screenshot(request.handle, activate=True)
+        window = next(w for w in self.app.windows() if w.handle == request.handle)
+        with Image.open(BytesIO(png)) as image:
+            width, height = image.size
+        self.last_frame = GraphCapture(
+            frame=GraphFrame(
+                frame_id=uuid4().hex, handle=request.handle, bounds=window.bounds,
+                width=width, height=height,
+            ),
+            png_base64=base64.b64encode(png).decode("ascii"),
+        )
+        return _json(self.last_frame)
+
+    def _verify_frame(self, request: NativeRequest) -> None:
+        capture = self.last_frame
+        self.last_frame = None
+        if (
+            capture is None or request.frame_id != capture.frame.frame_id
+            or request.handle != capture.frame.handle
+        ):
+            raise GraphOperationError(GraphFailure(
+                code="FRAME_REQUIRED", operation=request.operation, stage="preflight",
+                graph_input_may_have_been_sent=False, next_action="observe_graph",
+                detail="Capture a fresh graph frame in this session before input.",
+            ))
+        window = next(
+            (w for w in self.app.windows() if w.handle == request.handle), None,
+        )
+        reason = None
+        if window is None:
+            reason = "The observed graph window is no longer visible."
+        elif window.bounds != capture.frame.bounds:
+            reason = "The graph window bounds changed."
+        elif self.app.graph_screenshot(request.handle) != base64.b64decode(
+            capture.png_base64,
+        ):
+            reason = "The visible graph image changed."
+        if reason is not None:
+            raise GraphOperationError(GraphFailure(
+                code="STALE_FRAME", operation=request.operation, stage="preflight",
+                graph_input_may_have_been_sent=False, next_action="observe_graph",
+                detail=reason + " Reacquire coordinates.",
+            ))
 
     def _configure_sensor(self, request: NativeRequest) -> JsonValue:
         selection = select_sensor(

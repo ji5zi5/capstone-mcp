@@ -16,6 +16,7 @@ from capstone_mcp.capfiles import (
     extract_cap_datasets,
     read_cap_configuration,
     read_cap_file,
+    select_configuration,
 )
 
 if TYPE_CHECKING:
@@ -154,6 +155,55 @@ def test_reads_numeric_values_and_complete_configuration(tmp_path: Path) -> None
     assert dataset.text_values is None
     assert dataset.sample_indices == [0, 1, 2]
     assert dataset.unit_id == 2048
+    assert parsed.unconnected_sensors == []
+
+
+@pytest.mark.parametrize("with_interface", [False, True])
+def test_unconnected_sensor_metadata_is_separate_and_complete(
+    tmp_path: Path, *, with_interface: bool,
+) -> None:
+    interface = (
+        """<Interface EUID="{interface}"><Channel Index="2">
+        <Sensor Name="Attached" EUID="{attached}" />
+        </Channel></Interface>"""
+        if with_interface else ""
+    )
+    xml = f"""<DSProExperiment><Hardware>
+      {interface}
+      <UnconnectedSensor>
+        <Sensor Name="Stored Sensor" ID="42" EUID="{{stored}}"
+                SamplePeriod="0.05" SensorZeroOnStart="TRUE">
+          <Measurement Name="Angle" ID="1" EUID="{{angle}}" />
+        </Sensor>
+        <Sensor Name="Second Sensor" EUID="{{second}}" />
+      </UnconnectedSensor>
+    </Hardware></DSProExperiment>""".encode()
+    path = tmp_path / "unconnected.cap"
+    _write_cap(path, xml=xml)
+    parsed = read_cap_file(path)
+    config = read_cap_configuration(path)
+    assert config.unconnected_sensors == parsed.unconnected_sensors
+    assert len(config.unconnected_sensors) == 2
+    sensor = config.unconnected_sensors[0]
+    assert (sensor.name, sensor.euid, sensor.sensor_id) == (
+        "Stored Sensor", "{stored}", "42",
+    )
+    assert sensor.sample_period == Decimal("0.05")
+    assert sensor.interface_euid is None
+    assert sensor.channel_index is None
+    assert sensor.attributes["SensorZeroOnStart"] == "TRUE"
+    assert sensor.measurements[0].name == "Angle"
+    assert sensor.measurements[0].euid == "{angle}"
+    attached = [s for i in config.hardware_interfaces for s in i.sensors]
+    assert [s.euid for s in attached] == (["{attached}"] if with_interface else [])
+    assert config.hardware is not None
+    assert any(n.tag == "UnconnectedSensor" for n in config.hardware.children)
+
+
+def test_missing_hardware_has_no_unconnected_sensors(tmp_path: Path) -> None:
+    path = tmp_path / "empty.cap"
+    _write_cap(path, xml=b"<DSProExperiment />")
+    assert read_cap_configuration(path).unconnected_sensors == []
 
 
 def test_preserves_text_values_that_look_numeric(tmp_path: Path) -> None:
@@ -373,3 +423,73 @@ def test_numeric_cache_rejects_short_payload(tmp_path: Path) -> None:
     # When / Then
     with pytest.raises(CapFileError):
         _ = extract_cap_datasets(cap_path)
+
+
+def _with_run(xml: bytes, parameters: bytes) -> bytes:
+    return xml.replace(
+        b"</DataRepository>",
+        b'<RunParameterSet RunParameterID="{dataset}">' + parameters
+        + b"</RunParameterSet></DataRepository>",
+    )
+
+
+def test_saved_run_name_and_number_identify_each_dataset(tmp_path: Path) -> None:
+    # Given: Capstone stores the user-visible run label keyed by the dataset ID.
+    path = tmp_path / "named-run.cap"
+    xml = _with_run(_xml(2), (
+        b'<ParameterValue RunNumber="6" ID="{number}"/>'
+        b'<ParameterValue RunName="1k run" ID="{name}"/>'
+    ))
+    _write_cap(path, xml=xml, payload=_payload(["1.5", "2.5"]))
+    # When
+    dataset = extract_cap_datasets(path)[0]
+    # Then
+    assert dataset.run_name == "1k run"
+    assert dataset.run_number == 6
+
+
+def test_dataset_without_run_parameters_reports_no_run_label(tmp_path: Path) -> None:
+    # Given: user-entered data has no recorded run.
+    path = tmp_path / "no-run.cap"
+    _write_cap(path, xml=_xml(1), payload=_payload(["1.5"]))
+    # When
+    dataset = extract_cap_datasets(path)[0]
+    # Then: the label is absent rather than guessed from list order.
+    assert dataset.run_name is None
+    assert dataset.run_number is None
+
+
+def test_malformed_run_number_is_rejected(tmp_path: Path) -> None:
+    path = tmp_path / "bad-run.cap"
+    xml = _with_run(_xml(1), b'<ParameterValue RunNumber="six" ID="{number}"/>')
+    _write_cap(path, xml=xml, payload=_payload(["1.5"]))
+    with pytest.raises(CapFileError, match="RunNumber"):
+        _ = extract_cap_datasets(path)
+
+
+def test_requested_sections_are_returned_and_the_rest_reported_omitted(
+    tmp_path: Path,
+) -> None:
+    # Given
+    path = tmp_path / "sections.cap"
+    _write_cap(path, xml=_xml(1), payload=_payload(["1.5"]))
+    # When: only the hardware listing is requested.
+    view = select_configuration(read_cap_configuration(path), ["hardware_interfaces"])
+    # Then: unrequested sections are null and named, not presented as empty.
+    assert view.hardware_interfaces is not None
+    assert view.hardware_interfaces[0].sensors[0].name == "Synthetic Sensor"
+    assert view.data_sources is None
+    assert view.workspace is None
+    assert "data_sources" in view.omitted_sections
+    assert "hardware_interfaces" not in view.omitted_sections
+
+
+def test_no_section_selection_keeps_the_complete_configuration(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "complete.cap"
+    _write_cap(path, xml=_xml(1), payload=_payload(["1.5"]))
+    view = select_configuration(read_cap_configuration(path), None)
+    assert view.omitted_sections == []
+    assert view.data_sources is not None
+    assert view.experiment_settings is not None

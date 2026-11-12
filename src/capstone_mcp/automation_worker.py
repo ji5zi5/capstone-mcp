@@ -18,6 +18,7 @@ import win32job
 from pydantic import JsonValue, TypeAdapter
 
 from capstone_mcp.automation_models import NativeReply, NativeRequest, RequestPacket
+from capstone_mcp.graph_execution import GRAPH_INPUT_OPERATIONS, GraphFailure
 
 TEXT_VALUE: Final = TypeAdapter(str)
 LOGGER: Final = logging.getLogger(__name__)
@@ -27,6 +28,12 @@ PROCESS_ATTACH_TO_JOB: Final = 0x0101
 
 class NativeSessionError(RuntimeError):
     """The native session failed; an input may already have reached Capstone."""
+
+    def __init__(self, message: str, failure: GraphFailure | None = None) -> None:
+        """Keep graph recovery metadata without changing ordinary worker errors."""
+        self.failure: GraphFailure | None = failure
+        correlation = "" if failure is None else f" [request_id={failure.request_id}]"
+        super().__init__(message + correlation)
 
 
 class AutomationWorker:
@@ -42,6 +49,7 @@ class AutomationWorker:
         self.transport: Thread | None = None
         self.retired: bool = False
         self.uncertain: bool = False
+        self.last_graph_failure: GraphFailure | None = None
 
     def _spawn(self) -> subprocess.Popen[str]:
         """Launch the fixed native bootstrap; test backends replace this boundary."""
@@ -144,17 +152,42 @@ class AutomationWorker:
                 "retired without replay. Capstone was not terminated. Reattach and "
                 "inspect the application before further input."
             )
-            raise NativeSessionError(msg) from error
+            failure = self._graph_transport_failure(
+                request, identifier, "WORKER_TIMEOUT", msg,
+            )
+            raise NativeSessionError(msg, failure) from error
         except Exception as error:
             self.uncertain = True
             self._retire()
             msg = f"Native transport failed; outcome is unknown: {error}"
-            raise NativeSessionError(msg) from error
+            failure = self._graph_transport_failure(
+                request, identifier, "TRANSPORT_FAILURE", msg,
+            )
+            raise NativeSessionError(msg, failure) from error
         finally:
             self.lock.release()
         if reply.error is not None:
-            raise NativeSessionError(reply.error)
+            if reply.graph_failure is not None:
+                self.last_graph_failure = reply.graph_failure
+            raise NativeSessionError(reply.error, reply.graph_failure)
         return reply.result
+
+    def _graph_transport_failure(
+        self, request: NativeRequest, identifier: str, code: str, detail: str,
+    ) -> GraphFailure | None:
+        if request.operation not in GRAPH_INPUT_OPERATIONS | {
+            "read_graph", "observe_graph", "create_graph",
+        }:
+            return None
+        failure = GraphFailure(
+            code=code, request_id=identifier, operation=request.operation,
+            stage="transport",
+            graph_input_may_have_been_sent=request.operation in
+            GRAPH_INPUT_OPERATIONS | {"create_graph"},
+            next_action="reattach_and_inspect", detail=detail,
+        )
+        self.last_graph_failure = failure
+        return failure
 
     def _retire(self) -> None:
         """Terminate only the automation worker, with bounded reaping."""

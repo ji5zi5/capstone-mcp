@@ -63,14 +63,20 @@ class Reply(Model):
 
 
 class NativeInventory(Model):
-    """Native metadata retained without inventing units or sensor fields."""
+    """Native metadata retained without inventing units or sensor fields.
 
-    accessories: list[JsonValue]
-    codable_interfaces: list[JsonValue] = Field(alias="codableInterfaces")
-    code_nodes: list[JsonValue] = Field(alias="codeNodes")
-    control_nodes: list[JsonValue] = Field(alias="controlNodes")
+    Only sensors and measurements are common to every observed Capstone build.
+    A category the running build does not report stays null, not an empty list.
+    """
+
+    accessories: list[JsonValue] | None = None
+    codable_interfaces: list[JsonValue] | None = Field(
+        default=None, alias="codableInterfaces",
+    )
+    code_nodes: list[JsonValue] | None = Field(default=None, alias="codeNodes")
+    control_nodes: list[JsonValue] | None = Field(default=None, alias="controlNodes")
     measurements: list[JsonValue]
-    outputs: list[JsonValue]
+    outputs: list[JsonValue] | None = None
     sensors: list[JsonValue]
 
 

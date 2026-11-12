@@ -1,13 +1,17 @@
 # Copyright 2026 Capstone MCP contributors.
 """Capstone-scoped Windows UI Automation adapter."""
 
+import ctypes
+from collections.abc import Collection
 from io import BytesIO
 from itertools import islice
 from pathlib import Path
-from typing import Final, assert_never
+from typing import TYPE_CHECKING, Final, assert_never
 from uuid import uuid4
 
+import psutil
 import win32gui
+import win32process
 from PIL import Image, ImageGrab
 from pywinauto import Application, Desktop, mouse
 from pywinauto.application import ProcessNotFoundError, process_module
@@ -17,12 +21,37 @@ from pywinauto.findwindows import find_windows
 
 from capstone_mcp.models import Action, Bounds, Control, Result, Snapshot, Window
 
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
 EXECUTABLE: Final = Path("C:/Program Files/PASCO scientific/Capstone/Capstone.exe")
 CROP_COORDINATE_COUNT: Final = 4
+SHADOW_CLASS: Final = "SysShadow"
+GA_ROOT: Final = 2
+GWL_STYLE: Final = -16
+WS_CAPTION: Final = 0x00C00000
 
 
 class AutomationError(RuntimeError):
     """An unmet precondition prevents input delivery."""
+
+
+def capstone_processes() -> tuple[list[int], list[str]]:
+    """Separate installed-edition processes from other running Capstone builds."""
+    installed: list[int] = []
+    other: list[str] = []
+    for process in psutil.process_iter():
+        try:
+            if process.name().lower() != EXECUTABLE.name.lower():
+                continue
+            executable = Path(process.exe())
+        except psutil.Error:
+            continue
+        if executable == EXECUTABLE:
+            installed.append(process.pid)
+        else:
+            other.append(f"{process.pid}: {executable}")
+    return installed, other
 
 
 def bounds(control: UIAWrapper) -> Bounds:
@@ -80,11 +109,28 @@ class Capstone:
                 raise AutomationError(msg)
             _ = app.connect(process=process_id)
         else:
+            installed, other = capstone_processes()
+            if len(installed) > 1:
+                msg = (
+                    "Several installed Capstone instances are running. Pass the "
+                    "intended process_id: "
+                ) + ", ".join(map(str, installed))
+                raise AutomationError(msg)
             try:
                 _ = app.connect(path=str(EXECUTABLE))
-            except ProcessNotFoundError:
+            except ProcessNotFoundError as error:
                 if not launch:
-                    raise
+                    msg = (
+                        f"Installed Capstone is not running ({EXECUTABLE}). Start "
+                        "it, or call capstone_attach with launch=true."
+                    )
+                    if other:
+                        msg += (
+                            " Another Capstone build is running but cannot be "
+                            "controlled by this server (for example the Microsoft "
+                            "Store edition): "
+                        ) + "; ".join(other)
+                    raise AutomationError(msg) from error
                 _ = app.start(
                     f'"{EXECUTABLE}"', work_dir=str(EXECUTABLE.parent), timeout=30,
                 )
@@ -94,13 +140,21 @@ class Capstone:
         return self.windows()
 
     def windows(self) -> list[Window]:
-        """List visible windows only within the attached process."""
+        """List visible windows of the attached process, without menu shadows."""
         if self.pid is None:
             msg = "Call capstone_attach first."
+            raise AutomationError(msg)
+        if not psutil.pid_exists(self.pid):
+            msg = (
+                "The attached Capstone process has exited. Start Capstone and "
+                "call capstone_attach again."
+            )
             raise AutomationError(msg)
         handles = find_windows(process=self.pid, backend="win32", visible_only=True)
         result: list[Window] = []
         for handle in handles:
+            if win32gui.GetClassName(handle) == SHADOW_CLASS:
+                continue
             left, top, right, bottom = win32gui.GetWindowRect(handle)
             result.append(Window(
                 handle=handle, title=win32gui.GetWindowText(handle),
@@ -122,24 +176,42 @@ class Capstone:
 
     def snapshot(self, handle: int, depth: int, limit: int) -> Snapshot:
         """Traverse a bounded tree and invalidate previous control references."""
+        return self.matching_snapshot(handle, depth, limit)
+
+    def matching_snapshot(
+        self, handle: int, depth: int, limit: int,
+        *, query: str = "", control_types: Collection[str] = (),
+    ) -> Snapshot:
+        """Keep only controls matching a name/automation-id substring and types.
+
+        depth and limit still bound the visit, not the number of matches.
+        """
         root = self.window(handle)
         self.generation += 1
         self.refs.clear()
+        needle = query.casefold()
         controls: list[Control] = []
         pending: list[tuple[UIAWrapper, str | None, int]] = [(root, None, 0)]
         truncated = False
-        while pending and len(controls) < limit:
+        visited = 0
+        while pending and visited < limit:
             node, parent, level = pending.pop()
-            ref = f"{self.session_id}:{self.generation}:{len(controls)}"
-            self.refs[ref] = node
+            ref = f"{self.session_id}:{self.generation}:{visited}"
+            visited += 1
             info = node.element_info
-            controls.append(Control(
-                ref=ref, parent=parent, name=info.name,
-                control_type=info.control_type, automation_id=info.automation_id,
-                enabled=node.is_enabled(), visible=node.is_visible(),
-                bounds=bounds(node),
-            ))
-            child_budget = 1 if level >= depth else limit - len(controls) + 1
+            if (
+                not needle or needle in info.name.casefold()
+                or needle in info.automation_id.casefold()
+            ) and (not control_types or info.control_type in control_types):
+                self.refs[ref] = node
+                controls.append(Control(
+                    ref=ref, parent=parent, name=info.name,
+                    control_type=info.control_type,
+                    automation_id=info.automation_id,
+                    enabled=node.is_enabled(), visible=node.is_visible(),
+                    bounds=bounds(node),
+                ))
+            child_budget = 1 if level >= depth else limit - visited + 1
             children = list(islice(node.iter_children(), child_budget))
             if level < depth:
                 pending.extend((child, ref, level + 1) for child in reversed(children))
@@ -150,10 +222,73 @@ class Capstone:
             truncated=truncated or bool(pending),
         )
 
+    def require_input_ready(self, handle: int) -> None:
+        """Refuse input that a modal dialog would silently take over or drop."""
+        if win32gui.IsWindowEnabled(handle):
+            return
+        blockers = ", ".join(
+            f"{w.handle}: {w.title or 'untitled'}" for w in self.windows()
+            if w.handle != handle and win32gui.IsWindowEnabled(w.handle)
+        )
+        msg = (
+            "Window is disabled by a modal dialog, so no input was sent. Handle "
+            "the blocking window first: "
+        ) + (blockers or "none is visible")
+        raise AutomationError(msg)
+
+    def owning_window(self, node: UIAWrapper) -> int:
+        """Find the nearest visible native window that contains a control.
+
+        Qt reports a modal dialog below its owner in the accessibility tree,
+        so the top-level UIA parent of a dialog button is the disabled owner.
+        """
+        handles = {w.handle for w in self.windows()}
+        current: UIAWrapper | None = node
+        while current is not None:
+            if current.handle in handles:
+                return current.handle
+            current = current.parent()
+        msg = "Control no longer belongs to a visible Capstone window."
+        raise AutomationError(msg)
+
+    def require_uncovered(self, owner: int, point: tuple[int, int]) -> None:
+        """Refuse a click that a captioned window above the owner would receive."""
+        root = win32gui.GetAncestor(win32gui.WindowFromPoint(point), GA_ROOT)
+        if root == owner or not win32gui.GetWindowLong(root, GWL_STYLE) & WS_CAPTION:
+            return
+        title = next(
+            (w.title for w in self.windows() if w.handle == root),
+            "another application",
+        )
+        msg = (
+            f"Control is covered by another window ({root}: {title}), so no "
+            "click was sent. Handle that window first."
+        )
+        raise AutomationError(msg)
+
+    def require_foreground(self) -> None:
+        """Refuse input when another application kept the foreground.
+
+        Windows can decline activation. Keys and clicks would then reach
+        whatever application is in front instead of Capstone.
+        """
+        foreground = win32gui.GetForegroundWindow()
+        if win32process.GetWindowThreadProcessId(foreground)[1] == self.pid:
+            return
+        title = win32gui.GetWindowText(foreground) or "an untitled window"
+        msg = (
+            "Capstone could not be brought to the foreground, so no input was "
+            f"sent. The active window is {title!r}. Bring Capstone to the "
+            "front, then retry."
+        )
+        raise AutomationError(msg)
+
     def focus_window(self, handle: int) -> UIAWrapper:
         """Activate the native HWND; UIA SetFocus alone may not activate Qt."""
         window = self.window(handle)
+        self.require_input_ready(handle)
         _ = HwndWrapper(handle).set_focus()
+        self.require_foreground()
         return window
 
     def control(self, ref: str) -> UIAWrapper:
@@ -178,14 +313,20 @@ class Capstone:
                 if not allow_foreground:
                     msg = "Activation uses mouse input; set allow_foreground=true."
                     raise AutomationError(msg)
-                _ = HwndWrapper(node.top_level_parent().handle).set_focus()
+                top_level = node.top_level_parent().handle
+                modal = not win32gui.IsWindowEnabled(top_level)
+                if modal:
+                    top_level = self.owning_window(node)
+                    self.require_input_ready(top_level)
+                _ = HwndWrapper(top_level).set_focus()
+                self.require_foreground()
                 rect = node.rectangle()
-                node.click_input(
-                    button="left",
-                    coords=((rect.left + rect.right) // 2,
-                            (rect.top + rect.bottom) // 2),
-                    absolute=True,
+                point = (
+                    (rect.left + rect.right) // 2, (rect.top + rect.bottom) // 2,
                 )
+                if modal:
+                    self.require_uncovered(top_level, point)
+                node.click_input(button="left", coords=point, absolute=True)
                 return Result(detail="Control clicked; inspect to verify.")
             case Action.TOGGLE:
                 node.iface_toggle.Toggle()
@@ -242,19 +383,64 @@ class Capstone:
             )
             raise AutomationError(msg)
         window = self.window(handle)
-        with BytesIO() as output, ImageGrab.grab(window=window.handle) as raw:
-            processed = raw
-            if crop_region is not None:
-                processed = processed.crop((
-                    crop_region[0], crop_region[1], crop_region[2], crop_region[3],
-                ))
-            if scale != 1.0:
-                new_width = max(1, int(processed.width * scale))
-                new_height = max(1, int(processed.height * scale))
-                processed = processed.resize(
-                    (new_width, new_height), Image.Resampling.LANCZOS,
-                )
-            processed.save(output, format="PNG")
+        if win32gui.IsIconic(window.handle):
+            msg = (
+                "Capstone window is minimized. "
+                "Restore it before requesting a screenshot."
+            )
+            raise AutomationError(msg)
+        try:
+            with BytesIO() as output, ImageGrab.grab(window=window.handle) as raw:
+                processed = raw
+                if crop_region is not None:
+                    processed = processed.crop((
+                        crop_region[0], crop_region[1], crop_region[2], crop_region[3],
+                    ))
+                if scale != 1.0:
+                    new_width = max(1, int(processed.width * scale))
+                    new_height = max(1, int(processed.height * scale))
+                    processed = processed.resize(
+                        (new_width, new_height), Image.Resampling.LANCZOS,
+                    )
+                processed.save(output, format="PNG")
+                return output.getvalue()
+        except OSError as error:
+            msg = (
+                "Capstone window capture failed. Ensure the window is restored "
+                "and the interactive desktop is available, then retry."
+            )
+            raise AutomationError(msg) from error
+
+    def flush_paint(self, handle: int) -> None:
+        """Complete pending native painting before issuing a coordinate receipt."""
+        _ = self.window(handle)
+        win32gui.RedrawWindow(handle, None, None, 0x0001 | 0x0080 | 0x0100)
+        function = ctypes.WinDLL("dwmapi")["DwmFlush"]
+        function.argtypes = ()
+        function.restype = ctypes.c_long
+        flush: Callable[[], int] = function
+        if flush() < 0:
+            msg = "Windows compositor could not confirm the graph frame."
+            raise AutomationError(msg)
+
+    def graph_screenshot(self, handle: int, *, activate: bool = False) -> bytes:
+        """Capture the actual foreground client pixels used for coordinate input."""
+        _ = self.window(handle)
+        if win32gui.IsIconic(handle):
+            msg = "Restore the graph window before observing coordinates."
+            raise AutomationError(msg)
+        if activate:
+            _ = self.focus_window(handle)
+            self.flush_paint(handle)
+        if win32gui.GetForegroundWindow() != handle:
+            msg = "The graph window is no longer foreground; observe it again."
+            raise AutomationError(msg)
+        left, top = win32gui.ClientToScreen(handle, (0, 0))
+        _, _, width, height = win32gui.GetClientRect(handle)
+        with BytesIO() as output, ImageGrab.grab(
+            bbox=(left, top, left + width, top + height),
+        ) as image:
+            image.save(output, format="PNG")
             return output.getvalue()
 
     def keys(

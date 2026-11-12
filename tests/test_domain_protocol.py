@@ -9,9 +9,12 @@ from typing import Final
 import anyio
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
+from pydantic import Field, JsonValue
 
 from capstone_mcp.analysis import LinearFit
 from capstone_mcp.capfile_models import CapDatasetPage, CapDatasetSummary
+from capstone_mcp.graph_execution import GraphFailure
+from capstone_mcp.graph_state import FitModel
 from capstone_mcp.models import Model
 
 ROOT: Final = str(Path(__file__).resolve().parents[1])
@@ -23,6 +26,26 @@ EXAMPLE: Final = (
 
 class DatasetList(Model):
     result: list[CapDatasetSummary]
+
+
+class FitChoices(Model):
+    result: list[FitModel]
+
+
+class RequestDefinition(Model):
+    additional_properties: bool | None = Field(
+        default=None, alias="additionalProperties",
+    )
+    properties: dict[str, JsonValue] = Field(default_factory=dict)
+    required: list[str] = Field(default_factory=list)
+
+
+class RecoveryResult(Model):
+    result: GraphFailure
+
+
+class GraphToolSchema(Model):
+    definitions: dict[str, RequestDefinition] = Field(alias="$defs")
 
 
 async def exercise_file_tools() -> None:
@@ -84,3 +107,59 @@ def test_saved_sample_extraction_over_mcp() -> None:
 
 def test_linear_fit_over_mcp() -> None:
     anyio.run(exercise_fit_tool)
+
+
+async def exercise_ai_graph_contract() -> None:
+    # Given: actual MCP metadata, without attaching to or changing a desktop.
+    parameters = StdioServerParameters(
+        command=sys.executable, args=["-m", "capstone_mcp.server"], cwd=ROOT,
+    )
+    with anyio.fail_after(30):
+        async with (
+            stdio_client(parameters) as (reader, writer),
+            ClientSession(reader, writer) as session,
+        ):
+            _ = await session.initialize()
+            listed = await session.list_tools()
+            tools = {tool.name: tool for tool in listed.tools}
+            fit_tool = tools["capstone_set_graph_fits"]
+            assert fit_tool.annotations is not None
+            assert fit_tool.annotations.idempotentHint is True
+            assert fit_tool.annotations.destructiveHint is True
+            schema = GraphToolSchema.model_validate(fit_tool.inputSchema)
+            request = schema.definitions["GraphFitRequest"]
+            assert request.additional_properties is False
+            assert "expected_data_signature" in request.properties
+            assert "frame_id" in request.required
+            # When: discover a valid model, then submit an invented option.
+            response = await session.call_tool("capstone_fit_models", {})
+            choices = FitChoices.model_validate(response.structuredContent).result
+            assert FitModel.QUADRATIC in choices
+            invalid = await session.call_tool("capstone_set_graph_fits", {
+                "handle": 0,
+                "request": {
+                    "frame_id": "not-an-issued-frame",
+                    "menu_point": {"x": 0, "y": 0},
+                    "models": [FitModel.QUADRATIC.value],
+                    "preserve_existing_models": True,
+                },
+            })
+            # Then: reject the invented contract before native app input.
+            assert invalid.isError
+            no_frame = await session.call_tool(
+                "capstone_select_graph_measurement", {
+                    "handle": 0, "axis_point": {"x": 0, "y": 0},
+                    "menu_path": ["Index"], "frame_id": "not-issued",
+                },
+            )
+            assert no_frame.isError
+            recovery = await session.call_tool("capstone_graph_recovery", {})
+            failure = RecoveryResult.model_validate(recovery.structuredContent).result
+            assert failure.code == "FRAME_REQUIRED"
+            assert failure.request_id
+            assert not failure.graph_input_may_have_been_sent
+            assert failure.next_action == "observe_graph"
+
+
+def test_ai_graph_contract_over_mcp() -> None:
+    anyio.run(exercise_ai_graph_contract)
