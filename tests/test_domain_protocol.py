@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Final
 
 import anyio
+import pytest
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 from pydantic import Field, JsonValue
@@ -101,6 +102,10 @@ async def exercise_fit_tool() -> None:
             assert fit.intercept == 1
 
 
+@pytest.mark.skipif(
+    not Path(EXAMPLE).exists(),
+    reason=f"Capstone sample file not installed: {EXAMPLE}",
+)
 def test_saved_sample_extraction_over_mcp() -> None:
     anyio.run(exercise_file_tools)
 

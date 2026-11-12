@@ -69,7 +69,8 @@ async def exercise_protocol() -> None:
                 schema = ForegroundSchema.model_validate(tool.inputSchema)
                 assert schema.properties.allow_foreground.default is True
             attached = await session.call_tool("capstone_attach")
-            assert not attached.isError
+            if attached.isError:
+                pytest.skip("Could not attach to Capstone (not installed or running)")
             windows = WindowsResult.model_validate(attached.structuredContent).result
             if not windows:
                 pytest.skip("No running Capstone instance found on desktop")
