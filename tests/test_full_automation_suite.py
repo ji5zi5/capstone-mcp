@@ -290,3 +290,20 @@ def test_dispatch_triggers_calibration_and_layout() -> None:
         ))
         assert res["areas_created"] == 2
         mock_spl.assert_called_once()
+
+
+@pytest.mark.anyio
+async def test_mcp_resources_and_prompts_registered() -> None:
+    """Verify standard experiment prompts and status resources are exposed."""
+    resources = await MCP.list_resources()
+    resource_uris = {str(r.uri) for r in resources}
+    assert "capstone://status" in resource_uris
+    assert "capstone://guide" in resource_uris
+
+    prompts = await MCP.list_prompts()
+    prompt_names = {p.name for p in prompts}
+    assert "resonance_experiment_workflow" in prompt_names
+    assert "collision_impulse_experiment" in prompt_names
+    assert "titration_keep_sample_workflow" in prompt_names
+    assert "sensor_calibration_workflow" in prompt_names
+

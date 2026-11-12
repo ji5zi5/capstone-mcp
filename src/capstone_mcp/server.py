@@ -812,7 +812,18 @@ async def capstone_fit_graph(
     offset: Point = DEFAULT_FIT_OFFSET,
     allow_foreground: bool = True,
 ) -> FitGraphResult:
-    """Scale graph axes to fit all data or adjust bounds deterministically."""
+    """Scale graph axes to fit all data or adjust bounds deterministically.
+
+    Args:
+        handle: Capstone main window handle (0 for active window).
+        mode: Scaling mode ('scale_to_fit' or 'manual_bounds').
+        graph_name: Target graph display name (None for active graph).
+        offset: Offset coordinate point for scale-to-fit toolbar icon.
+        allow_foreground: Bring window to foreground for UI automation.
+
+    Returns:
+        FitGraphResult with scaling outcome and graph identity.
+    """
     return FitGraphResult.model_validate(await _native(NativeRequest(
         operation="fit_graph", handle=handle, mode=mode,
         target=graph_name or "", point=offset,
@@ -828,7 +839,17 @@ async def capstone_rename_run(
     *,
     allow_foreground: bool = True,
 ) -> RenameRunResult:
-    """Rename a specific Run item in the Data Summary tree safely."""
+    """Rename a specific Run item in the Data Summary tree safely.
+
+    Args:
+        handle: Capstone main window handle.
+        old_name: Existing run name in Data Summary (e.g. 'Run #1').
+        new_name: Desired new name for the run (e.g. 'Baseline trial').
+        allow_foreground: Bring window to foreground for UI automation.
+
+    Returns:
+        RenameRunResult with rename confirmation and updated run list.
+    """
     return RenameRunResult.model_validate(await _native(NativeRequest(
         operation="rename_run", handle=handle, old_name=old_name,
         new_name=new_name, allow_foreground=allow_foreground,
@@ -844,7 +865,18 @@ async def capstone_create_calculation(
     allow_foreground: bool = True,
     keep_open: bool = False,
 ) -> CreateCalculationResult:
-    """Register a formula and optional unit in Capstone Calculator with auto-cleanup."""
+    """Register a formula and optional unit in Capstone Calculator with auto-cleanup.
+
+    Args:
+        expression: Mathematical formula (e.g. 'KE = 0.5 * [Mass] * [Velocity]^2').
+        handle: Capstone main window handle (0 for active window).
+        unit: Optional physical unit string for the computed variable (e.g. 'J').
+        allow_foreground: Bring window to foreground for UI automation.
+        keep_open: Leave calculator side drawer open after registration.
+
+    Returns:
+        CreateCalculationResult with created variable name, formula, and status.
+    """
     return CreateCalculationResult.model_validate(await _native(NativeRequest(
         operation="create_calculation", handle=handle, expression=expression,
         unit=unit, allow_foreground=allow_foreground, keep_open=keep_open,
@@ -858,7 +890,16 @@ async def capstone_delete_run(
     run_name: str = "last_run",
     allow_foreground: bool = True,
 ) -> DeleteRunResult:
-    """Delete a run from Data Summary, auto-confirming any modal dialog."""
+    """Delete a run from Data Summary, auto-confirming any modal dialog.
+
+    Args:
+        handle: Capstone main window handle (0 for active window).
+        run_name: Name of the run to delete, or 'last_run' for most recent run.
+        allow_foreground: Bring window to foreground for UI automation.
+
+    Returns:
+        DeleteRunResult with deleted run name and remaining runs.
+    """
     return DeleteRunResult.model_validate(await _native(NativeRequest(
         operation="delete_run", handle=handle, run_name=run_name,
         allow_foreground=allow_foreground,
@@ -872,7 +913,16 @@ async def capstone_zero_sensor(
     sensor_name: str | None = None,
     allow_foreground: bool = True,
 ) -> ZeroSensorResult:
-    """Execute zero/tare for all connected sensors or a specified target sensor."""
+    """Execute zero/tare for all connected sensors or a specified target sensor.
+
+    Args:
+        handle: Capstone main window handle (0 for active window).
+        sensor_name: Target sensor to zero (e.g. 'Force Sensor', None for all).
+        allow_foreground: Bring window to foreground for UI automation.
+
+    Returns:
+        ZeroSensorResult with zeroed sensor list and confirmation status.
+    """
     return ZeroSensorResult.model_validate(await _native(NativeRequest(
         operation="zero_sensor", handle=handle, sensor_name=sensor_name,
         allow_foreground=allow_foreground,
@@ -1533,6 +1583,113 @@ async def capstone_set_page_layout(
         page_name=page_name,
         allow_foreground=allow_foreground,
     ), mutates=True))
+
+
+# ---------------------------------------------------------------------------
+# MCP Resources
+# ---------------------------------------------------------------------------
+
+
+@MCP.resource("capstone://status")
+async def capstone_status_resource() -> str:
+    """Return JSON status of the local Capstone application and connection."""
+    windows_json = await _native(NativeRequest(operation="windows"), mutates=False)
+    recording_json = await _native(
+        NativeRequest(operation="recording_status"), mutates=False,
+    )
+    status_doc = {
+        "server": "capstone-mcp",
+        "version": "0.1.0",
+        "worker_retired": WORKER.retired,
+        "windows": windows_json,
+        "recording": recording_json,
+    }
+    return JSON_VALUE.dump_json(status_doc, indent=2).decode("utf-8")
+
+
+@MCP.resource("capstone://guide")
+def capstone_guide_resource() -> str:
+    """Return the complete workflow guidance manual for PASCO Capstone."""
+    return guide()
+
+
+# ---------------------------------------------------------------------------
+# MCP Prompts
+# ---------------------------------------------------------------------------
+
+
+@MCP.prompt()
+def resonance_experiment_workflow(
+    frequency_hz: float = 1000.0,
+    amplitude_v: float = 2.0,
+) -> str:
+    """Guided prompt template for setting up an RLC/acoustic resonance experiment."""
+    return (
+        "Please set up and run an acoustic/electrical resonance experiment in "
+        "PASCO Capstone:\n"
+        f"1. Turn on the 850/550 Signal Generator (capstone_set_signal_generator) "
+        f"with a Sine wave at {frequency_hz} Hz and {amplitude_v} V amplitude.\n"
+        "2. Add an Oscilloscope display (capstone_create_scope) to monitor the input "
+        "and sensor output waveforms, and configure rising edge trigger "
+        "(capstone_set_scope_trigger).\n"
+        "3. Create an FFT display (capstone_create_fft) and extract the top "
+        "harmonic frequency peaks (capstone_read_fft_peaks) to identify resonance.\n"
+        "4. Report the measured peak frequency and amplitude comparison back to me."
+    )
+
+
+@MCP.prompt()
+def collision_impulse_experiment(
+    threshold_force_n: float = 0.5,
+) -> str:
+    """Guided prompt template for automated collision impulse measurement."""
+    return (
+        "Please set up a dynamics cart collision experiment in PASCO Capstone:\n"
+        "1. Set an automated recording start condition "
+        "(capstone_set_recording_condition) triggered when Force exceeds "
+        f"{threshold_force_n} N.\n"
+        "2. Arrange the page into a two-pane layout (capstone_set_page_layout "
+        "with 'two_vertical') containing a Graph and a Table.\n"
+        "3. Once collision data is recorded, integrate the area under the "
+        "Force-Time curve (capstone_measure_graph_area) to compute the total "
+        "impulse (integral of F dt).\n"
+        "4. Extract summary statistics (capstone_toggle_graph_statistics) and "
+        "display the resulting impulse and momentum values."
+    )
+
+
+@MCP.prompt()
+def titration_keep_sample_workflow(
+    volume_step_ml: float = 1.0,
+) -> str:
+    """Guided prompt template for manual point sampling (e.g. pH titration)."""
+    return (
+        "Please configure a manual point-by-point sampling workflow in PASCO "
+        "Capstone:\n"
+        "1. Switch the sampling mode to manual keep-sample "
+        "(capstone_set_sampling_mode with mode='keep_sample').\n"
+        "2. Create a Table display (capstone_create_table) and set columns "
+        f"(capstone_set_table_columns) with 'Volume' (step {volume_step_ml} mL) "
+        "and 'pH'.\n"
+        "3. Guide me through recording each droplet measurement point using "
+        "capstone_keep_sample(value=..., variable_name='Volume')."
+    )
+
+
+@MCP.prompt()
+def sensor_calibration_workflow(
+    sensor_name: str = "Force Sensor",
+) -> str:
+    """Guided prompt template for a guided 2-point sensor calibration wizard."""
+    return (
+        f"Please calibrate the connected '{sensor_name}' in PASCO Capstone:\n"
+        "1. Open the calibration wizard (capstone_calibrate_sensor) using "
+        "2-point calibration.\n"
+        "2. Guide me through measuring Standard 1 (zero load) and Standard 2 "
+        "(known calibration weight or buffer).\n"
+        "3. Confirm calibration completion and verify sensor reading matches "
+        "the reference value."
+    )
 
 
 def main() -> None:
