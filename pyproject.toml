@@ -35,6 +35,8 @@ convention = "google"
 "src/capstone_mcp/tutor/curriculum.py" = ["E501"]
 "src/capstone_mcp/tutor/lesson_generator.py" = ["E501"]
 "src/capstone_mcp/tutor/workspace_sync.py" = ["E501"]
+"src/capstone_mcp/numerics/sparklines.py" = ["E501", "PLR0913", "PLR0917"]
+
 
 
 [tool.basedpyright]
