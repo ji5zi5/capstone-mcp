@@ -886,7 +886,16 @@ async def capstone_create_table(
     table_name: str | None = None,
     allow_foreground: bool = True,
 ) -> CreateTableResult:
-    """Create a new Table display widget on the active workbook page."""
+    """Create a new Table display widget on the active workbook page.
+
+    Args:
+        handle: Capstone main window handle (0 for active window).
+        table_name: Optional title or name for the created table display.
+        allow_foreground: Bring window to foreground for UI automation.
+
+    Returns:
+        CreateTableResult with table_id, name, columns, and status.
+    """
     return CreateTableResult.model_validate(await _native(NativeRequest(
         operation="create_table",
         handle=handle,
@@ -903,7 +912,17 @@ async def capstone_set_table_columns(
     table_name: str | None = None,
     allow_foreground: bool = True,
 ) -> SetTableColumnsResult:
-    """Configure columns and data bindings for a Table display."""
+    """Configure columns and data bindings for a Table display.
+
+    Args:
+        columns: List of measurement or calculation names to map as table columns.
+        handle: Capstone main window handle (0 for active window).
+        table_name: Target table display name or ID (None targets active table).
+        allow_foreground: Bring window to foreground for UI automation.
+
+    Returns:
+        SetTableColumnsResult with updated columns list and binding status.
+    """
     return SetTableColumnsResult.model_validate(await _native(NativeRequest(
         operation="set_table_columns",
         handle=handle,
@@ -923,7 +942,19 @@ async def capstone_read_table(  # noqa: PLR0913
     include_statistics: bool = True,
     allow_foreground: bool = True,
 ) -> ReadTableResult:
-    """Read rendered table rows, pagination info, and summary statistics."""
+    """Read rendered table rows, pagination info, and summary statistics.
+
+    Args:
+        handle: Capstone main window handle (0 for active window).
+        table_name: Target table display name or ID (None targets active table).
+        page: Page number for paginated rows (1-based, default 1).
+        page_size: Number of rows per page (default 50).
+        include_statistics: Include summary statistics (mean, std_dev, min, max).
+        allow_foreground: Bring window to foreground for UI automation.
+
+    Returns:
+        ReadTableResult containing headers, rows, total_rows, and statistics.
+    """
     return ReadTableResult.model_validate(await _native(NativeRequest(
         operation="read_table",
         handle=handle,
@@ -943,7 +974,17 @@ async def capstone_create_digits(
     digits_name: str | None = None,
     allow_foreground: bool = True,
 ) -> CreateDigitsResult:
-    """Create a large Digits numeric display and optionally bind a measurement."""
+    """Create a large Digits numeric display and optionally bind a measurement.
+
+    Args:
+        handle: Capstone main window handle (0 for active window).
+        measurement: Sensor measurement or calculation name to monitor.
+        digits_name: Optional custom title/name for the digits display widget.
+        allow_foreground: Bring window to foreground for UI automation.
+
+    Returns:
+        CreateDigitsResult with digits_id, name, bound measurement, and unit.
+    """
     return CreateDigitsResult.model_validate(await _native(NativeRequest(
         operation="create_digits",
         handle=handle,
@@ -961,7 +1002,17 @@ async def capstone_toggle_graph_statistics(
     enable: bool | None = None,
     allow_foreground: bool = True,
 ) -> ToggleGraphStatisticsResult:
-    """Toggle graph statistics box (Σ) and read descriptive statistics."""
+    """Toggle graph statistics box (Σ) and read descriptive statistics.
+
+    Args:
+        handle: Capstone main window handle (0 for active window).
+        graph_name: Specific graph display name (None targets active graph).
+        enable: Explicitly enable (True), disable (False), or toggle (None).
+        allow_foreground: Bring window to foreground for UI automation.
+
+    Returns:
+        ToggleGraphStatisticsResult with statistics dict (mean, min, max, std_dev).
+    """
     return ToggleGraphStatisticsResult.model_validate(await _native(NativeRequest(
         operation="toggle_graph_statistics",
         handle=handle,
@@ -979,7 +1030,17 @@ async def capstone_measure_graph_area(
     enable: bool | None = None,
     allow_foreground: bool = True,
 ) -> MeasureGraphAreaResult:
-    """Toggle graph area tool (∫ydx) and extract integral value."""
+    """Toggle graph area integration tool (∫ydx) and extract integral value.
+
+    Args:
+        handle: Capstone main window handle (0 for active window).
+        graph_name: Specific graph display name (None targets active graph).
+        enable: Explicitly enable (True), disable (False), or toggle (None).
+        allow_foreground: Bring window to foreground for UI automation.
+
+    Returns:
+        MeasureGraphAreaResult with area value, integral units, and active status.
+    """
     return MeasureGraphAreaResult.model_validate(await _native(NativeRequest(
         operation="measure_graph_area",
         handle=handle,
@@ -998,7 +1059,18 @@ async def capstone_graph_delta(
     point2: Point | None = None,
     allow_foreground: bool = True,
 ) -> GraphDeltaResult:
-    """Activate delta crosshair tool and read coordinate differences (Δx, Δy)."""
+    """Activate delta crosshair tool and read coordinate differences (Δx, Δy).
+
+    Args:
+        handle: Capstone main window handle (0 for active window).
+        graph_name: Specific graph display name (None targets active graph).
+        point1: First reference coordinate point (Point(x=..., y=...)).
+        point2: Second reference coordinate point (Point(x=..., y=...)).
+        allow_foreground: Bring window to foreground for UI automation.
+
+    Returns:
+        GraphDeltaResult with delta_x, delta_y, slope, and crosshair state.
+    """
     return GraphDeltaResult.model_validate(await _native(NativeRequest(
         operation="graph_delta",
         handle=handle,
@@ -1018,7 +1090,18 @@ async def capstone_set_run_visibility(
     target_displays: list[str] | None = None,
     allow_foreground: bool = True,
 ) -> SetRunVisibilityResult:
-    """Control visibility (show/hide) of specific runs on displays."""
+    """Control visibility (show/hide) of specific runs on displays.
+
+    Args:
+        runs: List of run names (e.g. ['Run #1', 'Run #2']).
+        handle: Capstone main window handle (0 for active window).
+        visible: Whether to make the specified runs visible (True) or hidden (False).
+        target_displays: Specific display names to filter, or None for all displays.
+        allow_foreground: Bring window to foreground for UI automation.
+
+    Returns:
+        SetRunVisibilityResult with list of currently visible runs.
+    """
     return SetRunVisibilityResult.model_validate(await _native(NativeRequest(
         operation="set_run_visibility",
         handle=handle,
@@ -1041,7 +1124,21 @@ async def capstone_set_signal_generator(  # noqa: PLR0913
     allow_foreground: bool = True,
     keep_open: bool = False,
 ) -> SetSignalGeneratorResult:
-    """Configure signal generator waveform, frequency, amplitude, and power."""
+    """Configure signal generator waveform, frequency, amplitude, and power.
+
+    Args:
+        handle: Capstone main window handle (0 for active window).
+        waveform: Shape ('Sine', 'Square', 'Triangle', 'Ramp Up', 'Ramp Down', 'DC').
+        frequency: Target frequency in Hertz (Hz).
+        amplitude: Target peak amplitude in Volts (V).
+        enabled: Turn signal output On (True) or Off (False).
+        generator_name: Target generator channel ('Output 1', None for default).
+        allow_foreground: Bring window to foreground for UI automation.
+        keep_open: Keep signal generator side drawer open after configuration.
+
+    Returns:
+        SetSignalGeneratorResult with applied parameters and output status.
+    """
     return SetSignalGeneratorResult.model_validate(await _native(NativeRequest(
         operation="set_signal_generator",
         handle=handle,
@@ -1063,7 +1160,17 @@ async def capstone_read_signal_generator_status(
     allow_foreground: bool = True,
     keep_open: bool = False,
 ) -> SignalGeneratorStatusResult:
-    """Read current waveform, frequency, amplitude, and power of signal generator."""
+    """Read current waveform, frequency, amplitude, and power of signal generator.
+
+    Args:
+        handle: Capstone main window handle (0 for active window).
+        generator_name: Target generator channel (e.g. 'Output 1', None for default).
+        allow_foreground: Bring window to foreground for UI automation.
+        keep_open: Keep signal generator side drawer open after reading.
+
+    Returns:
+        SignalGeneratorStatusResult with waveform, frequency, amplitude, and enabled.
+    """
     return SignalGeneratorStatusResult.model_validate(await _native(NativeRequest(
         operation="read_signal_generator_status",
         handle=handle,
@@ -1081,7 +1188,17 @@ async def capstone_create_scope(
     channel: str | None = None,
     allow_foreground: bool = True,
 ) -> CreateScopeResult:
-    """Create an Oscilloscope display widget on the active page."""
+    """Create an Oscilloscope display widget on the active page.
+
+    Args:
+        handle: Capstone main window handle (0 for active window).
+        timebase: Timebase setting (e.g. '1 ms/div', '100 us/div').
+        channel: Input sensor channel or measurement name.
+        allow_foreground: Bring window to foreground for UI automation.
+
+    Returns:
+        CreateScopeResult with scope_id, channel, and timebase.
+    """
     return CreateScopeResult.model_validate(await _native(NativeRequest(
         operation="create_scope",
         handle=handle,
@@ -1102,7 +1219,20 @@ async def capstone_set_scope_trigger(  # noqa: PLR0913
     trigger_source: str | None = None,
     allow_foreground: bool = True,
 ) -> ScopeTriggerResult:
-    """Configure oscilloscope trigger level, slope edge, mode, and source."""
+    """Configure oscilloscope trigger level, slope edge, mode, and source.
+
+    Args:
+        handle: Capstone main window handle (0 for active window).
+        scope_id: Specific scope display ID (None targets active scope).
+        trigger_level: Threshold voltage level for trigger (Volts).
+        trigger_slope: Slope edge ('rising' or 'falling').
+        trigger_mode: Trigger mode ('auto', 'normal', or 'single').
+        trigger_source: Channel name to trigger from.
+        allow_foreground: Bring window to foreground for UI automation.
+
+    Returns:
+        ScopeTriggerResult with applied trigger configuration.
+    """
     return ScopeTriggerResult.model_validate(await _native(NativeRequest(
         operation="set_scope_trigger",
         handle=handle,
@@ -1123,7 +1253,17 @@ async def capstone_create_fft(
     frequency_range: str | None = None,
     allow_foreground: bool = True,
 ) -> CreateFftResult:
-    """Create an FFT frequency spectrum display widget."""
+    """Create an FFT frequency spectrum display widget.
+
+    Args:
+        handle: Capstone main window handle (0 for active window).
+        measurement: Input sensor channel or signal measurement to analyze.
+        frequency_range: Maximum frequency span (e.g. '1000 Hz', '20 kHz').
+        allow_foreground: Bring window to foreground for UI automation.
+
+    Returns:
+        CreateFftResult with fft_id, measurement, and frequency_range.
+    """
     return CreateFftResult.model_validate(await _native(NativeRequest(
         operation="create_fft",
         handle=handle,
@@ -1141,7 +1281,17 @@ async def capstone_read_fft_peaks(
     top_k: int = 5,
     allow_foreground: bool = True,
 ) -> ReadFftPeaksResult:
-    """Read top peak frequencies and amplitudes from FFT display."""
+    """Read top peak frequencies and amplitudes from FFT display.
+
+    Args:
+        handle: Capstone main window handle (0 for active window).
+        fft_id: Specific FFT display ID (None targets active FFT).
+        top_k: Number of highest harmonic peaks to extract (default 5).
+        allow_foreground: Bring window to foreground for UI automation.
+
+    Returns:
+        ReadFftPeaksResult with list of detected frequency peaks and amplitudes.
+    """
     return ReadFftPeaksResult.model_validate(await _native(NativeRequest(
         operation="read_fft_peaks",
         handle=handle,
@@ -1160,7 +1310,18 @@ async def capstone_set_recording_condition(
     allow_foreground: bool = True,
     keep_open: bool = False,
 ) -> SetRecordingConditionResult:
-    """Configure start/stop recording conditions based on time or threshold."""
+    """Configure start/stop recording conditions based on time or threshold.
+
+    Args:
+        handle: Capstone main window handle (0 for active window).
+        start_condition: Start criteria (e.g. {'type': 'threshold', 'value': 0.5}).
+        stop_condition: Stop criteria (e.g. {'type': 'time', 'duration_seconds': 5.0}).
+        allow_foreground: Bring window to foreground for UI automation.
+        keep_open: Leave recording condition drawer open.
+
+    Returns:
+        SetRecordingConditionResult with applied start/stop conditions.
+    """
     return SetRecordingConditionResult.model_validate(await _native(NativeRequest(
         operation="set_recording_condition",
         handle=handle,
@@ -1178,7 +1339,16 @@ async def capstone_set_sampling_mode(
     *,
     allow_foreground: bool = True,
 ) -> SetSamplingModeResult:
-    """Switch sampling mode between continuous, keep_sample, and fast_monitor."""
+    """Switch sampling mode between continuous, keep_sample, and fast_monitor.
+
+    Args:
+        mode: Sampling mode ('continuous', 'keep_sample', or 'fast_monitor').
+        handle: Capstone main window handle (0 for active window).
+        allow_foreground: Bring window to foreground for UI automation.
+
+    Returns:
+        SetSamplingModeResult with active mode and description.
+    """
     return SetSamplingModeResult.model_validate(await _native(NativeRequest(
         operation="set_sampling_mode",
         handle=handle,
@@ -1195,7 +1365,17 @@ async def capstone_keep_sample(
     variable_name: str | None = None,
     allow_foreground: bool = True,
 ) -> KeepSampleResult:
-    """Record one manual sample point in keep_sample mode."""
+    """Record one manual sample point in keep_sample mode.
+
+    Args:
+        handle: Capstone main window handle (0 for active window).
+        value: Optional manual independent variable value (e.g. mass, concentration).
+        variable_name: Name of the independent variable being recorded.
+        allow_foreground: Bring window to foreground for UI automation.
+
+    Returns:
+        KeepSampleResult with recorded sample index, values, and total points.
+    """
     return KeepSampleResult.model_validate(await _native(NativeRequest(
         operation="keep_sample",
         handle=handle,
@@ -1213,7 +1393,17 @@ async def capstone_scan_wireless_sensors(
     allow_foreground: bool = True,
     keep_open: bool = False,
 ) -> ScanWirelessSensorsResult:
-    """Scan for nearby wireless Bluetooth PASCO sensors."""
+    """Scan for nearby wireless Bluetooth PASCO sensors.
+
+    Args:
+        handle: Capstone main window handle (0 for active window).
+        timeout_seconds: Duration in seconds to scan for advertising devices.
+        allow_foreground: Bring window to foreground for UI automation.
+        keep_open: Leave hardware setup drawer open after scan.
+
+    Returns:
+        ScanWirelessSensorsResult with discovered sensor IDs and names.
+    """
     return ScanWirelessSensorsResult.model_validate(await _native(NativeRequest(
         operation="scan_wireless_sensors",
         handle=handle,
@@ -1231,7 +1421,17 @@ async def capstone_connect_wireless_sensor(
     allow_foreground: bool = True,
     keep_open: bool = False,
 ) -> ConnectWirelessSensorResult:
-    """Pair and connect a discovered wireless sensor by sensor_id."""
+    """Pair and connect a discovered wireless sensor by sensor_id.
+
+    Args:
+        sensor_id: Discovered sensor hardware ID or Bluetooth name.
+        handle: Capstone main window handle (0 for active window).
+        allow_foreground: Bring window to foreground for UI automation.
+        keep_open: Leave hardware setup drawer open after pairing.
+
+    Returns:
+        ConnectWirelessSensorResult with connection status and battery level.
+    """
     return ConnectWirelessSensorResult.model_validate(await _native(NativeRequest(
         operation="connect_wireless_sensor",
         handle=handle,
@@ -1253,7 +1453,21 @@ async def capstone_calibrate_sensor(  # noqa: PLR0913
     allow_foreground: bool = True,
     keep_open: bool = False,
 ) -> CalibrateSensorResult:
-    """Execute sensor calibration wizard with standard reference points."""
+    """Execute sensor calibration wizard with standard reference points.
+
+    Args:
+        sensor_name: Target sensor to calibrate (e.g. 'Force Sensor', 'pH Sensor').
+        handle: Capstone main window handle (0 for active window).
+        measurement_type: Measurement to calibrate (e.g. 'Force', 'pH').
+        calibration_type: Calibration wizard type ('one_point' or 'two_point').
+        standard_1: First reference standard physical value.
+        standard_2: Second reference standard physical value (required for two_point).
+        allow_foreground: Bring window to foreground for UI automation.
+        keep_open: Leave calibration dialog/drawer open.
+
+    Returns:
+        CalibrateSensorResult with calibration status, slope, and offset.
+    """
     return CalibrateSensorResult.model_validate(await _native(NativeRequest(
         operation="calibrate_sensor",
         handle=handle,
@@ -1274,7 +1488,16 @@ async def capstone_add_page(
     title: str = "New Page",
     allow_foreground: bool = True,
 ) -> AddPageResult:
-    """Add a new page tab to the Capstone workbook."""
+    """Add a new page tab to the Capstone workbook.
+
+    Args:
+        handle: Capstone main window handle (0 for active window).
+        title: Title/name for the newly added page tab.
+        allow_foreground: Bring window to foreground for UI automation.
+
+    Returns:
+        AddPageResult with page_index, title, and total pages count.
+    """
     return AddPageResult.model_validate(await _native(NativeRequest(
         operation="add_page",
         handle=handle,
@@ -1291,7 +1514,18 @@ async def capstone_set_page_layout(
     page_name: str | None = None,
     allow_foreground: bool = True,
 ) -> SetPageLayoutResult:
-    """Apply a multi-display split layout template to the active or target page."""
+    """Apply a multi-display split layout template to the active or target page.
+
+    Args:
+        layout: Split template ('two_vertical', 'two_horizontal',
+            'three_pane', 'four_grid').
+        handle: Capstone main window handle (0 for active window).
+        page_name: Specific page name to layout (None targets active page).
+        allow_foreground: Bring window to foreground for UI automation.
+
+    Returns:
+        SetPageLayoutResult with layout template and display placeholders.
+    """
     return SetPageLayoutResult.model_validate(await _native(NativeRequest(
         operation="set_page_layout",
         handle=handle,
