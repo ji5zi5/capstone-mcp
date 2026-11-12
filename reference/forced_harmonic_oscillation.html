@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <title>강제 조화 진동 및 감쇠 (Driven Damped Oscillations) - 실험 레퍼런스 시트</title>
+  <link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+  <h1>강제 조화 진동 및 감쇠 (Driven Damped Oscillations)</h1>
+  <p><strong>분야:</strong> 고전역학 (Classical Mechanics) | <strong>식별자:</strong> <code>forced_harmonic_oscillation</code></p>
+
+  <h2>기본 물리 이론 및 지배 방정식</h2>
+  <p>용수철에 연결된 카트의 강제 진동 운동을 분석합니다. 구동 주파수(omega)가 고유 진동수(omega_0)에 접근할 때 나타나는 공진 현상과, 트랙에 작용하는 와전류 자기 감쇠(b)에 따른 진폭 감쇠 및 위상 지연을 규명합니다.</p>
+  <ul><li><code>m d^2x/dt^2 + b dx/dt + kx = F_0 cos(omega t)</code></li><li><code>omega_0 = sqrt(k / m)</code></li><li><code>x_0(omega) = (F_0 / m) / sqrt((omega^2 - omega_0^2)^2 + (b omega / m)^2)</code></li><li><code>tan(phi) = (b omega / m) / (omega_0^2 - omega^2)</code></li></ul>
+
+  <h2>실험 장비 구성</h2>
+  <ul><li>스마트 카트 (Smart Cart ME-1240, 내장 가속도/힘/위치 센서)</li><li>기계적 진동 드라이버 (Mechanical Oscillator/Driver ME-8750)</li><li>자기 감쇠 액세서리 (Magnetic Damping Accessory ME-6828)</li><li>역학 트랙 (1.2m Metal Dynamics Track ME-9493)</li><li>스프링 세트 (Dynamics Spring Set ME-8999)</li><li>포토게이트 (ME-9498A)</li></ul>
+
+  <h2>실험 절차 및 Capstone 제어 지침</h2>
+  <div class="step-card"><div class="step-header">단계 1: 스마트 카트 및 드라이버 셋업</div><p>트랙 끝에 기계식 드라이버를 장착하고, 카트 양 끝에 스프링을 연결하여 평형을 맞춥니다.</p><p><strong>주의사항:</strong> 스마트 카트 바퀴와 센서에 무리한 충격이 가지 않도록 주의합니다.</p><p><strong>Capstone 설정:</strong> <code>블루투스로 스마트 카트를 페어링하고 위치 100Hz, 힘 25Hz를 설정합니다.</code></p><p><strong>검증 기준:</strong> 카트 수동 진동 시 자유 감쇠 진동 파형이 매끄럽게 기록되는지 확인합니다.</p></div><div class="step-card"><div class="step-header">단계 2: 고유 진동수(omega_0) 측정</div><p>드라이버 전원을 끈 상태에서 카트를 당겼다 놓아 자유 진동 주기를 측정합니다.</p><p><strong>주의사항:</strong> 진폭이 용수철 탄성 한계를 넘지 않도록 5cm 이내로 유지합니다.</p><p><strong>Capstone 설정:</strong> <code>위치 그래프에서 주기 T를 측정하여 omega_0 = 2 pi / T 를 계산합니다.</code></p><p><strong>검증 기준:</strong> 용수철 상수 k와 카트 질량 m으로부터 이론 고유진동수 sqrt(k/m)와 비교합니다.</p></div><div class="step-card"><div class="step-header">단계 3: 구동 주파수 스윕 및 공진 곡선 획득</div><p>드라이버 주파수를 0.5Hz부터 점진적으로 증가시키며 각 주파수에서의 정상 상태 진폭을 측정합니다.</p><p><strong>주의사항:</strong> 공진 영역에서 진폭이 과도하게 커지면 즉시 드라이버 진폭 노브를 줄입니다.</p><p><strong>Capstone 설정:</strong> <code>자동 정지 조건을 480초로 설정하고 진폭 대 주파수 응답 곡선을 완성합니다.</code></p><p><strong>검증 기준:</strong> 공진 주파수에서 진폭이 극대값을 형성하고 자기 감쇠 증가 시 피크가 낮아지고 넓어지는지 관찰합니다.</p></div>
+
+  <div class="footer">
+    <p>PASCO Capstone MCP Pedagogical Tutor Reference Sheet</p>
+  </div>
+</body>
+</html>

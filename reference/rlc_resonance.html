@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <title>LRC 직렬 공진 회로 (RLC Circuit Resonance) - 실험 레퍼런스 시트</title>
+  <link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+  <h1>LRC 직렬 공진 회로 (RLC Circuit Resonance)</h1>
+  <p><strong>분야:</strong> 전자기학 (Electromagnetism) | <strong>식별자:</strong> <code>rlc_resonance</code></p>
+
+  <h2>기본 물리 이론 및 지배 방정식</h2>
+  <p>교류 전압이 인가된 RLC 직렬 회로에서 주파수 변화에 따른 전류 및 임피던스 변화를 관찰합니다. 유도 리액턴스(X_L = omega L)와 용량 리액턴스(X_C = 1 / (omega C))가 같아지는 공진 주파수 f_0 = 1 / (2 pi sqrt(LC)) 에서 회로의 임피던스는 최소값(R)이 되고 저항에 걸리는 전류가 최대가 됩니다.</p>
+  <ul><li><code>Z = sqrt(R^2 + (X_L - X_C)^2)</code></li><li><code>X_L = 2 pi f L,  X_C = 1 / (2 pi f C)</code></li><li><code>f_0 = 1 / (2 pi sqrt(L C))</code></li><li><code>tan(phi) = (X_L - X_C) / R</code></li><li><code>Q = (1 / R) * sqrt(L / C) = f_0 / Delta f</code></li></ul>
+
+  <h2>실험 장비 구성</h2>
+  <ul><li>RLC 회로 보드 (CI-6512, R=10 Ohm, L=8.2 mH / 18.9 mH, C=100 uF / 10 uF)</li><li>850 Universal Interface (신호발생기 Output #1)</li><li>전압 센서 3개 (UI-5100, Analog Ch A, B, C)</li><li>바나나 플러그 케이블 세트</li></ul>
+
+  <h2>실험 절차 및 Capstone 제어 지침</h2>
+  <div class="step-card"><div class="step-header">단계 1: 회로 결선 및 신호발생기 연결</div><p>10 Ohm 저항, 8.2 mH 코일, 100 uF 축전기를 직렬 결선하고 850 Signal Generator Output 1과 연결합니다.</p><p><strong>주의사항:</strong> 전선 극성을 일치시키고 쇼트가 발생하지 않도록 주의합니다.</p><p><strong>Capstone 설정:</strong> <code>Signal Generator 창에서 Sine 파형, 주파수 10Hz, 진폭 1V, Auto 스위치를 설정합니다.</code></p><p><strong>검증 기준:</strong> 오실로스코프 화면에서 안정된 1Vpp 사인파가 관측되는지 확인합니다.</p></div><div class="step-card"><div class="step-header">단계 2: 주파수 스윕 및 공진 피크 관찰</div><p>신호발생기 주파수를 점진적으로 증가시키며 저항 양단 전압(V_R)의 진폭 변화를 모니터링합니다.</p><p><strong>주의사항:</strong> 최대 출력 전압이 10V를 넘지 않도록 안전 범위를 유지합니다.</p><p><strong>Capstone 설정:</strong> <code>주파수별 V_R 전압 진폭을 기록하고 공진 주파수 근처에서 1Hz 단위로 미세 조절합니다.</code></p><p><strong>검증 기준:</strong> V_R 전압이 피크에 도달하고 입력 전압과의 위상차가 0이 되는 주파수를 확인합니다.</p></div><div class="step-card"><div class="step-header">단계 3: 위상 관계 및 Q 인자 분석</div><p>공진 주파수보다 낮은 영역, 공진점, 높은 영역에서 V_R과 V_in 간의 시간차 Delta t를 측정하여 위상각을 계산합니다.</p><p><strong>주의사항:</strong> FFT 창과 오실로스코프 창의 트리거 레벨을 고정합니다.</p><p><strong>Capstone 설정:</strong> <code>FFT 디스플레이에서 대역폭 Delta f (전력 반치점 -3dB)를 측정하여 Q = f_0 / Delta f 를 산출합니다.</code></p><p><strong>검증 기준:</strong> 이론적 공진주파수 1/(2 pi sqrt(LC))와 실험치의 오차율을 계산합니다.</p></div>
+
+  <div class="footer">
+    <p>PASCO Capstone MCP Pedagogical Tutor Reference Sheet</p>
+  </div>
+</body>
+</html>

@@ -314,6 +314,46 @@ PASCO 850 Universal Interface 또는 550 Interface의 내장 신호발생기 출
 }
 ```
 
+## 물리 실험 종합 패키지 (Phase 3)
+
+### 1. 실험 원클릭 자동화 매크로 (`capstone_run_experiment_macro`)
+
+5대 정규 물리 실험에 대한 설정, 수집, 분석 단계를 선언적으로 오케스트레이션합니다:
+- `photoelectric_effect`: 수은 램프 5개 파장(365~577nm) 저지전압 탐색 및 플랑크 상수($h/e$) 회귀
+- `rlc_resonance`: 850 신호발생기 주파수 스윕, 오실로스코프/FFT 공진 피크 및 $Q$ 인자 계산
+- `forced_harmonic_oscillation`: 스마트 카트 위치/힘 100Hz 수집, 480초 자동 정지 및 공진 곡선 작성
+- `adiabatic_gas`: 1000Hz 급격한 압축 및 $P$-$V$ 선도 순작업($\oint P dV$) 면적 적분
+- `slit_diffraction`: 회전 운동 센서 이송대 스캔, 단일/이중 슬릿 극소·극대점 추출 및 슬릿 기하 규명
+
+```json
+{
+  "experiment_id": "photoelectric_effect",
+  "action": "run"
+}
+```
+
+### 2. 자동 랩리포트 생성기 (`capstone_generate_lab_report`)
+
+실제 `.cap` 파일이나 활성 측정 런의 데이터를 수집하여 이론값 비교, $R^2$ 선형/비선형 회귀, 오차율 표, ASCII 스파크라인 및 Tufte 스타일 벡터 SVG 그래프가 포함된 공식 랩리포트를 Markdown 및 HTML로 발행합니다:
+
+```json
+{
+  "file_path_or_run": "C:/Experiments/광전효과.cap",
+  "experiment_id": "photoelectric_effect",
+  "output_path": "C:/Experiments/광전효과_보고서.md",
+  "format": "both"
+}
+```
+
+### 3. 대화형 랩 어시스턴트 & 튜터 (`capstone_tutor_*`)
+
+한국어 정규 실험 매뉴얼(`.hwp`, `.docx`, `.pdf`)을 기반으로 한 학습 가이드와 안전 지침을 제공합니다:
+- `capstone_tutor_get_lesson(experiment_id)`: 전체 실습 커리큘럼, 지배 방정식, 필수 장비 목록 및 사전 퀴즈 조회
+- `capstone_tutor_guide_step(experiment_id, step_index)`: 단계별 세부 절차, 주의사항, Capstone 조작법 및 검증 기준 지도
+- FastMCP 리소스: `capstone://tutor/lessons`
+- FastMCP 프롬프트: `physics_lab_tutor`
+
+
 ## HTTP 연결
 
 클라이언트가 Streamable HTTP 연결을 지원한다면 저장소 폴더에서 서버를 실행합니다.

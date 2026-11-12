@@ -133,6 +133,19 @@ Saved-file and explicit-sample OLS also return residual, leverage, Cook's-distan
 
 > Record three runs of five seconds each, with a two-second pause between runs. Save each run's experiment snapshot in a new folder, `C:/Experiments/session-01`.
 
+**One-click physics experiment macros (Phase 3)**
+
+> Run the photoelectric effect experiment macro (`photoelectric_effect`) to sweep wavelengths, record stopping voltages, and compute Planck's constant ($h$).
+
+**Automated lab report generation (Phase 3)**
+
+> Ingest data from `photoelectric_effect.cap` and generate a formal Markdown and HTML physics lab report with theoretical comparison, $R^2$ regression, and error percentages.
+
+**Interactive pedagogical lab tutor (Phase 3)**
+
+> Load the full curriculum for `rlc_resonance`, verify the apparatus checklist, and guide me step-by-step through Capstone configuration and safety warnings.
+
+
 Choose sensor names, supported rates, dataset runs, and units based on the actual experiment. For individual saves and CSV exports, create the destination folder first and choose a filename that does not already exist.
 
 <details>

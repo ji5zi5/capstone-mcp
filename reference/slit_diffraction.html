@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <title>빛의 간섭과 회절 (Light Interference & Diffraction) - 실험 레퍼런스 시트</title>
+  <link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+  <h1>빛의 간섭과 회절 (Light Interference & Diffraction)</h1>
+  <p><strong>분야:</strong> 광학 (Optics) | <strong>식별자:</strong> <code>slit_diffraction</code></p>
+
+  <h2>기본 물리 이론 및 지배 방정식</h2>
+  <p>빛의 파동성을 입증하는 대표적인 프라운호퍼 회절 및 영(Young)의 이중 슬릿 간섭 현상을 관찰합니다. 슬릿 폭 a에 따른 회절 극소 조건(a sin(theta) = m lambda)과 슬릿 간격 d에 따른 간섭 극대 조건(d sin(theta) = m lambda)을 위치별 광강도 분포로부터 정밀 측정합니다.</p>
+  <ul><li><code>Single Slit Minima: a * sin(theta) = m * lambda  (m = 1, 2, ...)</code></li><li><code>Double Slit Maxima: d * sin(theta) = m * lambda  (m = 0, 1, 2, ...)</code></li><li><code>I(theta) = I_0 * (sin(beta)/beta)^2 * cos^2(alpha)</code></li><li><code>y_m approx (m * lambda * L) / d</code></li></ul>
+
+  <h2>실험 장비 구성</h2>
+  <ul><li>광학 벤치 (Optics Bench OS-8441, 1.2m)</li><li>반도체 다이오드 레이저 (Red Diode Laser, 650 nm)</li><li>단일 슬릿 / 이중 슬릿 디스크 (Slit Accessory Wheel)</li><li>고감도 광센서 (High Sensitivity Light Sensor CI-6504 / PS-2106A)</li><li>회전 운동 센서 (Rotary Motion Sensor for Linear Translation)</li></ul>
+
+  <h2>실험 절차 및 Capstone 제어 지침</h2>
+  <div class="step-card"><div class="step-header">단계 1: 광학 트랙 및 슬릿 정렬</div><p>레이저 광원, 슬릿 디스크, 광센서를 광학 벤치 위에 일직선으로 정렬합니다. 스크린까지의 거리 L을 측정합니다.</p><p><strong>주의사항:</strong> 레이저 빔을 직접 바라보거나 반사체에 의한 반사광이 눈에 들어가지 않도록 보안경을 착용합니다.</p><p><strong>Capstone 설정:</strong> <code>광센서의 조리개를 좁은 슬릿(0.1mm)에 맞추고 Capstone에서 Intensity vs Position 축을 설정합니다.</code></p><p><strong>검증 기준:</strong> 레이저 빔 중앙이 광센서 입사 슬릿의 정중앙을 지나도록 정밀 나사를 조절합니다.</p></div><div class="step-card"><div class="step-header">단계 2: 단일 슬릿 회절 패턴 스캔</div><p>단일 슬릿(a = 0.04mm 또는 0.08mm)을 선택하고, 센서 이송대를 천천히 회전시켜 중심 피크 및 좌우 1차, 2차 극소점을 스캔합니다.</p><p><strong>주의사항:</strong> 이송 핸들을 일정한 속도로 부드럽게 회전시켜 위치 노이즈를 방지합니다.</p><p><strong>Capstone 설정:</strong> <code>그래프 상에서 중앙 극대점과 1차 극소점 간의 거리 Delta y를 측정합니다.</code></p><p><strong>검증 기준:</strong> 슬릿 폭 a = lambda * L / Delta y 공식을 적용하여 표기 슬릿 폭과 오차를 비교합니다.</p></div><div class="step-card"><div class="step-header">단계 3: 이중 슬릿 간섭 무늬 스캔</div><p>이중 슬릿(d = 0.25mm, a = 0.04mm)으로 교체하고 미세 간섭 피크들이 회절 포락선 안에 나타나는 형태를 스캔합니다.</p><p><strong>주의사항:</strong> 주변 조명을 끄거나 차광막을 설치하여 암실 환경을 조성합니다.</p><p><strong>Capstone 설정:</strong> <code>연속된 간섭 극대점들 간의 평균 간격 Delta y를 측정하여 슬릿 간격 d = lambda * L / Delta y를 도출합니다.</code></p><p><strong>검증 기준:</strong> 회절 포락선 내부에 관측되는 간섭 줄무늬의 개수가 d/a 비율과 일치하는지 확인합니다.</p></div>
+
+  <div class="footer">
+    <p>PASCO Capstone MCP Pedagogical Tutor Reference Sheet</p>
+  </div>
+</body>
+</html>

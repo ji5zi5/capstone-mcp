@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <title>단열 기체 법칙 및 열기관 사이클 (Adiabatic Gas & Heat Engine) - 실험 레퍼런스 시트</title>
+  <link rel="stylesheet" href="../assets/style.css">
+</head>
+<body>
+  <h1>단열 기체 법칙 및 열기관 사이클 (Adiabatic Gas & Heat Engine)</h1>
+  <p><strong>분야:</strong> 열역학 (Thermodynamics) | <strong>식별자:</strong> <code>adiabatic_gas</code></p>
+
+  <h2>기본 물리 이론 및 지배 방정식</h2>
+  <p>기체의 급격한 압축 및 팽창 과정에서 열 출입이 차단된 단열 상태(Q = 0)의 상태 방정식 P V^gamma = const 를 검증합니다. 또한 열기관 4행정 닫힌 사이클의 P-V 선도를 작성하고 선도 내부 면적 적분(W = oint P dV)을 통해 기체가 수행한 역학적 일과 효율을 측정합니다.</p>
+  <ul><li><code>P * V^gamma = constant</code></li><li><code>T * V^(gamma - 1) = constant</code></li><li><code>W_cycle = oint P dV</code></li><li><code>gamma = C_p / C_v  (공기의 경우 약 1.40)</code></li></ul>
+
+  <h2>실험 장비 구성</h2>
+  <ul><li>단열 기체 실험 장치 (Adiabatic Gas Law Apparatus TD-8565)</li><li>열기관 사이클 장치 (Heat Engine Cycle Apparatus EX-5530B)</li><li>압력 센서 (Absolute Pressure Sensor)</li><li>부피/변위 센서 (Linear Position / Volume Sensor)</li><li>온도 센서 (Fast-response Temperature Sensor)</li><li>850 Universal Interface (1000 Hz Sampling)</li></ul>
+
+  <h2>실험 절차 및 Capstone 제어 지침</h2>
+  <div class="step-card"><div class="step-header">단계 1: 단열 실린더 압축 레버 설정</div><p>실린더 피스톤 레버를 상단에 고정하고 압력, 부피, 온도 센서의 영점을 교정합니다.</p><p><strong>주의사항:</strong> 피스톤을 강하게 누를 때 손가락이 끼이지 않도록 주의하십시오.</p><p><strong>Capstone 설정:</strong> <code>샘플링 속도를 1000 Hz로 올리고 압력 vs 부피 그래프를 생성합니다.</code></p><p><strong>검증 기준:</strong> 상온 대기압(약 101.3 kPa) 및 초기 부피가 올바르게 표시되는지 확인합니다.</p></div><div class="step-card"><div class="step-header">단계 2: 급격한 단열 압축 실행</div><p>기록을 시작하고 피스톤 레버를 순간적으로(0.1초 이내) 강하게 압축합니다.</p><p><strong>주의사항:</strong> 실린더 파손 방지를 위해 정격 압축 행정 범위를 초과하지 마십시오.</p><p><strong>Capstone 설정:</strong> <code>압축 순간의 P, V 곡선을 확인하고 지수 회귀(Power Fit: y = A * x^B)를 실행합니다.</code></p><p><strong>검증 기준:</strong> B의 지수값이 -1.40 (단열지수 gamma)에 근접하는지 확인합니다.</p></div><div class="step-card"><div class="step-header">단계 3: 열기관 순환 과정 면적 적분</div><p>열기관 사이클(온수조-냉수조)을 거치며 닫힌 폐곡선 P-V 선도를 형성합니다.</p><p><strong>주의사항:</strong> 온수조 사용 시 화상에 주의하십시오.</p><p><strong>Capstone 설정:</strong> <code>Capstone 그래프 도구상자의 Area Integral 도구를 적용하여 사이클 순작업 W = oint P dV를 계산합니다.</code></p><p><strong>검증 기준:</strong> 적분 일(W)과 질량 추를 들어올린 역학적 위치에너지 변화(Delta U = mgh)를 비교합니다.</p></div>
+
+  <div class="footer">
+    <p>PASCO Capstone MCP Pedagogical Tutor Reference Sheet</p>
+  </div>
+</body>
+</html>
