@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lesson 0001: 광전 효과 (Photoelectric Effect) - Capstone MCP Physics Tutor</title>
+  <link rel="stylesheet" href="../assets/style.css">
+  <style>
+    :root {
+      --bg-color: #fcfcf9;
+      --card-bg: #ffffff;
+      --text-main: #1f2328;
+      --text-muted: #59636e;
+      --primary: #0969da;
+      --accent: #8b1111;
+      --success: #1a7f37;
+      --warning: #9a6700;
+      --danger: #cf222e;
+      --border: #d0d7de;
+      --code-bg: #f6f8fa;
+    }
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif;
+      line-height: 1.68;
+      max-width: 880px;
+      margin: 36px auto;
+      padding: 0 20px;
+    }
+    .lesson-header {
+      border-bottom: 2px solid var(--accent);
+      padding-bottom: 16px;
+      margin-bottom: 28px;
+    }
+    .lesson-meta {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .badge {
+      display: inline-block;
+      padding: 3px 10px;
+      font-size: 0.85em;
+      font-weight: 600;
+      border-radius: 12px;
+      background: #eef2ff;
+      color: var(--primary);
+      border: 1px solid #c7d2fe;
+    }
+    .badge-domain {
+      background: #fdf2f2;
+      color: var(--accent);
+      border-color: #fecaca;
+    }
+    h1 {
+      font-size: 2em;
+      margin: 8px 0;
+      color: #111827;
+    }
+    h2 {
+      font-size: 1.4em;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 6px;
+      margin-top: 36px;
+      margin-bottom: 14px;
+      color: #1f2937;
+    }
+    p, li {
+      font-size: 1.02em;
+    }
+    code {
+      font-family: "Consolas", "Courier New", monospace;
+      background: var(--code-bg);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.92em;
+      border: 1px solid #e1e4e8;
+    }
+    .equation-list {
+      list-style-type: none;
+      padding-left: 0;
+    }
+    .equation-list li {
+      background: #f8fafc;
+      border-left: 4px solid var(--primary);
+      padding: 8px 14px;
+      margin: 6px 0;
+      border-radius: 0 4px 4px 0;
+    }
+    .equip-item {
+      list-style-type: none;
+      padding: 4px 0;
+    }
+    .equip-checkbox {
+      margin-right: 8px;
+      cursor: pointer;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      background: var(--card-bg);
+    }
+    th, td {
+      border: 1px solid var(--border);
+      padding: 10px 14px;
+      text-align: left;
+    }
+    th {
+      background: #f3f4f6;
+      font-weight: 600;
+    }
+    .step-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+    }
+    .step-badge {
+      display: inline-block;
+      font-weight: 700;
+      color: white;
+      background: var(--accent);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 0.85em;
+      margin-bottom: 6px;
+    }
+    .step-title {
+      margin: 4px 0 10px 0;
+      font-size: 1.2em;
+      color: #111827;
+    }
+    .safety-box, .action-box, .validation-box {
+      padding: 10px 14px;
+      border-radius: 6px;
+      margin-top: 10px;
+      font-size: 0.95em;
+    }
+    .safety-box {
+      background: #fffbeb;
+      border-left: 4px solid var(--warning);
+      color: #78350f;
+    }
+    .action-box {
+      background: #eff6ff;
+      border-left: 4px solid var(--primary);
+      color: #1e3a8a;
+    }
+    .validation-box {
+      background: #f0fdf4;
+      border-left: 4px solid var(--success);
+      color: #14532d;
+    }
+    .box-icon {
+      margin-right: 4px;
+    }
+    /* Interactive Quiz Widget Styles */
+    .quiz-section {
+      background: #f9fafb;
+      border: 2px solid #e5e7eb;
+      border-radius: 10px;
+      padding: 24px;
+      margin-top: 36px;
+    }
+    .quiz-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 18px;
+      margin-bottom: 20px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+    }
+    .quiz-question-header {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    .quiz-badge {
+      background: #4f46e5;
+      color: white;
+      font-size: 0.8em;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 4px;
+      flex-shrink: 0;
+    }
+    .quiz-question-text {
+      font-weight: 600;
+      font-size: 1.05em;
+      color: #1f2937;
+    }
+    .quiz-options {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .quiz-option-btn {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      width: 100%;
+      text-align: left;
+      padding: 12px 16px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: #ffffff;
+      cursor: pointer;
+      font-size: 0.98em;
+      color: #374151;
+      transition: all 0.15s ease-in-out;
+    }
+    .quiz-option-btn:hover {
+      background: #f3f4f6;
+      border-color: #9ca3af;
+    }
+    .opt-label {
+      font-weight: 700;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: #e5e7eb;
+      color: #4b5563;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.85em;
+      flex-shrink: 0;
+    }
+    .quiz-option-btn.selected {
+      border-width: 2px;
+    }
+    .quiz-option-btn.correct {
+      background: #ecfdf5;
+      border-color: var(--success);
+      color: #065f46;
+    }
+    .quiz-option-btn.correct .opt-label {
+      background: var(--success);
+      color: white;
+    }
+    .quiz-option-btn.incorrect {
+      background: #fef2f2;
+      border-color: var(--danger);
+      color: #991b1b;
+    }
+    .quiz-option-btn.incorrect .opt-label {
+      background: var(--danger);
+      color: white;
+    }
+    .quiz-option-btn.reveal-correct {
+      border-color: var(--success);
+      background: #f0fdf4;
+    }
+    .quiz-feedback {
+      margin-top: 14px;
+      padding: 10px 14px;
+      border-radius: 6px;
+      font-size: 0.95em;
+      font-weight: 500;
+    }
+    .feedback-correct {
+      background: #dcfce7;
+      color: #14532d;
+      border-left: 4px solid var(--success);
+    }
+    .feedback-incorrect {
+      background: #fee2e2;
+      color: #991b1b;
+      border-left: 4px solid var(--danger);
+    }
+    .quiz-explanation {
+      margin-top: 8px;
+      padding: 10px 14px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      font-size: 0.92em;
+      color: #334155;
+    }
+    .quiz-controls {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 20px;
+      padding-top: 16px;
+      border-top: 1px solid #e5e7eb;
+    }
+    .score-tracker {
+      font-weight: 600;
+      color: #374151;
+    }
+    .quiz-reset-btn {
+      padding: 8px 16px;
+      background: #ffffff;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: background 0.15s;
+    }
+    .quiz-reset-btn:hover {
+      background: #f3f4f6;
+    }
+    .lesson-footer {
+      margin-top: 50px;
+      padding-top: 20px;
+      border-top: 1px solid var(--border);
+      color: var(--text-muted);
+      font-size: 0.9em;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="lesson-header">
+    <div class="lesson-meta">
+      <span class="badge">Lesson 0001</span>
+      <span class="badge badge-domain">현대물리 (Modern Physics)</span>
+      <code>photoelectric_effect</code>
+    </div>
+    <h1>광전 효과 (Photoelectric Effect)</h1>
+  </div>
+
+  <h2>1. 실험 이론 및 지배 방정식</h2>
+  <p>빛의 입자성(광자 모델)을 검증하고 플랑크 상수(h)와 금속의 일함수(phi)를 측정합니다. 광자 에너지 E = hf 가 금속의 일함수 phi 보다 크면 광전자가 방출되며, 저지전압 V를 인가하여 광전류가 0이 되는 지점을 측정합니다 (eV = hf - phi).</p>
+  <ul class="equation-list">
+    <li><code>K_max = E - phi = hf - phi</code></li><li><code>eV_0 = hf - phi</code></li><li><code>V_0 = (h / e) * f - (phi / e)</code></li><li><code>f_cutoff = phi / h</code></li>
+  </ul>
+
+  <h2>2. 필요 실험 장비 구성</h2>
+  <ul class="equipment-list">
+    <li class="equip-item"><label><input type="checkbox" class="equip-checkbox"> 수은 분광 램프 (Mercury Light Source SE-6609)</label></li><li class="equip-item"><label><input type="checkbox" class="equip-checkbox"> 광전효과 측정기 본체 및 포토다이오드 (Photodiode Enclosure)</label></li><li class="equip-item"><label><input type="checkbox" class="equip-checkbox"> DC 전류 증폭기 (DC Current Amplifier SE-9622)</label></li><li class="equip-item"><label><input type="checkbox" class="equip-checkbox"> DC 전원 공급기 (DC Power Supply SE-9644, -4.5V ~ 0V)</label></li><li class="equip-item"><label><input type="checkbox" class="equip-checkbox"> 광학 트랙 (60cm Optical Track)</label></li><li class="equip-item"><label><input type="checkbox" class="equip-checkbox"> 850 Universal Interface &amp; DIN 케이블</label></li><li class="equip-item"><label><input type="checkbox" class="equip-checkbox"> 파장 필터 세트 (365nm, 405nm, 436nm, 546nm, 577nm)</label></li>
+  </ul>
+
+  <h2>3. PASCO Capstone 하드웨어 및 소프트웨어 설정</h2>
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 35%;">설정 파라미터</th>
+        <th>구성 내용</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td><code>analog_ch_a</code></td><td>DC Current Amplifier Interface (Signal Current)</td></tr><tr><td><code>analog_ch_b</code></td><td>DC Power Supply Interface (-4.5V ~ 0V Stopping Voltage)</td></tr><tr><td><code>display</code></td><td>Table (Wavelength, Frequency, Stopping Voltage, Current)</td></tr><tr><td><code>sampling_mode</code></td><td>Keep Sample (Manual Sampling on Preview)</td></tr>
+    </tbody>
+  </table>
+
+  <h2>4. 단계별 실험 절차 (Step-by-Step Guide)</h2>
+  
+        <div class="step-card" id="step-1">
+          <div class="step-badge">단계 1</div>
+          <h3 class="step-title">장비 설치 및 예열</h3>
+          <p class="step-instructions">트랙 위에 수은 램프와 포토다이오드를 35cm 간격으로 설치하고, 수은 램프를 10분 이상 충분히 예열합니다.</p>
+          <div class="safety-box">
+            <span class="box-icon">⚠️</span>
+            <strong>주의사항:</strong> 수은 램프에서 방출되는 자외선 불빛을 맨눈으로 직접 응시하지 마십시오.
+          </div>
+          <div class="action-box">
+            <span class="box-icon">⚙️</span>
+            <strong>Capstone 제어 동작:</strong>
+            <code>Capstone에서 EX-5549A Photoelectric Effect 템플릿을 열거나 아날로그 채널 A/B를 설정합니다.</code>
+          </div>
+          <div class="validation-box">
+            <span class="box-icon">✅</span>
+            <strong>검증 기준:</strong> 수은 램프가 안정적으로 켜져 있고 채널 A/B 케이블이 인터페이스에 단단히 결합되어 있는지 확인합니다.
+          </div>
+        </div>
+        
+        <div class="step-card" id="step-2">
+          <div class="step-badge">단계 2</div>
+          <h3 class="step-title">전류 증폭기 영점 교정 (Calibration)</h3>
+          <p class="step-instructions">DC 전류 증폭기의 CURRENT RANGES 스위치를 10^-13 A로 설정하고, SIGNAL 버튼을 눌러 Calibration 모드에서 0.000 A가 되도록 노브를 조절합니다.</p>
+          <div class="safety-box">
+            <span class="box-icon">⚠️</span>
+            <strong>주의사항:</strong> 실험 도중 전류 증폭기의 게인이나 영점 노브를 건드리지 마십시오.
+          </div>
+          <div class="action-box">
+            <span class="box-icon">⚙️</span>
+            <strong>Capstone 제어 동작:</strong>
+            <code>SIGNAL 버튼을 다시 눌러 Measure 모드로 전환합니다.</code>
+          </div>
+          <div class="validation-box">
+            <span class="box-icon">✅</span>
+            <strong>검증 기준:</strong> 암실/빛 차단 상태에서 전류계 표시창이 0.000 A에 머무르는지 확인합니다.
+          </div>
+        </div>
+        
+        <div class="step-card" id="step-3">
+          <div class="step-badge">단계 3</div>
+          <h3 class="step-title">파장별 저지전압 측정 및 Keep Sample</h3>
+          <p class="step-instructions">조리개를 8mm, 필터를 365nm(8.219 x 10^14 Hz)에 맞추고 Capstone 하단의 Preview를 클릭합니다. 전류가 정확히 0이 될 때까지 전원 공급기 전압 손잡이를 미세 조절한 후 Keep Sample을 누릅니다.</p>
+          <div class="safety-box">
+            <span class="box-icon">⚠️</span>
+            <strong>주의사항:</strong> 전압 노브를 급격하게 돌리지 말고 천천히 0A 지점을 찾습니다.
+          </div>
+          <div class="action-box">
+            <span class="box-icon">⚙️</span>
+            <strong>Capstone 제어 동작:</strong>
+            <code>각 파장(365, 405, 436, 546, 577 nm)에 대해 저지전압을 표에 순차적으로 기록합니다.</code>
+          </div>
+          <div class="validation-box">
+            <span class="box-icon">✅</span>
+            <strong>검증 기준:</strong> 단파장(365nm)일수록 높은 저지전압(음의 전위차 크기 증가)이 나타나는지 확인합니다.
+          </div>
+        </div>
+        
+        <div class="step-card" id="step-4">
+          <div class="step-badge">단계 4</div>
+          <h3 class="step-title">선형 회귀 및 플랑크 상수(h) 산출</h3>
+          <p class="step-instructions">Capstone 그래프에서 저지전압 vs 진동수(V vs f) 데이터를 선형 피팅(Linear Fit: y = mx + b)합니다.</p>
+          <div class="safety-box">
+            <span class="box-icon">⚠️</span>
+            <strong>주의사항:</strong> 데이터 이상치가 있는 경우 특정 회차의 샘플을 재측정합니다.
+          </div>
+          <div class="action-box">
+            <span class="box-icon">⚙️</span>
+            <strong>Capstone 제어 동작:</strong>
+            <code>그래프 맞춤 도구상자에서 Linear Fit을 적용하고 기울기(m)와 y절편(b)을 확인합니다.</code>
+          </div>
+          <div class="validation-box">
+            <span class="box-icon">✅</span>
+            <strong>검증 기준:</strong> 기울기 m = h/e 이므로, h = m * 1.602 x 10^-19 J·s가 공인값(6.626 x 10^-34 J·s)과 오차 10% 이내인지 검증합니다.
+          </div>
+        </div>
+        
+        <div class="step-card" id="step-5">
+          <div class="step-badge">단계 5</div>
+          <h3 class="step-title">빛의 세기별 저지전압 불변성 검증</h3>
+          <p class="step-instructions">필터를 436nm로 고정한 후, 조리개 직경을 2mm, 4mm, 8mm로 변경하며 저지전압을 측정합니다.</p>
+          <div class="safety-box">
+            <span class="box-icon">⚠️</span>
+            <strong>주의사항:</strong> 조리개 휠을 회전할 때 광학 트랙 정렬이 흐트러지지 않도록 주의합니다.
+          </div>
+          <div class="action-box">
+            <span class="box-icon">⚙️</span>
+            <strong>Capstone 제어 동작:</strong>
+            <code>조리개 구경에 따라 광전류 크기는 변하지만 저지전압은 일정함을 확인합니다.</code>
+          </div>
+          <div class="validation-box">
+            <span class="box-icon">✅</span>
+            <strong>검증 기준:</strong> 빛의 세기가 증가해도 저지전압이 변하지 않는 입자성(광양자설)의 핵심 증거를 확인합니다.
+          </div>
+        </div>
+        
+
+  <section class="quiz-section">
+    <h2>5. 형성 평가 인터랙티브 퀴즈 (Interactive Quiz Widget)</h2>
+    <div id="quiz-container">
+      
+            <div class="quiz-card" data-qidx="0">
+              <div class="quiz-question-header">
+                <span class="quiz-badge">문항 1</span>
+                <span class="quiz-question-text">광전 효과 실험에서 빛의 진동수를 증가시키면 방출되는 전자의 어떤 물리량이 증가합니까?</span>
+              </div>
+              <div class="quiz-options">
+                
+            <button type="button" class="quiz-option-btn" data-qidx="0" data-oidx="0" onclick="handleQuizOption(0, 0)">
+              <span class="opt-label">A</span>
+              <span class="opt-text">최대 운동 에너지 (저지전압)</span>
+            </button>
+            
+            <button type="button" class="quiz-option-btn" data-qidx="0" data-oidx="1" onclick="handleQuizOption(0, 1)">
+              <span class="opt-label">B</span>
+              <span class="opt-text">방출되는 광전자의 총 개수</span>
+            </button>
+            
+            <button type="button" class="quiz-option-btn" data-qidx="0" data-oidx="2" onclick="handleQuizOption(0, 2)">
+              <span class="opt-label">C</span>
+              <span class="opt-text">금속의 고유 일함수 크기</span>
+            </button>
+            
+            <button type="button" class="quiz-option-btn" data-qidx="0" data-oidx="3" onclick="handleQuizOption(0, 3)">
+              <span class="opt-label">D</span>
+              <span class="opt-text">전자의 기본 기본 전하량</span>
+            </button>
+            
+              </div>
+              <div class="quiz-feedback" id="feedback-0" style="display:none;"></div>
+              <div class="quiz-explanation" id="explanation-0" style="display:none;">
+                <strong>💡 해설:</strong> E = hf - phi 이므로 진동수가 증가하면 광전자의 최대 운동 에너지가 선형적으로 증가합니다.
+              </div>
+            </div>
+            
+            <div class="quiz-card" data-qidx="1">
+              <div class="quiz-question-header">
+                <span class="quiz-badge">문항 2</span>
+                <span class="quiz-question-text">저지전압(V) 대 진동수(f) 그래프에서 직선의 기울기가 나타내는 물리적 의미는 무엇입니까?</span>
+              </div>
+              <div class="quiz-options">
+                
+            <button type="button" class="quiz-option-btn" data-qidx="1" data-oidx="0" onclick="handleQuizOption(1, 0)">
+              <span class="opt-label">A</span>
+              <span class="opt-text">h / e (플랑크 상수를 기본 전하량으로 나눈 값)</span>
+            </button>
+            
+            <button type="button" class="quiz-option-btn" data-qidx="1" data-oidx="1" onclick="handleQuizOption(1, 1)">
+              <span class="opt-label">B</span>
+              <span class="opt-text">phi / e (금속의 일함수 전위)</span>
+            </button>
+            
+            <button type="button" class="quiz-option-btn" data-qidx="1" data-oidx="2" onclick="handleQuizOption(1, 2)">
+              <span class="opt-label">C</span>
+              <span class="opt-text">e / h (기본 전하량과 플랑크 상수의 비)</span>
+            </button>
+            
+            <button type="button" class="quiz-option-btn" data-qidx="1" data-oidx="3" onclick="handleQuizOption(1, 3)">
+              <span class="opt-label">D</span>
+              <span class="opt-text">c (진공에서의 빛의 속도)</span>
+            </button>
+            
+              </div>
+              <div class="quiz-feedback" id="feedback-1" style="display:none;"></div>
+              <div class="quiz-explanation" id="explanation-1" style="display:none;">
+                <strong>💡 해설:</strong> 식 V = (h/e)f - (phi/e) 로부터 기울기는 h/e를 직접 나타냅니다.
+              </div>
+            </div>
+            
+    </div>
+    <div class="quiz-controls">
+      <div class="score-tracker" id="score-display">
+        진행 상황: <span id="solved-count">0</span> / 2 문항 응시 (<span id="correct-count">0</span> 정답)
+      </div>
+      <button type="button" class="quiz-reset-btn" onclick="resetQuiz()">다시 풀기 (Reset Quiz)</button>
+    </div>
+  </section>
+
+  <div class="lesson-footer">
+    <p>PASCO Capstone Model Context Protocol Pedagogical Lab Tutor &bull; Automated Lesson Engine</p>
+  </div>
+
+  <script>
+    const QUIZ_DATA = [{"correctIndex": 0, "explanation": "E = hf - phi 이므로 진동수가 증가하면 광전자의 최대 운동 에너지가 선형적으로 증가합니다."}, {"correctIndex": 0, "explanation": "식 V = (h/e)f - (phi/e) 로부터 기울기는 h/e를 직접 나타냅니다."}];
+    const answers = {};
+
+    function handleQuizOption(qIdx, selectedOptIdx) {
+      const card = document.querySelector(`.quiz-card[data-qidx="${qIdx}"]`);
+      if (!card) return;
+      const qInfo = QUIZ_DATA[qIdx];
+      const buttons = card.querySelectorAll('.quiz-option-btn');
+      const feedbackEl = document.getElementById(`feedback-${qIdx}`);
+      const explanationEl = document.getElementById(`explanation-${qIdx}`);
+
+      answers[qIdx] = (selectedOptIdx === qInfo.correctIndex);
+
+      buttons.forEach((btn, idx) => {
+        btn.classList.remove('selected', 'correct', 'incorrect', 'reveal-correct');
+        if (idx === selectedOptIdx) {
+          btn.classList.add('selected');
+          if (idx === qInfo.correctIndex) {
+            btn.classList.add('correct');
+          } else {
+            btn.classList.add('incorrect');
+          }
+        }
+        if (idx === qInfo.correctIndex && selectedOptIdx !== qInfo.correctIndex) {
+          btn.classList.add('reveal-correct');
+        }
+      });
+
+      feedbackEl.style.display = 'block';
+      explanationEl.style.display = 'block';
+
+      if (selectedOptIdx === qInfo.correctIndex) {
+        feedbackEl.className = 'quiz-feedback feedback-correct';
+        feedbackEl.innerHTML = '🎉 <strong>정답입니다!</strong> 물리적 원리를 정확히 이해하셨습니다.';
+      } else {
+        feedbackEl.className = 'quiz-feedback feedback-incorrect';
+        feedbackEl.innerHTML = '❌ <strong>오답입니다.</strong> 아래 해설을 읽고 개념을 다시 점검해보세요.';
+      }
+
+      updateScore();
+    }
+
+    function resetQuiz() {
+      for (const k of Object.keys(answers)) {
+        delete answers[k];
+      }
+      document.querySelectorAll('.quiz-card').forEach((card, qIdx) => {
+        const buttons = card.querySelectorAll('.quiz-option-btn');
+        buttons.forEach(btn => btn.classList.remove('selected', 'correct', 'incorrect', 'reveal-correct'));
+        const feedbackEl = document.getElementById(`feedback-${qIdx}`);
+        const explanationEl = document.getElementById(`explanation-${qIdx}`);
+        if (feedbackEl) feedbackEl.style.display = 'none';
+        if (explanationEl) explanationEl.style.display = 'none';
+      });
+      updateScore();
+    }
+
+    function updateScore() {
+      const answeredCount = Object.keys(answers).length;
+      let correctCount = 0;
+      for (const val of Object.values(answers)) {
+        if (val) correctCount++;
+      }
+      const solvedEl = document.getElementById('solved-count');
+      const correctEl = document.getElementById('correct-count');
+      if (solvedEl) solvedEl.textContent = answeredCount;
+      if (correctEl) correctEl.textContent = correctCount;
+    }
+  </script>
+</body>
+</html>

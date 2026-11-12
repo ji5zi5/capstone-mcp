@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lesson 0003: 강제 조화 진동 및 감쇠 (Driven Damped Oscillations) - Capstone MCP Physics Tutor</title>
+  <link rel="stylesheet" href="../assets/style.css">
+  <style>
+    :root {
+      --bg-color: #fcfcf9;
+      --card-bg: #ffffff;
+      --text-main: #1f2328;
+      --text-muted: #59636e;
+      --primary: #0969da;
+      --accent: #8b1111;
+      --success: #1a7f37;
+      --warning: #9a6700;
+      --danger: #cf222e;
+      --border: #d0d7de;
+      --code-bg: #f6f8fa;
+    }
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif;
+      line-height: 1.68;
+      max-width: 880px;
+      margin: 36px auto;
+      padding: 0 20px;
+    }
+    .lesson-header {
+      border-bottom: 2px solid var(--accent);
+      padding-bottom: 16px;
+      margin-bottom: 28px;
+    }
+    .lesson-meta {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .badge {
+      display: inline-block;
+      padding: 3px 10px;
+      font-size: 0.85em;
+      font-weight: 600;
+      border-radius: 12px;
+      background: #eef2ff;
+      color: var(--primary);
+      border: 1px solid #c7d2fe;
+    }
+    .badge-domain {
+      background: #fdf2f2;
+      color: var(--accent);
+      border-color: #fecaca;
+    }
+    h1 {
+      font-size: 2em;
+      margin: 8px 0;
+      color: #111827;
+    }
+    h2 {
+      font-size: 1.4em;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 6px;
+      margin-top: 36px;
+      margin-bottom: 14px;
+      color: #1f2937;
+    }
+    p, li {
+      font-size: 1.02em;
+    }
+    code {
+      font-family: "Consolas", "Courier New", monospace;
+      background: var(--code-bg);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.92em;
+      border: 1px solid #e1e4e8;
+    }
+    .equation-list {
+      list-style-type: none;
+      padding-left: 0;
+    }
+    .equation-list li {
+      background: #f8fafc;
+      border-left: 4px solid var(--primary);
+      padding: 8px 14px;
+      margin: 6px 0;
+      border-radius: 0 4px 4px 0;
+    }
+    .equip-item {
+      list-style-type: none;
+      padding: 4px 0;
+    }
+    .equip-checkbox {
+      margin-right: 8px;
+      cursor: pointer;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      background: var(--card-bg);
+    }
+    th, td {
+      border: 1px solid var(--border);
+      padding: 10px 14px;
+      text-align: left;
+    }
+    th {
+      background: #f3f4f6;
+      font-weight: 600;
+    }
+    .step-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+    }
+    .step-badge {
+      display: inline-block;
+      font-weight: 700;
+      color: white;
+      background: var(--accent);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 0.85em;
+      margin-bottom: 6px;
+    }
+    .step-title {
+      margin: 4px 0 10px 0;
+      font-size: 1.2em;
+      color: #111827;
+    }
+    .safety-box, .action-box, .validation-box {
+      padding: 10px 14px;
+      border-radius: 6px;
+      margin-top: 10px;
+      font-size: 0.95em;
+    }
+    .safety-box {
+      background: #fffbeb;
+      border-left: 4px solid var(--warning);
+      color: #78350f;
+    }
+    .action-box {
+      background: #eff6ff;
+      border-left: 4px solid var(--primary);
+      color: #1e3a8a;
+    }
+    .validation-box {
+      background: #f0fdf4;
+      border-left: 4px solid var(--success);
+      color: #14532d;
+    }
+    .box-icon {
+      margin-right: 4px;
+    }
+    /* Interactive Quiz Widget Styles */
+    .quiz-section {
+      background: #f9fafb;
+      border: 2px solid #e5e7eb;
+      border-radius: 10px;
+      padding: 24px;
+      margin-top: 36px;
+    }
+    .quiz-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 18px;
+      margin-bottom: 20px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+    }
+    .quiz-question-header {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    .quiz-badge {
+      background: #4f46e5;
+      color: white;
+      font-size: 0.8em;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 4px;
+      flex-shrink: 0;
+    }
+    .quiz-question-text {
+      font-weight: 600;
+      font-size: 1.05em;
+      color: #1f2937;
+    }
+    .quiz-options {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .quiz-option-btn {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      width: 100%;
+      text-align: left;
+      padding: 12px 16px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: #ffffff;
+      cursor: pointer;
+      font-size: 0.98em;
+      color: #374151;
+      transition: all 0.15s ease-in-out;
+    }
+    .quiz-option-btn:hover {
+      background: #f3f4f6;
+      border-color: #9ca3af;
+    }
+    .opt-label {
+      font-weight: 700;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: #e5e7eb;
+      color: #4b5563;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.85em;
+      flex-shrink: 0;
+    }
+    .quiz-option-btn.selected {
+      border-width: 2px;
+    }
+    .quiz-option-btn.correct {
+      background: #ecfdf5;
+      border-color: var(--success);
+      color: #065f46;
+    }
+    .quiz-option-btn.correct .opt-label {
+      background: var(--success);
+      color: white;
+    }
+    .quiz-option-btn.incorrect {
+      background: #fef2f2;
+      border-color: var(--danger);
+      color: #991b1b;
+    }
+    .quiz-option-btn.incorrect .opt-label {
+      background: var(--danger);
+      color: white;
+    }
+    .quiz-option-btn.reveal-correct {
+      border-color: var(--success);
+      background: #f0fdf4;
+    }
+    .quiz-feedback {
+      margin-top: 14px;
+      padding: 10px 14px;
+      border-radius: 6px;
+      font-size: 0.95em;
+      font-weight: 500;
+    }
+    .feedback-correct {
+      background: #dcfce7;
+      color: #14532d;
+      border-left: 4px solid var(--success);
+    }
+    .feedback-incorrect {
+      background: #fee2e2;
+      color: #991b1b;
+      border-left: 4px solid var(--danger);
+    }
+    .quiz-explanation {
+      margin-top: 8px;
+      padding: 10px 14px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      font-size: 0.92em;
+      color: #334155;
+    }
+    .quiz-controls {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 20px;
+      padding-top: 16px;
+      border-top: 1px solid #e5e7eb;
+    }
+    .score-tracker {
+      font-weight: 600;
+      color: #374151;
+    }
+    .quiz-reset-btn {
+      padding: 8px 16px;
+      background: #ffffff;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: background 0.15s;
+    }
+    .quiz-reset-btn:hover {
+      background: #f3f4f6;
+    }
+    .lesson-footer {
+      margin-top: 50px;
+      padding-top: 20px;
+      border-top: 1px solid var(--border);
+      color: var(--text-muted);
+      font-size: 0.9em;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="lesson-header">
+    <div class="lesson-meta">
+      <span class="badge">Lesson 0003</span>
+      <span class="badge badge-domain">고전역학 (Classical Mechanics)</span>
+      <code>forced_harmonic_oscillation</code>
+    </div>
+    <h1>강제 조화 진동 및 감쇠 (Driven Damped Oscillations)</h1>
+  </div>
+
+  <h2>1. 실험 이론 및 지배 방정식</h2>
+  <p>용수철에 연결된 카트의 강제 진동 운동을 분석합니다. 구동 주파수(omega)가 고유 진동수(omega_0)에 접근할 때 나타나는 공진 현상과, 트랙에 작용하는 와전류 자기 감쇠(b)에 따른 진폭 감쇠 및 위상 지연을 규명합니다.</p>
+  <ul class="equation-list">
+    <li><code>m d^2x/dt^2 + b dx/dt + kx = F_0 cos(omega t)</code></li><li><code>omega_0 = sqrt(k / m)</code></li><li><code>x_0(omega) = (F_0 / m) / sqrt((omega^2 - omega_0^2)^2 + (b omega / m)^2)</code></li><li><code>tan(phi) = (b omega / m) / (omega_0^2 - omega^2)</code></li>
+  </ul>
+
+  <h2>2. 필요 실험 장비 구성</h2>
+  <ul class="equipment-list">
+    <li class="equip-item"><label><input type="checkbox" class="equip-checkbox"> 스마트 카트 (Smart Cart ME-1240, 내장 가속도/힘/위치 센서)</label></li><li class="equip-item"><label><input type="checkbox" class="equip-checkbox"> 기계적 진동 드라이버 (Mechanical Oscillator/Driver ME-8750)</label></li><li class="equip-item"><label><input type="checkbox" class="equip-checkbox"> 자기 감쇠 액세서리 (Magnetic Damping Accessory ME-6828)</label></li><li class="equip-item"><label><input type="checkbox" class="equip-checkbox"> 역학 트랙 (1.2m Metal Dynamics Track ME-9493)</label></li><li class="equip-item"><label><input type="checkbox" class="equip-checkbox"> 스프링 세트 (Dynamics Spring Set ME-8999)</label></li><li class="equip-item"><label><input type="checkbox" class="equip-checkbox"> 포토게이트 (ME-9498A)</label></li>
+  </ul>
+
+  <h2>3. PASCO Capstone 하드웨어 및 소프트웨어 설정</h2>
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 35%;">설정 파라미터</th>
+        <th>구성 내용</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td><code>wireless_sensors</code></td><td>Smart Cart Position (100 Hz), Force Sensor (25 Hz)</td></tr><tr><td><code>digital_ch_1</code></td><td>Photogate Pendulum Timer (Driver Period)</td></tr><tr><td><code>recording_condition</code></td><td>Automatic Stop Condition after 480 seconds</td></tr><tr><td><code>display</code></td><td>Position vs Time Graph, Amplitude vs Frequency Graph</td></tr>
+    </tbody>
+  </table>
+
+  <h2>4. 단계별 실험 절차 (Step-by-Step Guide)</h2>
+  
+        <div class="step-card" id="step-1">
+          <div class="step-badge">단계 1</div>
+          <h3 class="step-title">스마트 카트 및 드라이버 셋업</h3>
+          <p class="step-instructions">트랙 끝에 기계식 드라이버를 장착하고, 카트 양 끝에 스프링을 연결하여 평형을 맞춥니다.</p>
+          <div class="safety-box">
+            <span class="box-icon">⚠️</span>
+            <strong>주의사항:</strong> 스마트 카트 바퀴와 센서에 무리한 충격이 가지 않도록 주의합니다.
+          </div>
+          <div class="action-box">
+            <span class="box-icon">⚙️</span>
+            <strong>Capstone 제어 동작:</strong>
+            <code>블루투스로 스마트 카트를 페어링하고 위치 100Hz, 힘 25Hz를 설정합니다.</code>
+          </div>
+          <div class="validation-box">
+            <span class="box-icon">✅</span>
+            <strong>검증 기준:</strong> 카트 수동 진동 시 자유 감쇠 진동 파형이 매끄럽게 기록되는지 확인합니다.
+          </div>
+        </div>
+        
+        <div class="step-card" id="step-2">
+          <div class="step-badge">단계 2</div>
+          <h3 class="step-title">고유 진동수(omega_0) 측정</h3>
+          <p class="step-instructions">드라이버 전원을 끈 상태에서 카트를 당겼다 놓아 자유 진동 주기를 측정합니다.</p>
+          <div class="safety-box">
+            <span class="box-icon">⚠️</span>
+            <strong>주의사항:</strong> 진폭이 용수철 탄성 한계를 넘지 않도록 5cm 이내로 유지합니다.
+          </div>
+          <div class="action-box">
+            <span class="box-icon">⚙️</span>
+            <strong>Capstone 제어 동작:</strong>
+            <code>위치 그래프에서 주기 T를 측정하여 omega_0 = 2 pi / T 를 계산합니다.</code>
+          </div>
+          <div class="validation-box">
+            <span class="box-icon">✅</span>
+            <strong>검증 기준:</strong> 용수철 상수 k와 카트 질량 m으로부터 이론 고유진동수 sqrt(k/m)와 비교합니다.
+          </div>
+        </div>
+        
+        <div class="step-card" id="step-3">
+          <div class="step-badge">단계 3</div>
+          <h3 class="step-title">구동 주파수 스윕 및 공진 곡선 획득</h3>
+          <p class="step-instructions">드라이버 주파수를 0.5Hz부터 점진적으로 증가시키며 각 주파수에서의 정상 상태 진폭을 측정합니다.</p>
+          <div class="safety-box">
+            <span class="box-icon">⚠️</span>
+            <strong>주의사항:</strong> 공진 영역에서 진폭이 과도하게 커지면 즉시 드라이버 진폭 노브를 줄입니다.
+          </div>
+          <div class="action-box">
+            <span class="box-icon">⚙️</span>
+            <strong>Capstone 제어 동작:</strong>
+            <code>자동 정지 조건을 480초로 설정하고 진폭 대 주파수 응답 곡선을 완성합니다.</code>
+          </div>
+          <div class="validation-box">
+            <span class="box-icon">✅</span>
+            <strong>검증 기준:</strong> 공진 주파수에서 진폭이 극대값을 형성하고 자기 감쇠 증가 시 피크가 낮아지고 넓어지는지 관찰합니다.
+          </div>
+        </div>
+        
+
+  <section class="quiz-section">
+    <h2>5. 형성 평가 인터랙티브 퀴즈 (Interactive Quiz Widget)</h2>
+    <div id="quiz-container">
+      
+            <div class="quiz-card" data-qidx="0">
+              <div class="quiz-question-header">
+                <span class="quiz-badge">문항 1</span>
+                <span class="quiz-question-text">강제 진동 시스템에서 감쇠 계수(b)가 증가하면 공진 피크(Resonance Peak)의 형태는 어떻게 변화합니까?</span>
+              </div>
+              <div class="quiz-options">
+                
+            <button type="button" class="quiz-option-btn" data-qidx="0" data-oidx="0" onclick="handleQuizOption(0, 0)">
+              <span class="opt-label">A</span>
+              <span class="opt-text">최대 진폭이 감소하고 공진 대역폭이 넓어진다</span>
+            </button>
+            
+            <button type="button" class="quiz-option-btn" data-qidx="0" data-oidx="1" onclick="handleQuizOption(0, 1)">
+              <span class="opt-label">B</span>
+              <span class="opt-text">최대 진폭이 증가하고 공진 주파수가 높아진다</span>
+            </button>
+            
+            <button type="button" class="quiz-option-btn" data-qidx="0" data-oidx="2" onclick="handleQuizOption(0, 2)">
+              <span class="opt-label">C</span>
+              <span class="opt-text">공진 주파수가 정확히 2배로 증가하여 좁아진다</span>
+            </button>
+            
+            <button type="button" class="quiz-option-btn" data-qidx="0" data-oidx="3" onclick="handleQuizOption(0, 3)">
+              <span class="opt-label">D</span>
+              <span class="opt-text">진폭과 대역폭 모두 아무런 변화가 발생하지 않는다</span>
+            </button>
+            
+              </div>
+              <div class="quiz-feedback" id="feedback-0" style="display:none;"></div>
+              <div class="quiz-explanation" id="explanation-0" style="display:none;">
+                <strong>💡 해설:</strong> 감쇠 계수 b가 커지면 분모의 감쇠항이 커져 최대 진폭은 낮아지고 대역폭은 넓어지는 Q-factor 저하가 일어납니다.
+              </div>
+            </div>
+            
+            <div class="quiz-card" data-qidx="1">
+              <div class="quiz-question-header">
+                <span class="quiz-badge">문항 2</span>
+                <span class="quiz-question-text">구동 주파수 omega 가 시스템의 고유 진동수 omega_0 와 정확히 일치하는 공진 상태에서, 외력과 변위 사이의 위상차는 얼마입니까?</span>
+              </div>
+              <div class="quiz-options">
+                
+            <button type="button" class="quiz-option-btn" data-qidx="1" data-oidx="0" onclick="handleQuizOption(1, 0)">
+              <span class="opt-label">A</span>
+              <span class="opt-text">90도 (pi/2 rad, 변위가 외력보다 90도 뒤처진다)</span>
+            </button>
+            
+            <button type="button" class="quiz-option-btn" data-qidx="1" data-oidx="1" onclick="handleQuizOption(1, 1)">
+              <span class="opt-label">B</span>
+              <span class="opt-text">0도 (외력과 변위가 완벽히 일치하는 동위상이다)</span>
+            </button>
+            
+            <button type="button" class="quiz-option-btn" data-qidx="1" data-oidx="2" onclick="handleQuizOption(1, 2)">
+              <span class="opt-label">C</span>
+              <span class="opt-text">180도 (pi rad, 정반대 위상으로 진동한다)</span>
+            </button>
+            
+            <button type="button" class="quiz-option-btn" data-qidx="1" data-oidx="3" onclick="handleQuizOption(1, 3)">
+              <span class="opt-label">D</span>
+              <span class="opt-text">45도 (pi/4 rad)</span>
+            </button>
+            
+              </div>
+              <div class="quiz-feedback" id="feedback-1" style="display:none;"></div>
+              <div class="quiz-explanation" id="explanation-1" style="display:none;">
+                <strong>💡 해설:</strong> 공진 시 tan(phi) = (b*omega/m) / (omega_0^2 - omega^2) 에서 분모가 0이 되어 phi = 90도 (pi/2 rad)의 위상 지연이 발생합니다.
+              </div>
+            </div>
+            
+    </div>
+    <div class="quiz-controls">
+      <div class="score-tracker" id="score-display">
+        진행 상황: <span id="solved-count">0</span> / 2 문항 응시 (<span id="correct-count">0</span> 정답)
+      </div>
+      <button type="button" class="quiz-reset-btn" onclick="resetQuiz()">다시 풀기 (Reset Quiz)</button>
+    </div>
+  </section>
+
+  <div class="lesson-footer">
+    <p>PASCO Capstone Model Context Protocol Pedagogical Lab Tutor &bull; Automated Lesson Engine</p>
+  </div>
+
+  <script>
+    const QUIZ_DATA = [{"correctIndex": 0, "explanation": "감쇠 계수 b가 커지면 분모의 감쇠항이 커져 최대 진폭은 낮아지고 대역폭은 넓어지는 Q-factor 저하가 일어납니다."}, {"correctIndex": 0, "explanation": "공진 시 tan(phi) = (b*omega/m) / (omega_0^2 - omega^2) 에서 분모가 0이 되어 phi = 90도 (pi/2 rad)의 위상 지연이 발생합니다."}];
+    const answers = {};
+
+    function handleQuizOption(qIdx, selectedOptIdx) {
+      const card = document.querySelector(`.quiz-card[data-qidx="${qIdx}"]`);
+      if (!card) return;
+      const qInfo = QUIZ_DATA[qIdx];
+      const buttons = card.querySelectorAll('.quiz-option-btn');
+      const feedbackEl = document.getElementById(`feedback-${qIdx}`);
+      const explanationEl = document.getElementById(`explanation-${qIdx}`);
+
+      answers[qIdx] = (selectedOptIdx === qInfo.correctIndex);
+
+      buttons.forEach((btn, idx) => {
+        btn.classList.remove('selected', 'correct', 'incorrect', 'reveal-correct');
+        if (idx === selectedOptIdx) {
+          btn.classList.add('selected');
+          if (idx === qInfo.correctIndex) {
+            btn.classList.add('correct');
+          } else {
+            btn.classList.add('incorrect');
+          }
+        }
+        if (idx === qInfo.correctIndex && selectedOptIdx !== qInfo.correctIndex) {
+          btn.classList.add('reveal-correct');
+        }
+      });
+
+      feedbackEl.style.display = 'block';
+      explanationEl.style.display = 'block';
+
+      if (selectedOptIdx === qInfo.correctIndex) {
+        feedbackEl.className = 'quiz-feedback feedback-correct';
+        feedbackEl.innerHTML = '🎉 <strong>정답입니다!</strong> 물리적 원리를 정확히 이해하셨습니다.';
+      } else {
+        feedbackEl.className = 'quiz-feedback feedback-incorrect';
+        feedbackEl.innerHTML = '❌ <strong>오답입니다.</strong> 아래 해설을 읽고 개념을 다시 점검해보세요.';
+      }
+
+      updateScore();
+    }
+
+    function resetQuiz() {
+      for (const k of Object.keys(answers)) {
+        delete answers[k];
+      }
+      document.querySelectorAll('.quiz-card').forEach((card, qIdx) => {
+        const buttons = card.querySelectorAll('.quiz-option-btn');
+        buttons.forEach(btn => btn.classList.remove('selected', 'correct', 'incorrect', 'reveal-correct'));
+        const feedbackEl = document.getElementById(`feedback-${qIdx}`);
+        const explanationEl = document.getElementById(`explanation-${qIdx}`);
+        if (feedbackEl) feedbackEl.style.display = 'none';
+        if (explanationEl) explanationEl.style.display = 'none';
+      });
+      updateScore();
+    }
+
+    function updateScore() {
+      const answeredCount = Object.keys(answers).length;
+      let correctCount = 0;
+      for (const val of Object.values(answers)) {
+        if (val) correctCount++;
+      }
+      const solvedEl = document.getElementById('solved-count');
+      const correctEl = document.getElementById('correct-count');
+      if (solvedEl) solvedEl.textContent = answeredCount;
+      if (correctEl) correctEl.textContent = correctCount;
+    }
+  </script>
+</body>
+</html>
