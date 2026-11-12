@@ -9,7 +9,7 @@ from uuid import uuid4
 
 import win32gui
 from PIL import Image, ImageGrab
-from pywinauto import Application, Desktop
+from pywinauto import Application, Desktop, mouse
 from pywinauto.application import ProcessNotFoundError, process_module
 from pywinauto.controls.hwndwrapper import HwndWrapper
 from pywinauto.controls.uiawrapper import UIAWrapper
@@ -209,6 +209,23 @@ class Capstone:
         self.control(ref).iface_value.SetValue(value)
         self.refs.clear()
         return Result(detail="Value delivered; take a snapshot to verify.")
+
+    def click_point(
+        self,
+        handle: int,
+        x: int,
+        y: int,
+        button: str = "left",
+        *,
+        allow_foreground: bool = True,
+    ) -> Result:
+        """Click at absolute screen coordinates within target window."""
+        if not allow_foreground:
+            msg = "Coordinate clicking uses mouse input; set allow_foreground=true."
+            raise AutomationError(msg)
+        _ = self.focus_window(handle)
+        mouse.click(button=button, coords=(x, y))
+        return Result(detail=f"Clicked at ({x}, {y}) with {button} button.")
 
     def screenshot(
         self, handle: int, *, scale: float = 1.0,
