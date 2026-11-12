@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lesson 0002: LRC 직렬 공진 회로 (RLC Circuit Resonance) - Capstone MCP Physics Tutor</title>
+  <link rel="stylesheet" href="../assets/style.css">
+  <style>
+    :root {
+      --bg-color: #fcfcf9;
+      --card-bg: #ffffff;
+      --text-main: #1f2328;
+      --text-muted: #59636e;
+      --primary: #0969da;
+      --accent: #8b1111;
+      --success: #1a7f37;
+      --warning: #9a6700;
+      --danger: #cf222e;
+      --border: #d0d7de;
+      --code-bg: #f6f8fa;
+    }
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif;
+      line-height: 1.68;
+      max-width: 880px;
+      margin: 36px auto;
+      padding: 0 20px;
+    }
+    .lesson-header {
+      border-bottom: 2px solid var(--accent);
+      padding-bottom: 16px;
+      margin-bottom: 28px;
+    }
+    .lesson-meta {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .badge {
+      display: inline-block;
+      padding: 3px 10px;
+      font-size: 0.85em;
+      font-weight: 600;
+      border-radius: 12px;
+      background: #eef2ff;
+      color: var(--primary);
+      border: 1px solid #c7d2fe;
+    }
+    .badge-domain {
+      background: #fdf2f2;
+      color: var(--accent);
+      border-color: #fecaca;
+    }
+    h1 {
+      font-size: 2em;
+      margin: 8px 0;
+      color: #111827;
+    }
+    h2 {
+      font-size: 1.4em;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 6px;
+      margin-top: 36px;
+      margin-bottom: 14px;
+      color: #1f2937;
+    }
+    p, li {
+      font-size: 1.02em;
+    }
+    code {
+      font-family: "Consolas", "Courier New", monospace;
+      background: var(--code-bg);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.92em;
+      border: 1px solid #e1e4e8;
+    }
+    .equation-list {
+      list-style-type: none;
+      padding-left: 0;
+    }
+    .equation-list li {
+      background: #f8fafc;
+      border-left: 4px solid var(--primary);
+      padding: 8px 14px;
+      margin: 6px 0;
+      border-radius: 0 4px 4px 0;
+    }
+    .equip-item {
+      list-style-type: none;
+      padding: 4px 0;
+    }
+    .equip-checkbox {
+      margin-right: 8px;
+      cursor: pointer;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      background: var(--card-bg);
+    }
+    th, td {
+      border: 1px solid var(--border);
+      padding: 10px 14px;
+      text-align: left;
+    }
+    th {
+      background: #f3f4f6;
+      font-weight: 600;
+    }
+    .step-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+    }
+    .step-badge {
+      display: inline-block;
+      font-weight: 700;
+      color: white;
+      background: var(--accent);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 0.85em;
+      margin-bottom: 6px;
+    }
+    .step-title {
+      margin: 4px 0 10px 0;
+      font-size: 1.2em;
+      color: #111827;
+    }
+    .safety-box, .action-box, .validation-box {
+      padding: 10px 14px;
+      border-radius: 6px;
+      margin-top: 10px;
+      font-size: 0.95em;
+    }
+    .safety-box {
+      background: #fffbeb;
+      border-left: 4px solid var(--warning);
+      color: #78350f;
+    }
+    .action-box {
+      background: #eff6ff;
+      border-left: 4px solid var(--primary);
+      color: #1e3a8a;
+    }
+    .validation-box {
+      background: #f0fdf4;
+      border-left: 4px solid var(--success);
+      color: #14532d;
+    }
+    .box-icon {
+      margin-right: 4px;
+    }
+    /* Interactive Quiz Widget Styles */
+    .quiz-section {
+      background: #f9fafb;
+      border: 2px solid #e5e7eb;
+      border-radius: 10px;
+      padding: 24px;
+      margin-top: 36px;
+    }
+    .quiz-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 18px;
+      margin-bottom: 20px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+    }
+    .quiz-question-header {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    .quiz-badge {
+      background: #4f46e5;
+      color: white;
+      font-size: 0.8em;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 4px;
+      flex-shrink: 0;
+    }
+    .quiz-question-text {
+      font-weight: 600;
+      font-size: 1.05em;
+      color: #1f2937;
+    }
+    .quiz-options {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .quiz-option-btn {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      width: 100%;
+      text-align: left;
+      padding: 12px 16px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: #ffffff;
+      cursor: pointer;
+      font-size: 0.98em;
+      color: #374151;
+      transition: all 0.15s ease-in-out;
+    }
+    .quiz-option-btn:hover {
+      background: #f3f4f6;
+      border-color: #9ca3af;
+    }
+    .opt-label {
+      font-weight: 700;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: #e5e7eb;
+      color: #4b5563;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.85em;
+      flex-shrink: 0;
+    }
+    .quiz-option-btn.selected {
+      border-width: 2px;
+    }
+    .quiz-option-btn.correct {
+      background: #ecfdf5;
+      border-color: var(--success);
+      color: #065f46;
+    }
+    .quiz-option-btn.correct .opt-label {
+      background: var(--success);
+      color: white;
+    }
+    .quiz-option-btn.incorrect {
+      background: #fef2f2;
+      border-color: var(--danger);
+      color: #991b1b;
+    }
+    .quiz-option-btn.incorrect .opt-label {
+      background: var(--danger);
+      color: white;
+    }
+    .quiz-option-btn.reveal-correct {
+      border-color: var(--success);
+      background: #f0fdf4;
+    }
+    .quiz-feedback {
+      margin-top: 14px;
+      padding: 10px 14px;
+      border-radius: 6px;
+      font-size: 0.95em;
+      font-weight: 500;
+    }
+    .feedback-correct {
+      background: #dcfce7;
+      color: #14532d;
+      border-left: 4px solid var(--success);
+    }
+    .feedback-incorrect {
+      background: #fee2e2;
+      color: #991b1b;
+      border-left: 4px solid var(--danger);
+    }
+    .quiz-explanation {
+      margin-top: 8px;
+      padding: 10px 14px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      font-size: 0.92em;
+      color: #334155;
+    }
+    .quiz-controls {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 20px;
+      padding-top: 16px;
+      border-top: 1px solid #e5e7eb;
+    }
+    .score-tracker {
+      font-weight: 600;
+      color: #374151;
+    }
+    .quiz-reset-btn {
+      padding: 8px 16px;
+      background: #ffffff;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: background 0.15s;
+    }
+    .quiz-reset-btn:hover {
+      background: #f3f4f6;
+    }
+    .lesson-footer {
+      margin-top: 50px;
+      padding-top: 20px;
+      border-top: 1px solid var(--border);
+      color: var(--text-muted);
+      font-size: 0.9em;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="lesson-header">
+    <div class="lesson-meta">
+      <span class="badge">Lesson 0002</span>
+      <span class="badge badge-domain">전자기학 (Electromagnetism)</span>
+      <code>rlc_resonance</code>
+    </div>
+    <h1>LRC 직렬 공진 회로 (RLC Circuit Resonance)</h1>
+  </div>
+
+  <h2>1. 실험 이론 및 지배 방정식</h2>
+  <p>교류 전압이 인가된 RLC 직렬 회로에서 주파수 변화에 따른 전류 및 임피던스 변화를 관찰합니다. 유도 리액턴스(X_L = omega L)와 용량 리액턴스(X_C = 1 / (omega C))가 같아지는 공진 주파수 f_0 = 1 / (2 pi sqrt(LC)) 에서 회로의 임피던스는 최소값(R)이 되고 저항에 걸리는 전류가 최대가 됩니다.</p>
+  <ul class="equation-list">
+    <li><code>Z = sqrt(R^2 + (X_L - X_C)^2)</code></li><li><code>X_L = 2 pi f L,  X_C = 1 / (2 pi f C)</code></li><li><code>f_0 = 1 / (2 pi sqrt(L C))</code></li><li><code>tan(phi) = (X_L - X_C) / R</code></li><li><code>Q = (1 / R) * sqrt(L / C) = f_0 / Delta f</code></li>
+  </ul>
+
+  <h2>2. 필요 실험 장비 구성</h2>
+  <ul class="equipment-list">
+    <li class="equip-item"><label><input type="checkbox" class="equip-checkbox"> RLC 회로 보드 (CI-6512, R=10 Ohm, L=8.2 mH / 18.9 mH, C=100 uF / 10 uF)</label></li><li class="equip-item"><label><input type="checkbox" class="equip-checkbox"> 850 Universal Interface (신호발생기 Output #1)</label></li><li class="equip-item"><label><input type="checkbox" class="equip-checkbox"> 전압 센서 3개 (UI-5100, Analog Ch A, B, C)</label></li><li class="equip-item"><label><input type="checkbox" class="equip-checkbox"> 바나나 플러그 케이블 세트</label></li>
+  </ul>
+
+  <h2>3. PASCO Capstone 하드웨어 및 소프트웨어 설정</h2>
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 35%;">설정 파라미터</th>
+        <th>구성 내용</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td><code>signal_generator</code></td><td>Output 1: Sine Wave, 10 Hz ~ 5 kHz, Amplitude 1.0 V, Auto Mode</td></tr><tr><td><code>analog_ch_a</code></td><td>Voltage across Resistor (V_R)</td></tr><tr><td><code>analog_ch_b</code></td><td>Voltage across Inductor (V_L)</td></tr><tr><td><code>analog_ch_c</code></td><td>Voltage across Capacitor (V_C)</td></tr><tr><td><code>display</code></td><td>Scope Display &amp; FFT Frequency Spectrum</td></tr>
+    </tbody>
+  </table>
+
+  <h2>4. 단계별 실험 절차 (Step-by-Step Guide)</h2>
+  
+        <div class="step-card" id="step-1">
+          <div class="step-badge">단계 1</div>
+          <h3 class="step-title">회로 결선 및 신호발생기 연결</h3>
+          <p class="step-instructions">10 Ohm 저항, 8.2 mH 코일, 100 uF 축전기를 직렬 결선하고 850 Signal Generator Output 1과 연결합니다.</p>
+          <div class="safety-box">
+            <span class="box-icon">⚠️</span>
+            <strong>주의사항:</strong> 전선 극성을 일치시키고 쇼트가 발생하지 않도록 주의합니다.
+          </div>
+          <div class="action-box">
+            <span class="box-icon">⚙️</span>
+            <strong>Capstone 제어 동작:</strong>
+            <code>Signal Generator 창에서 Sine 파형, 주파수 10Hz, 진폭 1V, Auto 스위치를 설정합니다.</code>
+          </div>
+          <div class="validation-box">
+            <span class="box-icon">✅</span>
+            <strong>검증 기준:</strong> 오실로스코프 화면에서 안정된 1Vpp 사인파가 관측되는지 확인합니다.
+          </div>
+        </div>
+        
+        <div class="step-card" id="step-2">
+          <div class="step-badge">단계 2</div>
+          <h3 class="step-title">주파수 스윕 및 공진 피크 관찰</h3>
+          <p class="step-instructions">신호발생기 주파수를 점진적으로 증가시키며 저항 양단 전압(V_R)의 진폭 변화를 모니터링합니다.</p>
+          <div class="safety-box">
+            <span class="box-icon">⚠️</span>
+            <strong>주의사항:</strong> 최대 출력 전압이 10V를 넘지 않도록 안전 범위를 유지합니다.
+          </div>
+          <div class="action-box">
+            <span class="box-icon">⚙️</span>
+            <strong>Capstone 제어 동작:</strong>
+            <code>주파수별 V_R 전압 진폭을 기록하고 공진 주파수 근처에서 1Hz 단위로 미세 조절합니다.</code>
+          </div>
+          <div class="validation-box">
+            <span class="box-icon">✅</span>
+            <strong>검증 기준:</strong> V_R 전압이 피크에 도달하고 입력 전압과의 위상차가 0이 되는 주파수를 확인합니다.
+          </div>
+        </div>
+        
+        <div class="step-card" id="step-3">
+          <div class="step-badge">단계 3</div>
+          <h3 class="step-title">위상 관계 및 Q 인자 분석</h3>
+          <p class="step-instructions">공진 주파수보다 낮은 영역, 공진점, 높은 영역에서 V_R과 V_in 간의 시간차 Delta t를 측정하여 위상각을 계산합니다.</p>
+          <div class="safety-box">
+            <span class="box-icon">⚠️</span>
+            <strong>주의사항:</strong> FFT 창과 오실로스코프 창의 트리거 레벨을 고정합니다.
+          </div>
+          <div class="action-box">
+            <span class="box-icon">⚙️</span>
+            <strong>Capstone 제어 동작:</strong>
+            <code>FFT 디스플레이에서 대역폭 Delta f (전력 반치점 -3dB)를 측정하여 Q = f_0 / Delta f 를 산출합니다.</code>
+          </div>
+          <div class="validation-box">
+            <span class="box-icon">✅</span>
+            <strong>검증 기준:</strong> 이론적 공진주파수 1/(2 pi sqrt(LC))와 실험치의 오차율을 계산합니다.
+          </div>
+        </div>
+        
+
+  <section class="quiz-section">
+    <h2>5. 형성 평가 인터랙티브 퀴즈 (Interactive Quiz Widget)</h2>
+    <div id="quiz-container">
+      
+            <div class="quiz-card" data-qidx="0">
+              <div class="quiz-question-header">
+                <span class="quiz-badge">문항 1</span>
+                <span class="quiz-question-text">RLC 직렬 회로가 공진(Resonance) 상태에 도달했을 때 회로의 임피던스(Z)는 어떤 상태가 됩니까?</span>
+              </div>
+              <div class="quiz-options">
+                
+            <button type="button" class="quiz-option-btn" data-qidx="0" data-oidx="0" onclick="handleQuizOption(0, 0)">
+              <span class="opt-label">A</span>
+              <span class="opt-text">최소화되며 저항 R의 크기와 동일해진다</span>
+            </button>
+            
+            <button type="button" class="quiz-option-btn" data-qidx="0" data-oidx="1" onclick="handleQuizOption(0, 1)">
+              <span class="opt-label">B</span>
+              <span class="opt-text">최대화되며 전류의 흐름이 완전히 차단된다</span>
+            </button>
+            
+            <button type="button" class="quiz-option-btn" data-qidx="0" data-oidx="2" onclick="handleQuizOption(0, 2)">
+              <span class="opt-label">C</span>
+              <span class="opt-text">유도 리액턴스 X_L 만 남아 매우 커진다</span>
+            </button>
+            
+            <button type="button" class="quiz-option-btn" data-qidx="0" data-oidx="3" onclick="handleQuizOption(0, 3)">
+              <span class="opt-label">D</span>
+              <span class="opt-text">용량 리액턴스 X_C 에 의해 무한대가 된다</span>
+            </button>
+            
+              </div>
+              <div class="quiz-feedback" id="feedback-0" style="display:none;"></div>
+              <div class="quiz-explanation" id="explanation-0" style="display:none;">
+                <strong>💡 해설:</strong> X_L = X_C 가 상쇄되므로 Z = sqrt(R^2 + 0) = R 로 임피던스가 최소가 됩니다.
+              </div>
+            </div>
+            
+            <div class="quiz-card" data-qidx="1">
+              <div class="quiz-question-header">
+                <span class="quiz-badge">문항 2</span>
+                <span class="quiz-question-text">공진 주파수 f_0 에서 인가 전압과 회로 전류 사이의 위상차(Phase Angle)는 얼마입니까?</span>
+              </div>
+              <div class="quiz-options">
+                
+            <button type="button" class="quiz-option-btn" data-qidx="1" data-oidx="0" onclick="handleQuizOption(1, 0)">
+              <span class="opt-label">A</span>
+              <span class="opt-text">0도 (동위상으로 전류와 전압이 일치한다)</span>
+            </button>
+            
+            <button type="button" class="quiz-option-btn" data-qidx="1" data-oidx="1" onclick="handleQuizOption(1, 1)">
+              <span class="opt-label">B</span>
+              <span class="opt-text">+90도 (전압이 전류보다 앞선다)</span>
+            </button>
+            
+            <button type="button" class="quiz-option-btn" data-qidx="1" data-oidx="2" onclick="handleQuizOption(1, 2)">
+              <span class="opt-label">C</span>
+              <span class="opt-text">-90도 (전류가 전압보다 앞선다)</span>
+            </button>
+            
+            <button type="button" class="quiz-option-btn" data-qidx="1" data-oidx="3" onclick="handleQuizOption(1, 3)">
+              <span class="opt-label">D</span>
+              <span class="opt-text">180도 (반대 위상이다)</span>
+            </button>
+            
+              </div>
+              <div class="quiz-feedback" id="feedback-1" style="display:none;"></div>
+              <div class="quiz-explanation" id="explanation-1" style="display:none;">
+                <strong>💡 해설:</strong> 공진 시 유도 리액턴스와 용량 리액턴스가 같아 리액턴스 차이가 0이므로 위상각 phi = arctan((X_L - X_C)/R) = 0 입니다.
+              </div>
+            </div>
+            
+    </div>
+    <div class="quiz-controls">
+      <div class="score-tracker" id="score-display">
+        진행 상황: <span id="solved-count">0</span> / 2 문항 응시 (<span id="correct-count">0</span> 정답)
+      </div>
+      <button type="button" class="quiz-reset-btn" onclick="resetQuiz()">다시 풀기 (Reset Quiz)</button>
+    </div>
+  </section>
+
+  <div class="lesson-footer">
+    <p>PASCO Capstone Model Context Protocol Pedagogical Lab Tutor &bull; Automated Lesson Engine</p>
+  </div>
+
+  <script>
+    const QUIZ_DATA = [{"correctIndex": 0, "explanation": "X_L = X_C 가 상쇄되므로 Z = sqrt(R^2 + 0) = R 로 임피던스가 최소가 됩니다."}, {"correctIndex": 0, "explanation": "공진 시 유도 리액턴스와 용량 리액턴스가 같아 리액턴스 차이가 0이므로 위상각 phi = arctan((X_L - X_C)/R) = 0 입니다."}];
+    const answers = {};
+
+    function handleQuizOption(qIdx, selectedOptIdx) {
+      const card = document.querySelector(`.quiz-card[data-qidx="${qIdx}"]`);
+      if (!card) return;
+      const qInfo = QUIZ_DATA[qIdx];
+      const buttons = card.querySelectorAll('.quiz-option-btn');
+      const feedbackEl = document.getElementById(`feedback-${qIdx}`);
+      const explanationEl = document.getElementById(`explanation-${qIdx}`);
+
+      answers[qIdx] = (selectedOptIdx === qInfo.correctIndex);
+
+      buttons.forEach((btn, idx) => {
+        btn.classList.remove('selected', 'correct', 'incorrect', 'reveal-correct');
+        if (idx === selectedOptIdx) {
+          btn.classList.add('selected');
+          if (idx === qInfo.correctIndex) {
+            btn.classList.add('correct');
+          } else {
+            btn.classList.add('incorrect');
+          }
+        }
+        if (idx === qInfo.correctIndex && selectedOptIdx !== qInfo.correctIndex) {
+          btn.classList.add('reveal-correct');
+        }
+      });
+
+      feedbackEl.style.display = 'block';
+      explanationEl.style.display = 'block';
+
+      if (selectedOptIdx === qInfo.correctIndex) {
+        feedbackEl.className = 'quiz-feedback feedback-correct';
+        feedbackEl.innerHTML = '🎉 <strong>정답입니다!</strong> 물리적 원리를 정확히 이해하셨습니다.';
+      } else {
+        feedbackEl.className = 'quiz-feedback feedback-incorrect';
+        feedbackEl.innerHTML = '❌ <strong>오답입니다.</strong> 아래 해설을 읽고 개념을 다시 점검해보세요.';
+      }
+
+      updateScore();
+    }
+
+    function resetQuiz() {
+      for (const k of Object.keys(answers)) {
+        delete answers[k];
+      }
+      document.querySelectorAll('.quiz-card').forEach((card, qIdx) => {
+        const buttons = card.querySelectorAll('.quiz-option-btn');
+        buttons.forEach(btn => btn.classList.remove('selected', 'correct', 'incorrect', 'reveal-correct'));
+        const feedbackEl = document.getElementById(`feedback-${qIdx}`);
+        const explanationEl = document.getElementById(`explanation-${qIdx}`);
+        if (feedbackEl) feedbackEl.style.display = 'none';
+        if (explanationEl) explanationEl.style.display = 'none';
+      });
+      updateScore();
+    }
+
+    function updateScore() {
+      const answeredCount = Object.keys(answers).length;
+      let correctCount = 0;
+      for (const val of Object.values(answers)) {
+        if (val) correctCount++;
+      }
+      const solvedEl = document.getElementById('solved-count');
+      const correctEl = document.getElementById('correct-count');
+      if (solvedEl) solvedEl.textContent = answeredCount;
+      if (correctEl) correctEl.textContent = correctCount;
+    }
+  </script>
+</body>
+</html>
