@@ -75,6 +75,10 @@ from capstone_mcp.oscilloscope_fft import (
     ScopeTriggerResult,
 )
 from capstone_mcp.plotting import PlotInput, render_plot
+from capstone_mcp.recipes import (
+    ExperimentMacroResult,
+    run_experiment_macro,
+)
 from capstone_mcp.repetition import AcquisitionJobs, JobStatus, RepeatPlan
 from capstone_mcp.run_delete import DeleteRunResult
 from capstone_mcp.run_rename import RenameRunResult
@@ -1583,6 +1587,41 @@ async def capstone_set_page_layout(
         page_name=page_name,
         allow_foreground=allow_foreground,
     ), mutates=True))
+
+
+@MCP.tool()
+async def capstone_run_experiment_macro(
+    experiment_id: str,
+    action: str = "run",
+    parameters: dict[str, JsonValue] | None = None,
+) -> ExperimentMacroResult:
+    """Execute high-level automation macro for canonical physics experiments.
+
+    Supported experiments:
+    - 'photoelectric_effect': Mercury lamp wavelength sweep (365, 405, 436, 546,
+      577 nm), DC amplifier Ch A / DC power supply Ch B, Keep Sample stopping
+      potential acquisition, and h/e linear fit.
+    - 'rlc_resonance': 850 Signal generator sine sweep (10Hz-10kHz), Scope/FFT
+      peak measurement, resonant frequency f_0, and Q-factor calculation.
+    - 'forced_harmonic_oscillation' / 'forced_oscillation': Smart Cart 100Hz
+      position, 480s stop condition, resonance amplitude curve, and damping b.
+    - 'adiabatic_gas': 1000Hz sampling, cyclic work area integration (oint P dV),
+      and adiabatic index gamma fit (PV^gamma = const).
+    - 'slit_diffraction': Light intensity vs position scan, diffraction
+      minima/maxima extraction, and slit geometry (width a, separation d).
+
+    Actions:
+    - 'setup': Configure apparatus sensors, displays, and excitation sources.
+    - 'acquire': Record or sample experimental datasets.
+    - 'analyze': Perform numerical regression, peak detection, and error metrics.
+    - 'run': Sequentially execute setup, acquire, and analyze phases.
+    """
+    params = dict(parameters or {})
+    return run_experiment_macro(
+        experiment_id=experiment_id,
+        action=action,
+        parameters=params,
+    )
 
 
 # ---------------------------------------------------------------------------
