@@ -436,10 +436,19 @@ async def capstone_set_value(ref: str, value: str) -> Result:
 
 
 @MCP.tool()
-async def capstone_screenshot(handle: int) -> Image:
-    """Capture PNG pixels at native resolution; does not raise the window."""
+async def capstone_screenshot(
+    handle: int,
+    *,
+    scale: float = 1.0,
+    crop_region: list[int] | None = None,
+) -> Image:
+    """Capture PNG pixels at native resolution, optionally scaled or cropped.
+
+    Does not raise the target window to the foreground.
+    """
     encoded = TEXT.validate_python(await _native(NativeRequest(
-        operation="screenshot", handle=handle,
+        operation="screenshot", handle=handle, scale=scale,
+        crop_region=crop_region,
     )))
     return Image(data=base64.b64decode(encoded, validate=True), format="png")
 

@@ -62,7 +62,9 @@ class NativeDesktop:
             "read_value": lambda r: self.app.control(r.ref).iface_value.CurrentValue,
             "set_value": lambda r: _json(self.app.set_value(r.ref, r.value)),
             "screenshot": lambda r: base64.b64encode(
-                self.app.screenshot(r.handle),
+                self.app.screenshot(
+                    r.handle, scale=r.scale, crop_region=r.crop_region,
+                ),
             ).decode("ascii"),
             "keys": lambda r: _json(self.app.keys(
                 r.handle, r.value, allow_foreground=r.allow_foreground,

@@ -8,7 +8,7 @@ from typing import Final, assert_never
 from uuid import uuid4
 
 import win32gui
-from PIL import ImageGrab
+from PIL import Image, ImageGrab
 from pywinauto import Application, Desktop
 from pywinauto.application import ProcessNotFoundError, process_module
 from pywinauto.controls.hwndwrapper import HwndWrapper
@@ -18,6 +18,7 @@ from pywinauto.findwindows import find_windows
 from capstone_mcp.models import Action, Bounds, Control, Result, Snapshot, Window
 
 EXECUTABLE: Final = Path("C:/Program Files/PASCO scientific/Capstone/Capstone.exe")
+CROP_COORDINATE_COUNT: Final = 4
 
 
 class AutomationError(RuntimeError):
@@ -194,11 +195,34 @@ class Capstone:
         self.refs.clear()
         return Result(detail="Value delivered; take a snapshot to verify.")
 
-    def screenshot(self, handle: int) -> bytes:
+    def screenshot(
+        self, handle: int, *, scale: float = 1.0,
+        crop_region: list[int] | None = None,
+    ) -> bytes:
         """Capture the target HWND rather than unrelated overlapping windows."""
+        if scale <= 0.0 or scale > 1.0:
+            msg = "scale must be a positive float <= 1.0."
+            raise AutomationError(msg)
+        if crop_region is not None and len(crop_region) != CROP_COORDINATE_COUNT:
+            msg = (
+                "crop_region must contain exactly 4 integers: "
+                "[left, top, right, bottom]."
+            )
+            raise AutomationError(msg)
         window = self.window(handle)
-        with BytesIO() as output, ImageGrab.grab(window=window.handle) as image:
-            image.save(output, format="PNG")
+        with BytesIO() as output, ImageGrab.grab(window=window.handle) as raw:
+            processed = raw
+            if crop_region is not None:
+                processed = processed.crop((
+                    crop_region[0], crop_region[1], crop_region[2], crop_region[3],
+                ))
+            if scale != 1.0:
+                new_width = max(1, int(processed.width * scale))
+                new_height = max(1, int(processed.height * scale))
+                processed = processed.resize(
+                    (new_width, new_height), Image.Resampling.LANCZOS,
+                )
+            processed.save(output, format="PNG")
             return output.getvalue()
 
     def keys(

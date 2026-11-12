@@ -41,6 +41,8 @@ class NativeRequest(Model):
     target: str = ""
     step_limit: int = 128
     allow_foreground: bool = True
+    scale: float = 1.0
+    crop_region: list[int] | None = None
     plan: JsonValue = None
 
 
