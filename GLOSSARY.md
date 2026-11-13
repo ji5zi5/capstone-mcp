@@ -47,3 +47,10 @@ Automated threshold monitor halting data recording when sensor values exceed or 
 ### UI Escape Hatch (`capstone_interact_ui`)
 Consolidated fallback tool providing raw mouse and keyboard UIA activations across invoke, click, drag, scroll, and key typing without polluting the top-level tool catalog.
 
+### Live URI
+A URI scheme (`live://measurements`, `live://table`) enabling callers to query real-time sensor streams and display tables through the unified `data_sources` seam without knowing transport details.
+
+### Compound Seam
+A high-depth module interface (such as `manage_display` or `manage_instrument`) consolidating multiple domain actions behind a single parameter-driven entry point, eliminating shallow pass-through wrappers.
+
+
