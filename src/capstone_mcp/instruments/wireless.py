@@ -1,102 +1,34 @@
 # Copyright 2026 Capstone MCP contributors.
 """Wireless sensor discovery, pairing, and multi-point calibration tools."""
 
+from __future__ import annotations
+
 import contextlib
 import re
-from typing import Final, Literal
+from typing import TYPE_CHECKING
 
 from capstone_mcp.desktop import AutomationError, Capstone
-from capstone_mcp.models import Control, Model, Snapshot
+from capstone_mcp.instruments.models import (
+    CALIBRATION_NAME,
+    CALIBRATION_TOGGLE_SUFFIX,
+    HARDWARE_SETUP_NAME,
+    HARDWARE_SETUP_TOGGLE_SUFFIX,
+    VALID_CALIBRATIONS,
+    CalibrateSensorRequest,
+    CalibrateSensorResult,
+    ConnectWirelessSensorRequest,
+    ConnectWirelessSensorResult,
+    ScanWirelessSensorsRequest,
+    ScanWirelessSensorsResult,
+    WirelessSensorInfo,
+)
 
-HARDWARE_SETUP_TOGGLE_SUFFIX: Final = ".ObjNameHardware"
-HARDWARE_SETUP_NAME: Final = "Hardware Setup"
-CALIBRATION_TOGGLE_SUFFIX: Final = ".ObjNameCalibration"
-CALIBRATION_NAME: Final = "Calibration"
+if TYPE_CHECKING:
+    from capstone_mcp.models import Control, Snapshot
 
-type CalibrationType = Literal["two_point", "one_point"]
-
-VALID_CALIBRATIONS: Final = {
-    "two_point": "two_point",
-    "2_point": "two_point",
-    "2-point": "two_point",
-    "two standards": "two_point",
-    "one_point": "one_point",
-    "1_point": "one_point",
-    "1-point": "one_point",
-    "one standard": "one_point",
-}
-
-
-class WirelessSensorInfo(Model):
-    """Information about a discovered wireless sensor."""
-
-    sensor_id: str
-    name: str
-    connected: bool = False
-    battery_percent: int | None = None
-    signal_strength: str | None = None
-
-
-class ScanWirelessSensorsRequest(Model):
-    """Parameters for scanning wireless Bluetooth sensors."""
-
-    handle: int = 0
-    timeout_seconds: float = 5.0
-    allow_foreground: bool = True
-    keep_open: bool = False
-
-
-class ScanWirelessSensorsResult(Model):
-    """Discovered wireless sensors and summary."""
-
-    sensors: list[WirelessSensorInfo]
-    count: int
-    verified: bool = True
-    detail: str = ""
-
-
-class ConnectWirelessSensorRequest(Model):
-    """Parameters for connecting/pairing a wireless sensor."""
-
-    sensor_id: str
-    handle: int = 0
-    allow_foreground: bool = True
-    keep_open: bool = False
-
-
-class ConnectWirelessSensorResult(Model):
-    """Outcome of wireless sensor connection."""
-
-    sensor_id: str
-    name: str
-    connected: bool = True
-    verified: bool = True
-    detail: str = ""
-
-
-class CalibrateSensorRequest(Model):
-    """Parameters for sensor calibration wizard."""
-
-    sensor_name: str
-    measurement_type: str | None = None
-    calibration_type: str = "two_point"
-    standard_1: float = 0.0
-    standard_2: float | None = None
-    handle: int = 0
-    allow_foreground: bool = True
-    keep_open: bool = False
-
-
-class CalibrateSensorResult(Model):
-    """Outcome of sensor calibration wizard."""
-
-    sensor_name: str
-    measurement_type: str
-    calibration_type: str
-    standard_1: float
-    standard_2: float | None = None
-    verified: bool = True
-    detail: str = ""
+# ---------------------------------------------------------------------------
+# 1. Internal Helpers
+# ---------------------------------------------------------------------------
 
 
 def _find_palette_toggle(
@@ -189,6 +121,11 @@ def _extract_sensor_info(ctrl: Control) -> WirelessSensorInfo:
         connected=is_conn,
         battery_percent=battery,
     )
+
+
+# ---------------------------------------------------------------------------
+# 2. Public Operations: Scan & Connect Wireless Sensors
+# ---------------------------------------------------------------------------
 
 
 def scan_wireless_sensors(
@@ -309,6 +246,11 @@ def connect_wireless_sensor(
     finally:
         if opened_by_tool and not request.keep_open:
             app.click(request.handle, toggle.ref, allow_foreground=True)
+
+
+# ---------------------------------------------------------------------------
+# 3. Public Operations: Multi-Point Sensor Calibration Wizard
+# ---------------------------------------------------------------------------
 
 
 def _find_wizard_button(controls: list[Control], label: str) -> Control | None:

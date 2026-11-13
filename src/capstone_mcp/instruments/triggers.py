@@ -1,85 +1,30 @@
 # Copyright 2026 Capstone MCP contributors.
 """Intelligent recording conditions and manual sampling (Keep Sample) in Capstone."""
 
+from __future__ import annotations
+
 import contextlib
-from typing import Final, Literal
 
 from capstone_mcp.desktop import AutomationError, Capstone
-from capstone_mcp.models import Action, Control, Model
+from capstone_mcp.instruments.models import (
+    KEEP_SAMPLE_SUFFIX,
+    RECORDING_CONDITIONS_NAME,
+    RECORDING_CONDITIONS_SUFFIX,
+    SAMPLING_MODE_SUFFIX,
+    ConditionSpec,
+    KeepSampleRequest,
+    KeepSampleResult,
+    SamplingMode,
+    SetRecordingConditionRequest,
+    SetRecordingConditionResult,
+    SetSamplingModeRequest,
+    SetSamplingModeResult,
+)
+from capstone_mcp.models import Action, Control
 
-RECORDING_CONDITIONS_SUFFIX: Final = ".ObjNameRecordingConditions"
-RECORDING_CONDITIONS_NAME: Final = "Recording Conditions"
-SAMPLING_MODE_SUFFIX: Final = ".SamplingModeSelector"
-KEEP_SAMPLE_SUFFIX: Final = ".KeepSampleButton"
-
-type ConditionType = Literal["none", "time", "sensor_threshold"]
-type ComparisonOperator = Literal["above", "below", "rises_above", "falls_below"]
-type SamplingMode = Literal["continuous", "keep_sample", "fast_monitor"]
-
-
-class ConditionSpec(Model):
-    """Specification of a start or stop recording condition."""
-
-    condition_type: ConditionType = "none"
-    measurement: str | None = None
-    operator: ComparisonOperator | None = None
-    threshold: float | None = None
-    unit: str | None = None
-
-
-class SetRecordingConditionRequest(Model):
-    """Specification for start/stop recording conditions."""
-
-    start_condition: ConditionSpec | None = None
-    stop_condition: ConditionSpec | None = None
-    handle: int = 0
-    allow_foreground: bool = True
-    keep_open: bool = False
-
-
-class SetRecordingConditionResult(Model):
-    """Result of setting recording conditions."""
-
-    start_condition: ConditionSpec | None = None
-    stop_condition: ConditionSpec | None = None
-    verified: bool = True
-    detail: str = ""
-
-
-class SetSamplingModeRequest(Model):
-    """Specification for switching sampling mode."""
-
-    mode: SamplingMode = "continuous"
-    handle: int = 0
-    allow_foreground: bool = True
-
-
-class SetSamplingModeResult(Model):
-    """Result of switching sampling mode."""
-
-    mode: SamplingMode
-    previous_mode: str | None = None
-    verified: bool = True
-    detail: str = ""
-
-
-class KeepSampleRequest(Model):
-    """Specification for taking a manual sample point."""
-
-    value: float | None = None
-    variable_name: str | None = None
-    handle: int = 0
-    allow_foreground: bool = True
-
-
-class KeepSampleResult(Model):
-    """Outcome of keeping a sample point."""
-
-    recorded_value: float | None = None
-    variable_name: str | None = None
-    sample_retained: bool = True
-    verified: bool = True
-    detail: str = ""
+# ---------------------------------------------------------------------------
+# 1. Internal Helpers
+# ---------------------------------------------------------------------------
 
 
 def _click_control(
@@ -185,6 +130,11 @@ def _apply_condition(
 
     if thresh_ctrl is not None and cond.threshold is not None:
         _set_input_text(app, handle, thresh_ctrl, str(cond.threshold))
+
+
+# ---------------------------------------------------------------------------
+# 2. Public Operations
+# ---------------------------------------------------------------------------
 
 
 def set_recording_condition(

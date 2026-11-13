@@ -85,6 +85,12 @@ def test_systematic_tool_annotations() -> None:
         "capstone_extract_dataset",
         "capstone_recording_status",
         "capstone_linear_fit",
+        "capstone_scan_wireless_sensors",
+        "capstone_read_signal_generator_status",
+        "capstone_live_configuration",
+        "capstone_current_value",
+        "capstone_acquisition_job",
+        "capstone_read_fft_peaks",
     ]
     for name in read_only_tools:
         tool = tools[name]
@@ -103,13 +109,37 @@ def test_systematic_tool_annotations() -> None:
         assert tool.annotations is not None, f"Tool {name} missing annotations"
         assert tool.annotations.destructiveHint is True, f"Tool {name} expected destructiveHint=True"
 
+    # 3. Instrument tool annotations systematic completeness
+    instrument_tools = [
+        "capstone_manage_instrument",
+        "capstone_set_recording",
+        "capstone_step_sampling_rate",
+        "capstone_select_sensor",
+        "capstone_configure_sensor",
+        "capstone_zero_sensor",
+        "capstone_set_signal_generator",
+        "capstone_create_scope",
+        "capstone_set_scope_trigger",
+        "capstone_create_fft",
+        "capstone_set_recording_condition",
+        "capstone_set_sampling_mode",
+        "capstone_keep_sample",
+        "capstone_connect_wireless_sensor",
+        "capstone_calibrate_sensor",
+    ]
+    for name in instrument_tools:
+        tool = tools[name]
+        assert tool.annotations is not None, f"Tool {name} missing annotations"
+        assert tool.annotations.destructiveHint is False, f"Tool {name} expected destructiveHint=False"
+
 
 @pytest.mark.anyio
 async def test_dynamic_resources_contract() -> None:
-    """Verify capstone://status and capstone://runs/active dynamic state resources."""
+    """Verify capstone://status, capstone://runs/active, and capstone://hardware/inventory."""
     resources = {str(r.uri): r for r in server.MCP._resource_manager.list_resources()}
     assert "capstone://status" in resources
     assert "capstone://runs/active" in resources
+    assert "capstone://hardware/inventory" in resources
 
     # Status resource read
     status_raw = await server.capstone_status_resource()
@@ -125,3 +155,13 @@ async def test_dynamic_resources_contract() -> None:
     runs = json.loads(runs_raw)
     assert "process_id" in runs
     assert "active_jobs" in runs
+
+    # Hardware inventory resource read
+    hw_raw = await server.capstone_hardware_inventory_resource()
+    hw = json.loads(hw_raw)
+    assert "attached" in hw
+    assert "interfaces" in hw
+    assert "sensors" in hw
+    assert "wireless_devices" in hw
+    assert "recording" in hw
+    assert "sampling_rate" in hw

@@ -12,6 +12,18 @@ from capstone_mcp.graphs import (
     MeasureGraphAreaResult,
     ToggleGraphStatisticsResult,
 )
+from capstone_mcp.instruments import (
+    CalibrateSensorResult,
+    ConnectWirelessSensorResult,
+    InstrumentAction,
+    InstrumentResult,
+    KeepSampleResult,
+    ScanWirelessSensorsResult,
+    SetRecordingConditionResult,
+    SetSamplingModeResult,
+    SetSignalGeneratorResult,
+    SignalGeneratorStatusResult,
+)
 from capstone_mcp.native_loop import NativeDesktop
 from capstone_mcp.oscilloscope_fft import (
     CreateFftResult,
@@ -21,24 +33,10 @@ from capstone_mcp.oscilloscope_fft import (
 )
 from capstone_mcp.runs import SetRunVisibilityResult
 from capstone_mcp.server import MCP
-from capstone_mcp.signal_generator import (
-    SetSignalGeneratorResult,
-    SignalGeneratorStatusResult,
-)
-from capstone_mcp.smart_triggers import (
-    KeepSampleResult,
-    SetRecordingConditionResult,
-    SetSamplingModeResult,
-)
 from capstone_mcp.table_display import (
     CreateTableResult,
     ReadTableResult,
     SetTableColumnsResult,
-)
-from capstone_mcp.wireless_calibration import (
-    CalibrateSensorResult,
-    ConnectWirelessSensorResult,
-    ScanWirelessSensorsResult,
 )
 from capstone_mcp.workbook_layout import AddPageResult, SetPageLayoutResult
 
@@ -160,53 +158,75 @@ def test_dispatch_graph_toolbox_and_visibility() -> None:
 def test_dispatch_signal_generator_and_scope_fft() -> None:
     desktop = NativeDesktop()
 
-    with patch("capstone_mcp.native_loop.set_signal_generator") as mock_ssg:
-        mock_ssg.return_value = SetSignalGeneratorResult(
-            generator_name="Output 1", waveform="Sine",
-            frequency=1000.0, amplitude=1.0, enabled=True,
+    with patch("capstone_mcp.native_loop.manage_instrument") as mock_mi:
+        mock_mi.return_value = InstrumentResult(
+            action=InstrumentAction.CONFIGURE_SIGNAL_GENERATOR,
+            configure_signal_generator=SetSignalGeneratorResult(
+                generator_name="Output 1",
+                waveform="Sine",
+                frequency=1000.0,
+                amplitude=1.0,
+                enabled=True,
+            ),
         )
-        res = desktop.dispatch(NativeRequest(
-            operation="set_signal_generator", waveform="Sine",
-        ))
+        res = desktop.dispatch(
+            NativeRequest(
+                operation="set_signal_generator",
+                waveform="Sine",
+            ),
+        )
         assert res["waveform"] == "Sine"
-        mock_ssg.assert_called_once()
+        mock_mi.assert_called_once()
 
-    with (
-        patch("capstone_mcp.native_loop.read_signal_generator_status")
-        as mock_rsgs
-    ):
-        mock_rsgs.return_value = SignalGeneratorStatusResult(
-            generator_name="Output 1", enabled=True,
-            waveform="Sine", frequency=1000.0, amplitude=1.0,
+    with patch("capstone_mcp.native_loop.manage_instrument") as mock_mi:
+        mock_mi.return_value = InstrumentResult(
+            action=InstrumentAction.CONFIGURE_SIGNAL_GENERATOR,
+            configure_signal_generator=SignalGeneratorStatusResult(
+                generator_name="Output 1",
+                enabled=True,
+                waveform="Sine",
+                frequency=1000.0,
+                amplitude=1.0,
+            ),
         )
         res = desktop.dispatch(NativeRequest(operation="read_signal_generator_status"))
         assert res["enabled"] is True
-        mock_rsgs.assert_called_once()
+        mock_mi.assert_called_once()
 
     with patch("capstone_mcp.native_loop.create_scope") as mock_cs:
         mock_cs.return_value = CreateScopeResult(
-            display_id="Scope_1", display_type="Scope",
+            display_id="Scope_1",
+            display_type="Scope",
         )
-        res = desktop.dispatch(NativeRequest(
-            operation="create_scope", timebase="10ms",
-        ))
+        res = desktop.dispatch(
+            NativeRequest(
+                operation="create_scope",
+                timebase="10ms",
+            ),
+        )
         assert res["display_id"] == "Scope_1"
         mock_cs.assert_called_once()
 
     with patch("capstone_mcp.native_loop.set_scope_trigger") as mock_sst:
         mock_sst.return_value = ScopeTriggerResult(
-            scope_id="Scope_1", trigger_level=0.5,
-            trigger_slope="rising", trigger_mode="auto",
+            scope_id="Scope_1",
+            trigger_level=0.5,
+            trigger_slope="rising",
+            trigger_mode="auto",
         )
-        res = desktop.dispatch(NativeRequest(
-            operation="set_scope_trigger", trigger_level=0.5,
-        ))
+        res = desktop.dispatch(
+            NativeRequest(
+                operation="set_scope_trigger",
+                trigger_level=0.5,
+            ),
+        )
         assert res["trigger_level"] == 0.5
         mock_sst.assert_called_once()
 
     with patch("capstone_mcp.native_loop.create_fft") as mock_cf:
         mock_cf.return_value = CreateFftResult(
-            display_id="FFT_1", display_type="FFT",
+            display_id="FFT_1",
+            display_type="FFT",
         )
         res = desktop.dispatch(NativeRequest(operation="create_fft"))
         assert res["display_id"] == "FFT_1"
@@ -214,11 +234,16 @@ def test_dispatch_signal_generator_and_scope_fft() -> None:
 
     with patch("capstone_mcp.native_loop.read_fft_peaks") as mock_rfp:
         mock_rfp.return_value = ReadFftPeaksResult(
-            fft_id="FFT_1", peaks=[], peak_count=0,
+            fft_id="FFT_1",
+            peaks=[],
+            peak_count=0,
         )
-        res = desktop.dispatch(NativeRequest(
-            operation="read_fft_peaks", top_k=3,
-        ))
+        res = desktop.dispatch(
+            NativeRequest(
+                operation="read_fft_peaks",
+                top_k=3,
+            ),
+        )
         assert res["peak_count"] == 0
         mock_rfp.assert_called_once()
 
@@ -226,54 +251,87 @@ def test_dispatch_signal_generator_and_scope_fft() -> None:
 def test_dispatch_triggers_calibration_and_layout() -> None:
     desktop = NativeDesktop()
 
-    with patch("capstone_mcp.native_loop.set_recording_condition") as mock_src:
-        mock_src.return_value = SetRecordingConditionResult()
+    with patch("capstone_mcp.native_loop.manage_instrument") as mock_mi:
+        mock_mi.return_value = InstrumentResult(
+            action=InstrumentAction.SET_RECORDING_CONDITION,
+            set_recording_condition=SetRecordingConditionResult(),
+        )
         res = desktop.dispatch(NativeRequest(operation="set_recording_condition"))
         assert res["verified"] is True
-        mock_src.assert_called_once()
+        mock_mi.assert_called_once()
 
-    with patch("capstone_mcp.native_loop.set_sampling_mode") as mock_ssm:
-        mock_ssm.return_value = SetSamplingModeResult(mode="keep_sample")
-        res = desktop.dispatch(NativeRequest(
-            operation="set_sampling_mode", sampling_mode="keep_sample",
-        ))
+    with patch("capstone_mcp.native_loop.manage_instrument") as mock_mi:
+        mock_mi.return_value = InstrumentResult(
+            action=InstrumentAction.SET_SAMPLING_MODE,
+            set_sampling_mode=SetSamplingModeResult(mode="keep_sample"),
+        )
+        res = desktop.dispatch(
+            NativeRequest(
+                operation="set_sampling_mode",
+                sampling_mode="keep_sample",
+            ),
+        )
         assert res["mode"] == "keep_sample"
-        mock_ssm.assert_called_once()
+        mock_mi.assert_called_once()
 
-    with patch("capstone_mcp.native_loop.keep_sample") as mock_ks:
-        mock_ks.return_value = KeepSampleResult(recorded_value=3.14)
-        res = desktop.dispatch(NativeRequest(
-            operation="keep_sample", sample_value=3.14,
-        ))
+    with patch("capstone_mcp.native_loop.manage_instrument") as mock_mi:
+        mock_mi.return_value = InstrumentResult(
+            action=InstrumentAction.KEEP_SAMPLE,
+            keep_sample=KeepSampleResult(recorded_value=3.14),
+        )
+        res = desktop.dispatch(
+            NativeRequest(
+                operation="keep_sample",
+                sample_value=3.14,
+            ),
+        )
         assert res["recorded_value"] == 3.14
-        mock_ks.assert_called_once()
+        mock_mi.assert_called_once()
 
-    with patch("capstone_mcp.native_loop.scan_wireless_sensors") as mock_sws:
-        mock_sws.return_value = ScanWirelessSensorsResult(sensors=[], count=0)
+    with patch("capstone_mcp.native_loop.manage_instrument") as mock_mi:
+        mock_mi.return_value = InstrumentResult(
+            action=InstrumentAction.SCAN_WIRELESS,
+            scan_wireless=ScanWirelessSensorsResult(sensors=[], count=0),
+        )
         res = desktop.dispatch(NativeRequest(operation="scan_wireless_sensors"))
         assert res["count"] == 0
-        mock_sws.assert_called_once()
+        mock_mi.assert_called_once()
 
-    with patch("capstone_mcp.native_loop.connect_wireless_sensor") as mock_cws:
-        mock_cws.return_value = ConnectWirelessSensorResult(
-            sensor_id="Sensor_1", name="Smart Cart",
+    with patch("capstone_mcp.native_loop.manage_instrument") as mock_mi:
+        mock_mi.return_value = InstrumentResult(
+            action=InstrumentAction.CONNECT_WIRELESS,
+            connect_wireless=ConnectWirelessSensorResult(
+                sensor_id="Sensor_1",
+                name="Smart Cart",
+            ),
         )
-        res = desktop.dispatch(NativeRequest(
-            operation="connect_wireless_sensor", sensor_id="Sensor_1",
-        ))
+        res = desktop.dispatch(
+            NativeRequest(
+                operation="connect_wireless_sensor",
+                sensor_id="Sensor_1",
+            ),
+        )
         assert res["sensor_id"] == "Sensor_1"
-        mock_cws.assert_called_once()
+        mock_mi.assert_called_once()
 
-    with patch("capstone_mcp.native_loop.calibrate_sensor") as mock_csens:
-        mock_csens.return_value = CalibrateSensorResult(
-            sensor_name="Force", measurement_type="Force",
-            calibration_type="two_point", standard_1=0.0,
+    with patch("capstone_mcp.native_loop.manage_instrument") as mock_mi:
+        mock_mi.return_value = InstrumentResult(
+            action=InstrumentAction.CALIBRATE_SENSOR,
+            calibrate_sensor=CalibrateSensorResult(
+                sensor_name="Force",
+                measurement_type="Force",
+                calibration_type="two_point",
+                standard_1=0.0,
+            ),
         )
-        res = desktop.dispatch(NativeRequest(
-            operation="calibrate_sensor", sensor_name="Force",
-        ))
+        res = desktop.dispatch(
+            NativeRequest(
+                operation="calibrate_sensor",
+                sensor_name="Force",
+            ),
+        )
         assert res["sensor_name"] == "Force"
-        mock_csens.assert_called_once()
+        mock_mi.assert_called_once()
 
     with patch("capstone_mcp.native_loop.add_page") as mock_ap:
         mock_ap.return_value = AddPageResult(page_index=1, title="Page 2")

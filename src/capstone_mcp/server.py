@@ -517,6 +517,47 @@ async def capstone_active_runs_resource() -> str:
     return json.dumps(runs_info, indent=2)
 
 
+@MCP.resource("capstone://hardware/inventory")
+async def capstone_hardware_inventory_resource() -> str:
+    """Return real-time hardware status for interfaces, sensors, and devices."""
+    inventory_doc: dict[str, JsonValue] = {
+        "attached": not WORKER.retired and bool(WORKER.process_id),
+        "process_id": WORKER.process_id,
+        "interfaces": [],
+        "sensors": [],
+        "wireless_devices": [],
+        "recording": None,
+        "sampling_rate": None,
+    }
+    if not WORKER.retired and WORKER.process_id:
+        with suppress(Exception):
+            rec_status = await _native(
+                NativeRequest(operation="recording_status"),
+                mutates=False,
+            )
+            inventory_doc["recording"] = rec_status
+            if isinstance(rec_status, dict):
+                inventory_doc["sampling_rate"] = rec_status.get(
+                    "sampling_rate_display",
+                )
+        with suppress(Exception):
+            scan_res = await _native(
+                NativeRequest(
+                    operation="manage_instrument",
+                    instrument_request={
+                        "action": "scan_wireless",
+                        "scan_wireless": {"timeout_seconds": 1.0},
+                    },
+                ),
+                mutates=False,
+            )
+            if isinstance(scan_res, dict) and "scan_wireless" in scan_res:
+                sw = scan_res["scan_wireless"]
+                if isinstance(sw, dict) and "sensors" in sw:
+                    inventory_doc["wireless_devices"] = sw["sensors"]
+    return JSON_VALUE.dump_json(inventory_doc, indent=2).decode("utf-8")
+
+
 @MCP.resource("capstone://guide")
 def capstone_guide_resource() -> str:
     """Return the complete workflow guidance manual for PASCO Capstone."""
@@ -704,6 +745,35 @@ def run_comparison_workflow(
     )
 
 
+@MCP.prompt()
+def hardware_setup_workflow(
+    interface_type: str = "850 Universal Interface",
+    target_sensor: str = "Force Sensor",
+    sampling_rate: str = "100 Hz",
+) -> str:
+    """Guided prompt template for hardware setup, sensor zeroing, and calibration."""
+    return (
+        f"Please execute a hardware setup workflow for '{target_sensor}' "
+        f"on '{interface_type}' in PASCO Capstone:\n"
+        "1. Check hardware status and connected interfaces via the "
+        "capstone://hardware/inventory resource.\n"
+        "2. If using wireless sensors, scan and connect using "
+        "capstone_manage_instrument(action='scan_wireless') and "
+        "capstone_manage_instrument(action='connect_wireless', sensor_name=...).\n"
+        f"3. Select sensor and configure sampling rate to '{sampling_rate}' using "
+        f"capstone_manage_instrument(action='set_sampling_rate', "
+        f"sensor_name='{target_sensor}', sampling_rate='{sampling_rate}').\n"
+        "4. Zero or tare the sensor prior to data acquisition using "
+        f"capstone_manage_instrument(action='zero_sensor', "
+        f"sensor_name='{target_sensor}').\n"
+        "5. If a signal generator is required, configure waveform and frequency using "
+        "capstone_manage_instrument(action='set_signal_generator', ...).\n"
+        "6. Confirm live sensor values and readiness using "
+        "capstone_manage_instrument(action='read_signal_generator') or "
+        "capstone_snapshot."
+    )
+
+
 # ---------------------------------------------------------------------------
 # Structured MCP Protocol Error Envelopes
 # ---------------------------------------------------------------------------
@@ -743,6 +813,18 @@ def format_tool_error(error_message: str) -> ToolErrorPayload:
         remediation = (
             "Verify graph display exists using capstone_manage_graph(action='read') "
             "or snapshot."
+        )
+    elif (
+        "sensor" in lower
+        or "instrument" in lower
+        or "generator" in lower
+        or "calibration" in lower
+        or "hardware" in lower
+    ):
+        code = "INSTRUMENT_ERROR"
+        remediation = (
+            "Verify hardware connection via capstone://hardware/inventory or "
+            "check sensor configuration using capstone_manage_instrument."
         )
     elif "file" in lower or "path" in lower:
         code = "FILE_NOT_FOUND"
@@ -838,12 +920,14 @@ __all__ = [
     "capstone_acquisition_job",
     "capstone_cancel_acquisition",
     "capstone_generate_lab_report",
+    "capstone_hardware_inventory_resource",
     "capstone_run_experiment_macro",
     "capstone_tutor_get_lesson",
     "capstone_tutor_guide_step",
     "capstone_tutor_lessons_resource",
     "data_analysis_workflow",
     "format_tool_error",
+    "hardware_setup_workflow",
     "http_main",
     "main",
     "physics_lab_tutor",

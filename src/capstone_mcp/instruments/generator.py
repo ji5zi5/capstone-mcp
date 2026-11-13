@@ -1,72 +1,30 @@
 # Copyright 2026 Capstone MCP contributors.
 """Control waveform and output parameters of Capstone Signal Generator."""
 
+from __future__ import annotations
+
 import contextlib
 import re
-from typing import Final, Literal
+from typing import TYPE_CHECKING
 
 from capstone_mcp.desktop import AutomationError, Capstone
-from capstone_mcp.models import Control, Model
+from capstone_mcp.instruments.models import (
+    DEFAULT_GENERATOR_NAME,
+    SIGNAL_GENERATOR_NAME,
+    SIGNAL_GENERATOR_TOGGLE_SUFFIX,
+    VALID_WAVEFORMS,
+    ReadSignalGeneratorStatusRequest,
+    SetSignalGeneratorRequest,
+    SetSignalGeneratorResult,
+    SignalGeneratorStatusResult,
+)
 
-SIGNAL_GENERATOR_TOGGLE_SUFFIX: Final = ".ObjNameSignalGenerator"
-SIGNAL_GENERATOR_NAME: Final = "Signal Generator"
-DEFAULT_GENERATOR_NAME: Final = "Output 1"
+if TYPE_CHECKING:
+    from capstone_mcp.models import Control
 
-VALID_WAVEFORMS: Final = {
-    "sine": "Sine",
-    "square": "Square",
-    "triangle": "Triangle",
-    "ramp": "Ramp",
-    "dc": "DC",
-}
-
-type WaveformType = Literal["Sine", "Square", "Triangle", "Ramp", "DC"]
-
-
-class SetSignalGeneratorRequest(Model):
-    """Parameters for configuring the Capstone Signal Generator."""
-
-    waveform: str = "Sine"
-    frequency: float | None = 1000.0
-    amplitude: float | None = 1.0
-    enabled: bool = True
-    generator_name: str | None = None
-    handle: int = 0
-    allow_foreground: bool = True
-    keep_open: bool = False
-
-
-class SetSignalGeneratorResult(Model):
-    """Outcome of configuring the Capstone Signal Generator."""
-
-    generator_name: str
-    waveform: str
-    frequency: float | None
-    amplitude: float | None
-    enabled: bool
-    verified: bool = True
-    detail: str = ""
-
-
-class ReadSignalGeneratorStatusRequest(Model):
-    """Request to read the current state of the Capstone Signal Generator."""
-
-    generator_name: str | None = None
-    handle: int = 0
-    allow_foreground: bool = True
-    keep_open: bool = False
-
-
-class SignalGeneratorStatusResult(Model):
-    """Current state of the Capstone Signal Generator."""
-
-    generator_name: str
-    enabled: bool
-    waveform: str
-    frequency: float | None
-    amplitude: float | None
-    verified: bool = True
-    detail: str = ""
+# ---------------------------------------------------------------------------
+# 1. Internal Helpers
+# ---------------------------------------------------------------------------
 
 
 def _normalize_waveform(raw_waveform: str) -> str:
@@ -250,6 +208,11 @@ def _parse_numeric(text: str) -> float | None:
         except ValueError:
             return None
     return None
+
+
+# ---------------------------------------------------------------------------
+# 2. Public Operations
+# ---------------------------------------------------------------------------
 
 
 def set_signal_generator(

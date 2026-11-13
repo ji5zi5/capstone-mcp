@@ -6,8 +6,8 @@ from unittest.mock import MagicMock
 import pytest
 
 from capstone_mcp.desktop import AutomationError, Capstone
+from capstone_mcp.instruments import ZeroSensorRequest, ZeroSensorResult, zero_sensor
 from capstone_mcp.models import Bounds, Control, Snapshot, Window
-from capstone_mcp.sensor_zero import ZeroSensorRequest, ZeroSensorResult, zero_sensor
 
 
 def test_zero_sensor_raises_when_no_zero_button_found() -> None:

@@ -214,7 +214,69 @@ flowchart TD
 
 ---
 
-## 7. Quality & Verification Guardrails
+## 7. Deep Instrument Subsystem & Hardware Compound Tooling (Phase 7)
+
+Phase 7 deepened and consolidated the fragmented hardware and instrument automation utilities into a cohesive domain package (`src/capstone_mcp/instruments/`), deleted 5 obsolete shallow root modules, and introduced a unified compound tool, systematic tool annotations, dynamic hardware inventory resources, structured error envelopes, and guided hardware setup workflow prompts.
+
+```mermaid
+flowchart TD
+    subgraph ClientContext ["Client / AI Agent Context"]
+        SetupPrompt["Universal Hardware Setup Prompt\n(hardware_setup_workflow)"]
+        HardwareResource["Dynamic Hardware Resource\n(capstone://hardware/inventory)"]
+        CompoundInstrument["Compound Tool\n(capstone_manage_instrument)"]
+    end
+
+    subgraph ServerBoundary ["MCP Protocol Boundary (server.py)"]
+        ToolAnnotations["Systematic ToolAnnotations\n(readOnlyHint / destructiveHint)"]
+        ErrorProtocol["Structured Error Protocol\n(INSTRUMENT_ERROR -> JSON)"]
+    end
+
+    subgraph DeepInstruments ["Deep Instrument Package (capstone_mcp.instruments)"]
+        Manager["InstrumentManager & manage_instrument(app, request)"]
+        Sensors["Sensors & Rate Traversal (sensors.py)"]
+        Generator["Signal Generator (generator.py)"]
+        Triggers["Smart Triggers & Keep Sample (triggers.py)"]
+        Wireless["Wireless Discovery & Calibration (wireless.py)"]
+        Models["Unified Enums & Normalization Models (models.py)"]
+        Manager --> Sensors
+        Manager --> Generator
+        Manager --> Triggers
+        Manager --> Wireless
+        Manager --> Models
+    end
+
+    CompoundInstrument --> Manager
+    CompoundInstrument --> ToolAnnotations
+    ErrorProtocol --> ClientContext
+```
+
+### Key Architectural Enhancements:
+
+1. **Deep Instrument Domain Seam (`src/capstone_mcp/instruments/`)**:
+   - Consolidated 5 shallow root modules (`sensor_settings.py`, `sensor_zero.py`, `signal_generator.py`, `smart_triggers.py`, `wireless_calibration.py`) into a deep, cohesive package.
+   - Anchored by a single unified functional seam: `manage_instrument(app: Capstone, request: InstrumentRequest) -> InstrumentResult` and `InstrumentManager` engine.
+   - Dispatches across 9 discrete hardware actions: `SET_SAMPLING_RATE`, `ZERO_SENSOR`, `CONFIGURE_SIGNAL_GENERATOR`, `SET_RECORDING_CONDITION`, `SET_SAMPLING_MODE`, `KEEP_SAMPLE`, `SCAN_WIRELESS`, `CONNECT_WIRELESS`, and `CALIBRATE_SENSOR`.
+   - Incorporates ergonomic flat argument normalization (`_FLAT_FIELD_MAPPINGS`) enabling callers and AI agents to invoke operations without complex nested dictionary schemas.
+
+2. **Compound FastMCP Tool (`capstone_manage_instrument`) & Thin Forwarding Adapters**:
+   - Registers a single compound tool on FastMCP dispatching across all 9 instrument actions via `request: InstrumentRequest`.
+   - Dramatically reduces AI agent context footprint and tool schema overhead while preserving thin backward-compatible forwarding adapters for all legacy tool callers (`capstone_zero_sensor`, `capstone_set_signal_generator`, etc.).
+
+3. **Systematic Tool Annotations**:
+   - All 24 instrument tools are explicitly annotated with `ToolAnnotations`:
+     - `readOnlyHint=True` on non-mutating query tools (`capstone_recording_status`, `capstone_read_signal_generator_status`, `capstone_scan_wireless_sensors`).
+     - `readOnlyHint=False` on state-altering actuators (`capstone_zero_sensor`, `capstone_set_signal_generator`, `capstone_calibrate_sensor`).
+
+4. **Dynamic Real-Time Hardware Resource**:
+   - `capstone://hardware/inventory`: Real-time JSON snapshot providing connected interfaces, sensor states, and wireless status. Includes deterministic offline fallbacks when Capstone is unattached.
+
+5. **Structured Hardware Error Envelope & Universal Setup Prompt**:
+   - Classifies hardware/sensor/calibration failures into `INSTRUMENT_ERROR` with structured JSON payloads and actionable remediation advice.
+   - `hardware_setup_workflow`: 6-step prompt guiding agents through interface verification, wireless pairing, sampling rate configuration, sensor zero/tare, and signal generator initialization.
+
+---
+
+## 8. Quality & Verification Guardrails
 
 1. **Automated Test Coverage**: 476 unit and integration tests across 57 test suites, executed with `uv run --no-sync pytest` (100% pass rate).
 2. **Deterministic Offline CI**: Hardware-dependent and live GUI tests include fallback guards (`pytest.mark.skipif`), allowing CI pipelines to pass deterministically in headless environments.

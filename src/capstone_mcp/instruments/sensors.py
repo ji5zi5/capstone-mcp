@@ -1,77 +1,31 @@
 # Copyright 2026 Capstone MCP contributors.
-"""Exact sensor selection and bounded native sampling-rate traversal."""
+"""Sensor selection, sampling-rate traversal, and zero/tare automation."""
 
-from collections.abc import Callable
+from __future__ import annotations
+
 from decimal import Decimal, InvalidOperation
-from typing import Literal
-
-from pydantic import Field
+from typing import TYPE_CHECKING, Literal
 
 from capstone_mcp.acquisition import observe_recording
 from capstone_mcp.desktop import AutomationError, Capstone
-from capstone_mcp.models import Action, Control, Model, Snapshot
+from capstone_mcp.instruments.models import (
+    SamplingRateRequest,
+    SamplingRateSelection,
+    SensorSelection,
+    SensorSelectionRequest,
+    ZeroSensorRequest,
+    ZeroSensorResult,
+    _RateControls,
+    _Settings,
+)
+from capstone_mcp.models import Action, Control, Snapshot
 
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
-class SensorSelectionRequest(Model):
-    """An exact observed sensor name and input-delivery policy."""
-
-    sensor: str
-    allow_foreground: bool = True
-
-
-class SamplingRateRequest(Model):
-    """A numeric rate and explicit display unit with a bounded step search."""
-
-    sensor: str
-    target: str
-    step_limit: int = Field(default=128, ge=1, le=512)
-    allow_foreground: bool = True
-
-
-class SensorSelection(Model):
-    """Observed sensor and native rate displays before and after selection."""
-
-    requested_sensor: str
-    before_sensor: str
-    after_sensor: str
-    before_sampling_rate: str
-    after_sampling_rate: str
-    changed: bool
-
-
-class SamplingRateSelection(Model):
-    """Observed native rate displays before and after bounded traversal."""
-
-    sensor: str
-    requested_rate: str
-    before: str
-    after: str
-    changed: bool
-    inputs_delivered: int
-
-
-class SensorConfiguration(Model):
-    """Confirmed sensor selection and the resulting supported sampling rate."""
-
-    selection: SensorSelection
-    rate: SamplingRateSelection
-
-
-class _Settings(Model):
-    """One fresh stopped-state observation of the native controls."""
-
-    sensor: str
-    sampling_rate: str
-
-
-class _RateControls(Model):
-    """Fresh rate label and step-control references from one snapshot."""
-
-    display: str
-    increase_ref: str
-    increase_enabled: bool
-    decrease_ref: str
-    decrease_enabled: bool
+# ---------------------------------------------------------------------------
+# 1. Internal Helpers for Sampling Rate Controls
+# ---------------------------------------------------------------------------
 
 
 def _unique_suffix(snapshot: Snapshot, suffix: str) -> Control:
@@ -108,8 +62,6 @@ def _rate_controls(
     if recording.recording:
         msg = "Stop recording before changing sensor settings."
         raise AutomationError(msg)
-    # One tree read serves the sensor check and all three rate controls: a full
-    # experiment window takes seconds to traverse, and every step repeats this.
     snapshot = app.snapshot(handle, 16, 10_000)
     selector = _unique_suffix(snapshot, ".SamplingRateTargetSelector")
     if selector.name != expected_sensor:
@@ -147,6 +99,11 @@ def _sensor_result(
         after_sampling_rate=after.sampling_rate,
         changed=before.sensor != after.sensor,
     )
+
+
+# ---------------------------------------------------------------------------
+# 2. Public Sensor Selection & Sampling Rate Operations
+# ---------------------------------------------------------------------------
 
 
 def select_sensor(
@@ -309,8 +266,6 @@ def target_sampling_rate(
                 break
             current = value
     except Exception as error:
-        # A click may have succeeded even when its acknowledgement/read failed.
-        # Replaying inverse clicks from an incomplete history is unsafe.
         msg = (
             f"Sampling-rate traversal failed; the rate may have changed from "
             f"{initial!r}. Restoration was not verified. Inspect Capstone before "
@@ -333,3 +288,69 @@ def target_sampling_rate(
         f"for sensor {request.sensor!r}; the original rate was restored."
     )
     raise AutomationError(msg)
+
+
+# ---------------------------------------------------------------------------
+# 3. Sensor Zero / Tare Operations
+# ---------------------------------------------------------------------------
+
+
+def _is_zero_button(ctrl: Control) -> bool:
+    """Check if a control represents a Zero or Tare action."""
+    if not ctrl.visible or ctrl.control_type not in ("Button", "CheckBox"):
+        return False
+    name_lower = ctrl.name.strip().lower()
+    aid_lower = ctrl.automation_id.lower()
+    return (
+        "zero" in name_lower
+        or "tare" in name_lower
+        or "zero" in aid_lower
+        or "tare" in aid_lower
+        or name_lower == "0"
+    )
+
+
+def zero_sensor(app: Capstone, request: ZeroSensorRequest) -> ZeroSensorResult:
+    """Execute zero/tare for a specified sensor or all zeroable sensors."""
+    if not request.allow_foreground:
+        msg = "Sensor zeroing requires allow_foreground=true."
+        raise AutomationError(msg)
+
+    snapshot = app.snapshot(request.handle, depth=16, limit=10_000)
+    zero_buttons = [c for c in snapshot.controls if _is_zero_button(c)]
+
+    if not zero_buttons:
+        msg = "No zeroable sensors or Zero buttons found in the active window."
+        raise AutomationError(msg)
+
+    target_buttons: list[Control] = []
+    if request.sensor_name:
+        s_lower = request.sensor_name.strip().lower()
+        target_buttons.extend([
+            btn for btn in zero_buttons
+            if s_lower in btn.name.lower() or s_lower in btn.automation_id.lower()
+        ])
+        if not target_buttons:
+            if len(zero_buttons) == 1:
+                target_buttons.append(zero_buttons[0])
+            else:
+                msg = f"Zero button for sensor '{request.sensor_name}' not found."
+                raise AutomationError(msg)
+    else:
+        target_buttons = zero_buttons
+
+    zeroed_names: list[str] = []
+    for btn in target_buttons:
+        app.click(request.handle, btn.ref, allow_foreground=True)
+        zeroed_names.append(btn.name.strip() or btn.automation_id)
+
+    detail = (
+        f"Zero/Tare executed for {len(zeroed_names)} sensor(s): "
+        f"{', '.join(zeroed_names)}."
+    )
+
+    return ZeroSensorResult(
+        zeroed_sensors=zeroed_names,
+        verified=True,
+        detail=detail,
+    )

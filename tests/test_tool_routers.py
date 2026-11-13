@@ -12,6 +12,13 @@ from capstone_mcp.graphs import (
     GraphRequest,
     GraphResult,
 )
+from capstone_mcp.instruments import (
+    InstrumentAction,
+    InstrumentRequest,
+    InstrumentResult,
+    ZeroSensorRequest,
+    ZeroSensorResult,
+)
 from capstone_mcp.server import MCP, ExportedData
 from capstone_mcp.tools import (
     register_display_tools,
@@ -69,6 +76,7 @@ def test_server_has_all_tool_domains_registered() -> None:
 
     # 3. Instrument tools
     expected_instruments = {
+        "capstone_manage_instrument",
         "capstone_recording_status",
         "capstone_set_recording",
         "capstone_step_sampling_rate",
@@ -134,8 +142,9 @@ def test_isolated_router_registration() -> None:
     # Instrument router
     mcp_instruments = FastMCP("test-instruments")
     instrument_tools = register_instrument_tools(mcp_instruments, mock_native)
-    assert len(instrument_tools) == 23
-    assert len(mcp_instruments._tool_manager.list_tools()) == 23
+    assert len(instrument_tools) == 24
+    assert len(mcp_instruments._tool_manager.list_tools()) == 24
+    assert "capstone_manage_instrument" in instrument_tools
 
     # Physics router
     mcp_physics = FastMCP("test-physics")
@@ -207,3 +216,71 @@ async def test_legacy_graph_tools_delegate_to_manage_graph() -> None:
     assert len(captured_requests) == 1
     assert captured_requests[0].operation == "manage_graph"
     assert captured_requests[0].graph_request["action"] == "create"
+
+
+@pytest.mark.anyio
+async def test_manage_instrument_tool_delegation() -> None:
+    """Verify capstone_manage_instrument invokes native with 'manage_instrument'."""
+    captured_requests: list[NativeRequest] = []
+
+    async def mock_native(
+        req: NativeRequest,
+        *_args: object,
+        **_kwargs: object,
+    ) -> dict[str, object]:
+        captured_requests.append(req)
+        return InstrumentResult(
+            action=InstrumentAction.ZERO_SENSOR,
+            zero_sensor=ZeroSensorResult(
+                zeroed_sensors=["Force Sensor"],
+                verified=True,
+                detail="Zeroed",
+            ),
+        ).model_dump()
+
+    mcp = FastMCP("test-manage-instrument")
+    tools = register_instrument_tools(mcp, mock_native)
+    manage_fn = tools["capstone_manage_instrument"]
+
+    res = await manage_fn(
+        InstrumentRequest(
+            action=InstrumentAction.ZERO_SENSOR,
+            zero_sensor=ZeroSensorRequest(handle=42, sensor_name="Force Sensor"),
+        ),
+    )
+    assert isinstance(res, InstrumentResult)
+    assert len(captured_requests) == 1
+    assert captured_requests[0].operation == "manage_instrument"
+    assert captured_requests[0].instrument_request["action"] == "zero_sensor"
+
+
+@pytest.mark.anyio
+async def test_legacy_instrument_tools_delegate_to_manage_instrument() -> None:
+    """Verify legacy tool capstone_zero_sensor delegates to manage_instrument."""
+    captured_requests: list[NativeRequest] = []
+
+    async def mock_native(
+        req: NativeRequest,
+        *_args: object,
+        **_kwargs: object,
+    ) -> dict[str, object]:
+        captured_requests.append(req)
+        return InstrumentResult(
+            action=InstrumentAction.ZERO_SENSOR,
+            zero_sensor=ZeroSensorResult(
+                zeroed_sensors=["Force Sensor"],
+                verified=True,
+                detail="Legacy zeroed",
+            ),
+        ).model_dump()
+
+    mcp = FastMCP("test-legacy-instrument")
+    tools = register_instrument_tools(mcp, mock_native)
+    zero_fn = tools["capstone_zero_sensor"]
+
+    res = await zero_fn(handle=100, sensor_name="Force Sensor")
+    assert res.verified is True
+    assert res.detail == "Legacy zeroed"
+    assert len(captured_requests) == 1
+    assert captured_requests[0].operation == "manage_instrument"
+    assert captured_requests[0].instrument_request["action"] == "zero_sensor"

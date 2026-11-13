@@ -2,13 +2,13 @@
 """Tool router for physical and virtual instruments, sensors, and acquisition."""
 
 from collections.abc import Awaitable, Callable
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, Final, Literal
 from uuid import UUID
 
 import anyio
 from mcp.server.fastmcp import FastMCP
 from mcp.types import ToolAnnotations
-from pydantic import Field, JsonValue
+from pydantic import BaseModel, Field, JsonValue, TypeAdapter
 
 from capstone_mcp.acquisition import (
     RecordingRequest,
@@ -21,6 +21,34 @@ from capstone_mcp.bridge import (
     read_inventory,
     read_measurement,
 )
+from capstone_mcp.instruments import (
+    CalibrateSensorRequest,
+    CalibrateSensorResult,
+    ConditionSpec,
+    ConnectWirelessSensorRequest,
+    ConnectWirelessSensorResult,
+    InstrumentAction,
+    InstrumentRequest,
+    InstrumentResult,
+    KeepSampleRequest,
+    KeepSampleResult,
+    SamplingMode,
+    SamplingRateRequest,
+    ScanWirelessSensorsRequest,
+    ScanWirelessSensorsResult,
+    SensorConfiguration,
+    SensorSelection,
+    SensorSelectionRequest,
+    SetRecordingConditionRequest,
+    SetRecordingConditionResult,
+    SetSamplingModeRequest,
+    SetSamplingModeResult,
+    SetSignalGeneratorRequest,
+    SetSignalGeneratorResult,
+    SignalGeneratorStatusResult,
+    ZeroSensorRequest,
+    ZeroSensorResult,
+)
 from capstone_mcp.oscilloscope_fft import (
     CreateFftResult,
     CreateScopeResult,
@@ -28,33 +56,16 @@ from capstone_mcp.oscilloscope_fft import (
     ScopeTriggerResult,
 )
 from capstone_mcp.repetition import AcquisitionJobs, JobStatus, RepeatPlan
-from capstone_mcp.sensor_settings import (
-    SamplingRateRequest,
-    SensorConfiguration,
-    SensorSelection,
-    SensorSelectionRequest,
-)
-from capstone_mcp.sensor_zero import ZeroSensorResult
-from capstone_mcp.signal_generator import (
-    SetSignalGeneratorResult,
-    SignalGeneratorStatusResult,
-)
-from capstone_mcp.smart_triggers import (
-    KeepSampleResult,
-    SamplingMode,
-    SetRecordingConditionResult,
-    SetSamplingModeResult,
-)
-from capstone_mcp.wireless_calibration import (
-    CalibrateSensorResult,
-    ConnectWirelessSensorResult,
-    ScanWirelessSensorsResult,
-)
 
 type NativeCaller = Callable[..., Awaitable[Any]]
+JSON_VALUE: Final = TypeAdapter(JsonValue)
 
 
-def register_instrument_tools(
+def _json_dict(model: BaseModel) -> JsonValue:
+    return JSON_VALUE.validate_json(model.model_dump_json())
+
+
+def register_instrument_tools(  # noqa: PLR0915
     mcp: FastMCP,
     native: NativeCaller,
     jobs: AcquisitionJobs | Callable[[], AcquisitionJobs] | None = None,
@@ -67,6 +78,49 @@ def register_instrument_tools(
         if jobs is not None:
             return jobs
         return AcquisitionJobs()
+
+    @mcp.tool(
+        annotations=ToolAnnotations(
+            title="Manage sensors, hardware, and instruments",
+            readOnlyHint=False,
+            destructiveHint=False,
+            idempotentHint=False,
+            openWorldHint=False,
+        ),
+    )
+    async def capstone_manage_instrument(
+        request: InstrumentRequest,
+    ) -> InstrumentResult:
+        """Unified compound entry point for all Capstone instrument operations.
+
+        Supported actions (request.action):
+        - set_sampling_rate: Navigate sensor rate or select sensor (request.set_sampling_rate)
+        - zero_sensor: Zero or tare connected sensors (request.zero_sensor)
+        - configure_signal_generator: Configure generator or read status (request.configure_signal_generator)
+        - set_recording_condition: Configure start/stop threshold triggers (request.set_recording_condition)
+        - set_sampling_mode: Switch sampling mode (continuous, keep_sample) (request.set_sampling_mode)
+        - keep_sample: Log discrete point in manual sampling mode (request.keep_sample)
+        - scan_wireless: Discover nearby Bluetooth PASCO sensors (request.scan_wireless)
+        - connect_wireless: Pair and connect a wireless sensor (request.connect_wireless)
+        - calibrate_sensor: Guided 1-point or 2-point sensor calibration (request.calibrate_sensor)
+        """
+        is_read_only = (
+            request.action == InstrumentAction.SCAN_WIRELESS
+            or (
+                request.action == InstrumentAction.CONFIGURE_SIGNAL_GENERATOR
+                and request.configure_signal_generator is not None
+                and request.configure_signal_generator.read_only
+            )
+        )
+        return InstrumentResult.model_validate(
+            await native(
+                NativeRequest(
+                    operation="manage_instrument",
+                    instrument_request=_json_dict(request),
+                ),
+                mutates=not is_read_only,
+            ),
+        )
 
     @mcp.tool(
         annotations=ToolAnnotations(
@@ -88,7 +142,15 @@ def register_instrument_tools(
             ),
         )
 
-    @mcp.tool()
+    @mcp.tool(
+        annotations=ToolAnnotations(
+            title="Set recording state",
+            readOnlyHint=False,
+            destructiveHint=False,
+            idempotentHint=True,
+            openWorldHint=False,
+        ),
+    )
     async def capstone_set_recording(
         handle: int,
         *,
@@ -113,7 +175,15 @@ def register_instrument_tools(
             ),
         )
 
-    @mcp.tool()
+    @mcp.tool(
+        annotations=ToolAnnotations(
+            title="Step sampling rate",
+            readOnlyHint=False,
+            destructiveHint=False,
+            idempotentHint=False,
+            openWorldHint=False,
+        ),
+    )
     async def capstone_step_sampling_rate(
         handle: int,
         direction: Literal["increase", "decrease"],
@@ -139,7 +209,15 @@ def register_instrument_tools(
             ),
         )
 
-    @mcp.tool()
+    @mcp.tool(
+        annotations=ToolAnnotations(
+            title="Select sensor",
+            readOnlyHint=False,
+            destructiveHint=False,
+            idempotentHint=True,
+            openWorldHint=False,
+        ),
+    )
     async def capstone_select_sensor(
         handle: int,
         request: SensorSelectionRequest,
@@ -157,7 +235,15 @@ def register_instrument_tools(
             ),
         )
 
-    @mcp.tool()
+    @mcp.tool(
+        annotations=ToolAnnotations(
+            title="Configure sensor sampling rate",
+            readOnlyHint=False,
+            destructiveHint=False,
+            idempotentHint=True,
+            openWorldHint=False,
+        ),
+    )
     async def capstone_configure_sensor(
         handle: int,
         request: SamplingRateRequest,
@@ -181,7 +267,15 @@ def register_instrument_tools(
             ),
         )
 
-    @mcp.tool()
+    @mcp.tool(
+        annotations=ToolAnnotations(
+            title="Repeat acquisition",
+            readOnlyHint=False,
+            destructiveHint=False,
+            idempotentHint=False,
+            openWorldHint=False,
+        ),
+    )
     async def capstone_repeat_acquisition(plan: RepeatPlan) -> JobStatus:
         """Start bounded repeated runs, confirming native start/stop events each cycle.
 
@@ -206,12 +300,28 @@ def register_instrument_tools(
         """Read a repeat job's completion and confirmed-cycle receipts."""
         return _get_jobs().status(job_id)
 
-    @mcp.tool()
+    @mcp.tool(
+        annotations=ToolAnnotations(
+            title="Cancel acquisition job",
+            readOnlyHint=False,
+            destructiveHint=False,
+            idempotentHint=True,
+            openWorldHint=False,
+        ),
+    )
     def capstone_cancel_acquisition(job_id: str) -> JobStatus:
         """Request cancellation; completion requires the worker to stop recording."""
         return _get_jobs().cancel(job_id)
 
-    @mcp.tool()
+    @mcp.tool(
+        annotations=ToolAnnotations(
+            title="Zero or tare sensor",
+            readOnlyHint=False,
+            destructiveHint=False,
+            idempotentHint=False,
+            openWorldHint=False,
+        ),
+    )
     async def capstone_zero_sensor(
         handle: int = 0,
         *,
@@ -220,25 +330,21 @@ def register_instrument_tools(
     ) -> ZeroSensorResult:
         """Execute zero/tare for all connected sensors or a specified target sensor.
 
-        Args:
-            handle: Capstone main window handle (0 for active window).
-            sensor_name: Target sensor to zero (e.g. 'Force Sensor', None for all).
-            allow_foreground: Bring window to foreground for UI automation.
-
-        Returns:
-            ZeroSensorResult with zeroed sensor list and confirmation status.
+        Delegates to capstone_manage_instrument(action='zero_sensor').
         """
-        return ZeroSensorResult.model_validate(
-            await native(
-                NativeRequest(
-                    operation="zero_sensor",
-                    handle=handle,
-                    sensor_name=sensor_name,
-                    allow_foreground=allow_foreground,
-                ),
-                mutates=True,
+        req = InstrumentRequest(
+            action=InstrumentAction.ZERO_SENSOR,
+            zero_sensor=ZeroSensorRequest(
+                handle=handle,
+                sensor_name=sensor_name,
+                allow_foreground=allow_foreground,
             ),
         )
+        res = await capstone_manage_instrument(req)
+        if res.zero_sensor is None:
+            msg = "Expected zero_sensor result from manage_instrument"
+            raise RuntimeError(msg)
+        return res.zero_sensor
 
     @mcp.tool(
         annotations=ToolAnnotations(
@@ -286,7 +392,15 @@ def register_instrument_tools(
             unit_type,
         )
 
-    @mcp.tool()
+    @mcp.tool(
+        annotations=ToolAnnotations(
+            title="Configure signal generator",
+            readOnlyHint=False,
+            destructiveHint=False,
+            idempotentHint=True,
+            openWorldHint=False,
+        ),
+    )
     async def capstone_set_signal_generator(  # noqa: PLR0913
         handle: int = 0,
         *,
@@ -300,35 +414,28 @@ def register_instrument_tools(
     ) -> SetSignalGeneratorResult:
         """Configure signal generator waveform, frequency, amplitude, and power.
 
-        Args:
-            handle: Capstone main window handle (0 for active window).
-            waveform: Shape ('Sine', 'Square', 'Triangle', 'Ramp Up', 'Ramp Down', 'DC').
-            frequency: Target frequency in Hertz (Hz).
-            amplitude: Target peak amplitude in Volts (V).
-            enabled: Turn signal output On (True) or Off (False).
-            generator_name: Target generator channel ('Output 1', None for default).
-            allow_foreground: Bring window to foreground for UI automation.
-            keep_open: Keep signal generator side drawer open after configuration.
-
-        Returns:
-            SetSignalGeneratorResult with applied parameters and output status.
+        Delegates to capstone_manage_instrument(action='configure_signal_generator').
         """
-        return SetSignalGeneratorResult.model_validate(
-            await native(
-                NativeRequest(
-                    operation="set_signal_generator",
-                    handle=handle,
-                    waveform=waveform,
-                    frequency=frequency,
-                    amplitude=amplitude,
-                    enabled=enabled,
-                    generator_name=generator_name,
-                    allow_foreground=allow_foreground,
-                    keep_open=keep_open,
-                ),
-                mutates=True,
+        req = InstrumentRequest(
+            action=InstrumentAction.CONFIGURE_SIGNAL_GENERATOR,
+            configure_signal_generator=SetSignalGeneratorRequest(
+                handle=handle,
+                waveform=waveform,
+                frequency=frequency,
+                amplitude=amplitude,
+                enabled=enabled,
+                generator_name=generator_name,
+                allow_foreground=allow_foreground,
+                keep_open=keep_open,
             ),
         )
+        res = await capstone_manage_instrument(req)
+        if res.configure_signal_generator is None or not isinstance(
+            res.configure_signal_generator, SetSignalGeneratorResult,
+        ):
+            msg = "Expected set_signal_generator result from manage_instrument"
+            raise RuntimeError(msg)
+        return res.configure_signal_generator
 
     @mcp.tool(
         annotations=ToolAnnotations(
@@ -348,29 +455,35 @@ def register_instrument_tools(
     ) -> SignalGeneratorStatusResult:
         """Read current waveform, frequency, amplitude, and power of signal generator.
 
-        Args:
-            handle: Capstone main window handle (0 for active window).
-            generator_name: Target generator channel (e.g. 'Output 1', None for default).
-            allow_foreground: Bring window to foreground for UI automation.
-            keep_open: Keep signal generator side drawer open after reading.
-
-        Returns:
-            SignalGeneratorStatusResult with waveform, frequency, amplitude, and enabled.
+        Delegates to capstone_manage_instrument(action='configure_signal_generator', read_only=True).
         """
-        return SignalGeneratorStatusResult.model_validate(
-            await native(
-                NativeRequest(
-                    operation="read_signal_generator_status",
-                    handle=handle,
-                    generator_name=generator_name,
-                    allow_foreground=allow_foreground,
-                    keep_open=keep_open,
-                ),
-                mutates=True,
+        req = InstrumentRequest(
+            action=InstrumentAction.CONFIGURE_SIGNAL_GENERATOR,
+            configure_signal_generator=SetSignalGeneratorRequest(
+                handle=handle,
+                generator_name=generator_name,
+                allow_foreground=allow_foreground,
+                keep_open=keep_open,
+                read_only=True,
             ),
         )
+        res = await capstone_manage_instrument(req)
+        if res.configure_signal_generator is None or not isinstance(
+            res.configure_signal_generator, SignalGeneratorStatusResult,
+        ):
+            msg = "Expected read_signal_generator_status result from manage_instrument"
+            raise RuntimeError(msg)
+        return res.configure_signal_generator
 
-    @mcp.tool()
+    @mcp.tool(
+        annotations=ToolAnnotations(
+            title="Create oscilloscope display",
+            readOnlyHint=False,
+            destructiveHint=False,
+            idempotentHint=False,
+            openWorldHint=False,
+        ),
+    )
     async def capstone_create_scope(
         handle: int = 0,
         *,
@@ -402,7 +515,15 @@ def register_instrument_tools(
             ),
         )
 
-    @mcp.tool()
+    @mcp.tool(
+        annotations=ToolAnnotations(
+            title="Set oscilloscope trigger",
+            readOnlyHint=False,
+            destructiveHint=False,
+            idempotentHint=True,
+            openWorldHint=False,
+        ),
+    )
     async def capstone_set_scope_trigger(  # noqa: PLR0913
         handle: int = 0,
         *,
@@ -443,7 +564,15 @@ def register_instrument_tools(
             ),
         )
 
-    @mcp.tool()
+    @mcp.tool(
+        annotations=ToolAnnotations(
+            title="Create FFT display",
+            readOnlyHint=False,
+            destructiveHint=False,
+            idempotentHint=False,
+            openWorldHint=False,
+        ),
+    )
     async def capstone_create_fft(
         handle: int = 0,
         *,
@@ -515,7 +644,15 @@ def register_instrument_tools(
             ),
         )
 
-    @mcp.tool()
+    @mcp.tool(
+        annotations=ToolAnnotations(
+            title="Set recording conditions",
+            readOnlyHint=False,
+            destructiveHint=False,
+            idempotentHint=True,
+            openWorldHint=False,
+        ),
+    )
     async def capstone_set_recording_condition(
         handle: int = 0,
         *,
@@ -526,31 +663,43 @@ def register_instrument_tools(
     ) -> SetRecordingConditionResult:
         """Configure start/stop recording conditions based on time or threshold.
 
-        Args:
-            handle: Capstone main window handle (0 for active window).
-            start_condition: Start criteria (e.g. {'type': 'threshold', 'value': 0.5}).
-            stop_condition: Stop criteria (e.g. {'type': 'time', 'duration_seconds': 5.0}).
-            allow_foreground: Bring window to foreground for UI automation.
-            keep_open: Leave recording condition drawer open.
-
-        Returns:
-            SetRecordingConditionResult with applied start/stop conditions.
+        Delegates to capstone_manage_instrument(action='set_recording_condition').
         """
-        return SetRecordingConditionResult.model_validate(
-            await native(
-                NativeRequest(
-                    operation="set_recording_condition",
-                    handle=handle,
-                    start_condition=start_condition,
-                    stop_condition=stop_condition,
-                    allow_foreground=allow_foreground,
-                    keep_open=keep_open,
-                ),
-                mutates=True,
+        start_cond = (
+            ConditionSpec.model_validate(start_condition)
+            if start_condition is not None
+            else None
+        )
+        stop_cond = (
+            ConditionSpec.model_validate(stop_condition)
+            if stop_condition is not None
+            else None
+        )
+        req = InstrumentRequest(
+            action=InstrumentAction.SET_RECORDING_CONDITION,
+            set_recording_condition=SetRecordingConditionRequest(
+                handle=handle,
+                start_condition=start_cond,
+                stop_condition=stop_cond,
+                allow_foreground=allow_foreground,
+                keep_open=keep_open,
             ),
         )
+        res = await capstone_manage_instrument(req)
+        if res.set_recording_condition is None:
+            msg = "Expected set_recording_condition result from manage_instrument"
+            raise RuntimeError(msg)
+        return res.set_recording_condition
 
-    @mcp.tool()
+    @mcp.tool(
+        annotations=ToolAnnotations(
+            title="Set sampling mode",
+            readOnlyHint=False,
+            destructiveHint=False,
+            idempotentHint=True,
+            openWorldHint=False,
+        ),
+    )
     async def capstone_set_sampling_mode(
         mode: SamplingMode = "continuous",
         handle: int = 0,
@@ -559,27 +708,31 @@ def register_instrument_tools(
     ) -> SetSamplingModeResult:
         """Switch sampling mode between continuous, keep_sample, and fast_monitor.
 
-        Args:
-            mode: Sampling mode ('continuous', 'keep_sample', or 'fast_monitor').
-            handle: Capstone main window handle (0 for active window).
-            allow_foreground: Bring window to foreground for UI automation.
-
-        Returns:
-            SetSamplingModeResult with active mode and description.
+        Delegates to capstone_manage_instrument(action='set_sampling_mode').
         """
-        return SetSamplingModeResult.model_validate(
-            await native(
-                NativeRequest(
-                    operation="set_sampling_mode",
-                    handle=handle,
-                    sampling_mode=mode,
-                    allow_foreground=allow_foreground,
-                ),
-                mutates=True,
+        req = InstrumentRequest(
+            action=InstrumentAction.SET_SAMPLING_MODE,
+            set_sampling_mode=SetSamplingModeRequest(
+                handle=handle,
+                mode=mode,
+                allow_foreground=allow_foreground,
             ),
         )
+        res = await capstone_manage_instrument(req)
+        if res.set_sampling_mode is None:
+            msg = "Expected set_sampling_mode result from manage_instrument"
+            raise RuntimeError(msg)
+        return res.set_sampling_mode
 
-    @mcp.tool()
+    @mcp.tool(
+        annotations=ToolAnnotations(
+            title="Keep manual sample point",
+            readOnlyHint=False,
+            destructiveHint=False,
+            idempotentHint=False,
+            openWorldHint=False,
+        ),
+    )
     async def capstone_keep_sample(
         handle: int = 0,
         *,
@@ -589,27 +742,22 @@ def register_instrument_tools(
     ) -> KeepSampleResult:
         """Record one manual sample point in keep_sample mode.
 
-        Args:
-            handle: Capstone main window handle (0 for active window).
-            value: Optional manual independent variable value (e.g. mass, concentration).
-            variable_name: Name of the independent variable being recorded.
-            allow_foreground: Bring window to foreground for UI automation.
-
-        Returns:
-            KeepSampleResult with recorded sample index, values, and total points.
+        Delegates to capstone_manage_instrument(action='keep_sample').
         """
-        return KeepSampleResult.model_validate(
-            await native(
-                NativeRequest(
-                    operation="keep_sample",
-                    handle=handle,
-                    sample_value=value,
-                    variable_name=variable_name,
-                    allow_foreground=allow_foreground,
-                ),
-                mutates=True,
+        req = InstrumentRequest(
+            action=InstrumentAction.KEEP_SAMPLE,
+            keep_sample=KeepSampleRequest(
+                handle=handle,
+                value=value,
+                variable_name=variable_name,
+                allow_foreground=allow_foreground,
             ),
         )
+        res = await capstone_manage_instrument(req)
+        if res.keep_sample is None:
+            msg = "Expected keep_sample result from manage_instrument"
+            raise RuntimeError(msg)
+        return res.keep_sample
 
     @mcp.tool(
         annotations=ToolAnnotations(
@@ -629,29 +777,32 @@ def register_instrument_tools(
     ) -> ScanWirelessSensorsResult:
         """Scan for nearby wireless Bluetooth PASCO sensors.
 
-        Args:
-            handle: Capstone main window handle (0 for active window).
-            timeout_seconds: Duration in seconds to scan for advertising devices.
-            allow_foreground: Bring window to foreground for UI automation.
-            keep_open: Leave hardware setup drawer open after scan.
-
-        Returns:
-            ScanWirelessSensorsResult with discovered sensor IDs and names.
+        Delegates to capstone_manage_instrument(action='scan_wireless').
         """
-        return ScanWirelessSensorsResult.model_validate(
-            await native(
-                NativeRequest(
-                    operation="scan_wireless_sensors",
-                    handle=handle,
-                    timeout_seconds=timeout_seconds,
-                    allow_foreground=allow_foreground,
-                    keep_open=keep_open,
-                ),
-                mutates=True,
+        req = InstrumentRequest(
+            action=InstrumentAction.SCAN_WIRELESS,
+            scan_wireless=ScanWirelessSensorsRequest(
+                handle=handle,
+                timeout_seconds=timeout_seconds,
+                allow_foreground=allow_foreground,
+                keep_open=keep_open,
             ),
         )
+        res = await capstone_manage_instrument(req)
+        if res.scan_wireless is None:
+            msg = "Expected scan_wireless result from manage_instrument"
+            raise RuntimeError(msg)
+        return res.scan_wireless
 
-    @mcp.tool()
+    @mcp.tool(
+        annotations=ToolAnnotations(
+            title="Connect wireless sensor",
+            readOnlyHint=False,
+            destructiveHint=False,
+            idempotentHint=True,
+            openWorldHint=False,
+        ),
+    )
     async def capstone_connect_wireless_sensor(
         sensor_id: str,
         handle: int = 0,
@@ -661,29 +812,32 @@ def register_instrument_tools(
     ) -> ConnectWirelessSensorResult:
         """Pair and connect a discovered wireless sensor by sensor_id.
 
-        Args:
-            sensor_id: Discovered sensor hardware ID or Bluetooth name.
-            handle: Capstone main window handle (0 for active window).
-            allow_foreground: Bring window to foreground for UI automation.
-            keep_open: Leave hardware setup drawer open after pairing.
-
-        Returns:
-            ConnectWirelessSensorResult with connection status and battery level.
+        Delegates to capstone_manage_instrument(action='connect_wireless').
         """
-        return ConnectWirelessSensorResult.model_validate(
-            await native(
-                NativeRequest(
-                    operation="connect_wireless_sensor",
-                    handle=handle,
-                    sensor_id=sensor_id,
-                    allow_foreground=allow_foreground,
-                    keep_open=keep_open,
-                ),
-                mutates=True,
+        req = InstrumentRequest(
+            action=InstrumentAction.CONNECT_WIRELESS,
+            connect_wireless=ConnectWirelessSensorRequest(
+                handle=handle,
+                sensor_id=sensor_id,
+                allow_foreground=allow_foreground,
+                keep_open=keep_open,
             ),
         )
+        res = await capstone_manage_instrument(req)
+        if res.connect_wireless is None:
+            msg = "Expected connect_wireless result from manage_instrument"
+            raise RuntimeError(msg)
+        return res.connect_wireless
 
-    @mcp.tool()
+    @mcp.tool(
+        annotations=ToolAnnotations(
+            title="Calibrate sensor",
+            readOnlyHint=False,
+            destructiveHint=False,
+            idempotentHint=False,
+            openWorldHint=False,
+        ),
+    )
     async def capstone_calibrate_sensor(  # noqa: PLR0913
         sensor_name: str,
         handle: int = 0,
@@ -697,37 +851,29 @@ def register_instrument_tools(
     ) -> CalibrateSensorResult:
         """Execute sensor calibration wizard with standard reference points.
 
-        Args:
-            sensor_name: Target sensor to calibrate (e.g. 'Force Sensor', 'pH Sensor').
-            handle: Capstone main window handle (0 for active window).
-            measurement_type: Measurement to calibrate (e.g. 'Force', 'pH').
-            calibration_type: Calibration wizard type ('one_point' or 'two_point').
-            standard_1: First reference standard physical value.
-            standard_2: Second reference standard physical value (required for two_point).
-            allow_foreground: Bring window to foreground for UI automation.
-            keep_open: Leave calibration dialog/drawer open.
-
-        Returns:
-            CalibrateSensorResult with calibration status, slope, and offset.
+        Delegates to capstone_manage_instrument(action='calibrate_sensor').
         """
-        return CalibrateSensorResult.model_validate(
-            await native(
-                NativeRequest(
-                    operation="calibrate_sensor",
-                    handle=handle,
-                    sensor_name=sensor_name,
-                    measurement_type=measurement_type,
-                    calibration_type=calibration_type,
-                    standard_1=standard_1,
-                    standard_2=standard_2,
-                    allow_foreground=allow_foreground,
-                    keep_open=keep_open,
-                ),
-                mutates=True,
+        req = InstrumentRequest(
+            action=InstrumentAction.CALIBRATE_SENSOR,
+            calibrate_sensor=CalibrateSensorRequest(
+                handle=handle,
+                sensor_name=sensor_name,
+                measurement_type=measurement_type,
+                calibration_type=calibration_type,
+                standard_1=standard_1,
+                standard_2=standard_2,
+                allow_foreground=allow_foreground,
+                keep_open=keep_open,
             ),
         )
+        res = await capstone_manage_instrument(req)
+        if res.calibrate_sensor is None:
+            msg = "Expected calibrate_sensor result from manage_instrument"
+            raise RuntimeError(msg)
+        return res.calibrate_sensor
 
     return {
+        "capstone_manage_instrument": capstone_manage_instrument,
         "capstone_recording_status": capstone_recording_status,
         "capstone_set_recording": capstone_set_recording,
         "capstone_step_sampling_rate": capstone_step_sampling_rate,

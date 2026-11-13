@@ -6,13 +6,13 @@ from unittest.mock import MagicMock
 import pytest
 
 from capstone_mcp.desktop import AutomationError, Capstone
-from capstone_mcp.models import Bounds, Control, Snapshot, Window
-from capstone_mcp.signal_generator import (
+from capstone_mcp.instruments import (
     ReadSignalGeneratorStatusRequest,
     SetSignalGeneratorRequest,
     read_signal_generator_status,
     set_signal_generator,
 )
+from capstone_mcp.models import Bounds, Control, Snapshot, Window
 
 
 def _create_mock_window(handle: int = 100) -> Window:
