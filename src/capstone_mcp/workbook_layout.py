@@ -5,7 +5,8 @@ import contextlib
 from typing import Final, Literal
 
 from capstone_mcp.desktop import AutomationError, Capstone
-from capstone_mcp.models import Action, Control, Model
+from capstone_mcp.displays import click_control
+from capstone_mcp.models import Control, Model
 
 ADD_PAGE_SUFFIX: Final = ".AddPageButton"
 ADD_PAGE_NAMES: Final = ("Add Page", "New Page", "Create Page", "+")
@@ -96,10 +97,7 @@ def _click_control(
     allow_foreground: bool = True,
 ) -> None:
     """Click a control using either the high-level click helper or act(INVOKE)."""
-    if hasattr(app, "click"):
-        app.click(handle, ctrl.ref, allow_foreground=allow_foreground)
-    else:
-        _ = app.act(ctrl.ref, Action.INVOKE, allow_foreground=allow_foreground)
+    click_control(app, handle, ctrl, allow_foreground=allow_foreground)
 
 
 def _find_add_page_button(controls: list[Control]) -> Control:

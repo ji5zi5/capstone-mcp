@@ -22,8 +22,13 @@ from capstone_mcp.analysis import (
 from capstone_mcp.capfile_models import CapDataSet, CapFile
 from capstone_mcp.capfiles import CapFileError, read_cap_file
 from capstone_mcp.desktop import AutomationError, Capstone
+from capstone_mcp.displays import (
+    click_control,
+    find_display_containers,
+    is_within_bounds,
+)
 from capstone_mcp.file_workflows import FileArtifact
-from capstone_mcp.models import Action, Control
+from capstone_mcp.models import Control
 from capstone_mcp.runs.models import (
     CapturedFit,
     CapturedRun,
@@ -55,10 +60,7 @@ def _click_control(
     allow_foreground: bool = True,
 ) -> None:
     """Click a control using high-level click helper or act(INVOKE)."""
-    if hasattr(app, "click"):
-        app.click(handle, ctrl.ref, allow_foreground=allow_foreground)
-    else:
-        _ = app.act(ctrl.ref, Action.INVOKE, allow_foreground=allow_foreground)
+    click_control(app, handle, ctrl, allow_foreground=allow_foreground)
 
 
 # ---------------------------------------------------------------------------
@@ -258,26 +260,12 @@ def _match_display_control(controls: list[Control], display_name: str) -> Contro
 
 def _find_display_containers(controls: list[Control]) -> list[Control]:
     """Find all graph or table display containers in the window snapshot."""
-    displays: list[Control] = []
-    for ctrl in controls:
-        if not ctrl.visible:
-            continue
-        name_lower = ctrl.name.lower()
-        if (
-            "graph" in name_lower or "table" in name_lower
-        ) and ctrl.control_type in ("Custom", "Pane", "Group"):
-            displays.append(ctrl)
-    return displays
+    return find_display_containers(controls, ("graph", "table"))
 
 
 def _is_within_bounds(inner: Control, outer: Control) -> bool:
     """Check if inner control rectangle is contained within outer control bounds."""
-    return (
-        inner.bounds.left >= outer.bounds.left
-        and inner.bounds.top >= outer.bounds.top
-        and inner.bounds.right <= outer.bounds.right
-        and inner.bounds.bottom <= outer.bounds.bottom
-    )
+    return is_within_bounds(inner, outer)
 
 
 def _find_run_controls(

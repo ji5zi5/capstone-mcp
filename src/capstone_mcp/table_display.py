@@ -7,7 +7,12 @@ import re
 from typing import Any, Final
 
 from capstone_mcp.desktop import AutomationError, Capstone
-from capstone_mcp.models import Action, Control, Model
+from capstone_mcp.displays import (
+    click_control,
+    find_display_container,
+    find_palette_item,
+)
+from capstone_mcp.models import Control, Model
 
 TABLE_PALETTE_NAME: Final = "Table"
 ROW_Y_TOLERANCE_PX: Final = 5
@@ -99,41 +104,18 @@ def _click(
     allow_foreground: bool = True,
 ) -> None:
     """Deliver a click or double-click compatible with real app and mocks."""
-    if hasattr(app, "click"):
-        app.click(handle, ctrl.ref, allow_foreground=allow_foreground)
-        return
-    with contextlib.suppress(Exception):
-        node = app.control(ctrl.ref)
-        if double:
-            b = ctrl.bounds
-            coords = ((b.left + b.right) // 2, (b.top + b.bottom) // 2)
-            node.click_input(button="left", double=True, coords=coords, absolute=True)
-            return
-        if hasattr(node, "invoke") and callable(node.invoke):
-            node.invoke()
-            return
-    app.act(handle, Action.INVOKE, ref=ctrl.ref, allow_foreground=allow_foreground)
+    click_control(
+        app,
+        handle,
+        ctrl,
+        double=double,
+        allow_foreground=allow_foreground,
+    )
 
 
 def _find_table_palette_item(controls: list[Control]) -> Control:
     """Find Table display item in the Displays palette."""
-    matches = [
-        c
-        for c in controls
-        if c.visible
-        and c.enabled
-        and (
-            c.name.strip() == TABLE_PALETTE_NAME
-            or c.name.strip().lower() == "table"
-            or c.automation_id.endswith(".ObjNameTable")
-            or "table" in c.automation_id.lower()
-        )
-        and c.control_type in ("Text", "Button", "ListItem", "TreeItem", "Custom")
-    ]
-    if not matches:
-        msg = "Table display palette item not found in window snapshot."
-        raise AutomationError(msg)
-    return matches[0]
+    return find_palette_item(controls, TABLE_PALETTE_NAME, ".ObjNameTable")
 
 
 def _find_table_control(
@@ -141,40 +123,7 @@ def _find_table_control(
     table_name: str | None = None,
 ) -> Control:
     """Locate the target Table widget container."""
-    if table_name:
-        t_lower = table_name.strip().lower()
-        for ctrl in controls:
-            if ctrl.visible and (
-                t_lower == ctrl.name.strip().lower()
-                or t_lower in ctrl.automation_id.lower()
-            ):
-                return ctrl
-        msg = f"Table control matching '{table_name}' not found."
-        raise AutomationError(msg)
-
-    # Search for DataGrid, Table, or Pane/Custom representing table
-    for ctrl in controls:
-        if ctrl.visible and ctrl.control_type in ("Table", "DataGrid"):
-            return ctrl
-
-    for ctrl in controls:
-        if (
-            ctrl.visible
-            and ctrl.control_type in ("Pane", "Custom", "Group")
-            and "table" in ctrl.name.lower()
-        ):
-            return ctrl
-
-    for ctrl in controls:
-        if (
-            ctrl.visible
-            and "table" in ctrl.automation_id.lower()
-            and ctrl.control_type in ("Pane", "Custom", "Group")
-        ):
-            return ctrl
-
-    msg = "No Table display found in the active window."
-    raise AutomationError(msg)
+    return find_display_container(controls, "table", table_name)
 
 
 def _find_column_headers(controls: list[Control], table_ctrl: Control) -> list[Control]:
