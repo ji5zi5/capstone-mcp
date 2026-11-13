@@ -155,15 +155,6 @@ def register_file_tools(mcp: FastMCP, native: NativeCaller) -> dict[str, Any]:
         )
         return ExportedData(artifact=artifact, data=data)
 
-    @mcp.tool(
-        annotations=ToolAnnotations(
-            title="Read CSV page",
-            readOnlyHint=True,
-            destructiveHint=False,
-            idempotentHint=True,
-            openWorldHint=False,
-        ),
-    )
     async def capstone_csv_page(
         path: str,
         offset: Annotated[int, Field(ge=0)] = 0,
@@ -284,15 +275,6 @@ def register_file_tools(mcp: FastMCP, native: NativeCaller) -> dict[str, Any]:
             independent_kind=dataset.independent_kind,
         )
 
-    @mcp.tool(
-        annotations=ToolAnnotations(
-            title="Fit datasets from file",
-            readOnlyHint=True,
-            destructiveHint=False,
-            idempotentHint=True,
-            openWorldHint=False,
-        ),
-    )
     def capstone_fit_file(
         path: str,
         request: CapLinearFitRequest,
@@ -300,15 +282,6 @@ def register_file_tools(mcp: FastMCP, native: NativeCaller) -> dict[str, Any]:
         """Extract and fit two explicit saved datasets, returning their full provenance."""
         return fit_cap_datasets(path, request)
 
-    @mcp.tool(
-        annotations=ToolAnnotations(
-            title="Compare datasets from file",
-            readOnlyHint=True,
-            destructiveHint=False,
-            idempotentHint=True,
-            openWorldHint=False,
-        ),
-    )
     def capstone_compare_file(
         path: str,
         request: CapRunComparisonRequest,

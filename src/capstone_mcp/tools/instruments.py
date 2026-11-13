@@ -129,15 +129,6 @@ def register_instrument_tools(  # noqa: PLR0915
             ),
         )
 
-    @mcp.tool(
-        annotations=ToolAnnotations(
-            title="Read recording status",
-            readOnlyHint=True,
-            destructiveHint=False,
-            idempotentHint=True,
-            openWorldHint=False,
-        ),
-    )
     async def capstone_recording_status(handle: int) -> RecordingStatus:
         """Read actual recording toggle, enabled state, and displayed time/rate."""
         return RecordingStatus.model_validate(
@@ -149,15 +140,6 @@ def register_instrument_tools(  # noqa: PLR0915
             ),
         )
 
-    @mcp.tool(
-        annotations=ToolAnnotations(
-            title="Set recording state",
-            readOnlyHint=False,
-            destructiveHint=False,
-            idempotentHint=True,
-            openWorldHint=False,
-        ),
-    )
     async def capstone_set_recording(
         handle: int,
         *,
@@ -182,15 +164,6 @@ def register_instrument_tools(  # noqa: PLR0915
             ),
         )
 
-    @mcp.tool(
-        annotations=ToolAnnotations(
-            title="Step sampling rate",
-            readOnlyHint=False,
-            destructiveHint=False,
-            idempotentHint=False,
-            openWorldHint=False,
-        ),
-    )
     async def capstone_step_sampling_rate(
         handle: int,
         direction: Literal["increase", "decrease"],
@@ -216,15 +189,6 @@ def register_instrument_tools(  # noqa: PLR0915
             ),
         )
 
-    @mcp.tool(
-        annotations=ToolAnnotations(
-            title="Select sensor",
-            readOnlyHint=False,
-            destructiveHint=False,
-            idempotentHint=True,
-            openWorldHint=False,
-        ),
-    )
     async def capstone_select_sensor(
         handle: int,
         request: SensorSelectionRequest,
@@ -242,15 +206,6 @@ def register_instrument_tools(  # noqa: PLR0915
             ),
         )
 
-    @mcp.tool(
-        annotations=ToolAnnotations(
-            title="Configure sensor sampling rate",
-            readOnlyHint=False,
-            destructiveHint=False,
-            idempotentHint=True,
-            openWorldHint=False,
-        ),
-    )
     async def capstone_configure_sensor(
         handle: int,
         request: SamplingRateRequest,
@@ -274,15 +229,6 @@ def register_instrument_tools(  # noqa: PLR0915
             ),
         )
 
-    @mcp.tool(
-        annotations=ToolAnnotations(
-            title="Repeat acquisition",
-            readOnlyHint=False,
-            destructiveHint=False,
-            idempotentHint=False,
-            openWorldHint=False,
-        ),
-    )
     async def capstone_repeat_acquisition(plan: RepeatPlan) -> JobStatus:
         """Start bounded repeated runs, confirming native start/stop events each cycle.
 
@@ -294,41 +240,14 @@ def register_instrument_tools(  # noqa: PLR0915
         """
         return await anyio.to_thread.run_sync(_get_jobs().start, plan)
 
-    @mcp.tool(
-        annotations=ToolAnnotations(
-            title="Read acquisition job status",
-            readOnlyHint=True,
-            destructiveHint=False,
-            idempotentHint=True,
-            openWorldHint=False,
-        ),
-    )
     def capstone_acquisition_job(job_id: str) -> JobStatus:
         """Read a repeat job's completion and confirmed-cycle receipts."""
         return _get_jobs().status(job_id)
 
-    @mcp.tool(
-        annotations=ToolAnnotations(
-            title="Cancel acquisition job",
-            readOnlyHint=False,
-            destructiveHint=False,
-            idempotentHint=True,
-            openWorldHint=False,
-        ),
-    )
     def capstone_cancel_acquisition(job_id: str) -> JobStatus:
         """Request cancellation; completion requires the worker to stop recording."""
         return _get_jobs().cancel(job_id)
 
-    @mcp.tool(
-        annotations=ToolAnnotations(
-            title="Zero or tare sensor",
-            readOnlyHint=False,
-            destructiveHint=False,
-            idempotentHint=False,
-            openWorldHint=False,
-        ),
-    )
     async def capstone_zero_sensor(
         handle: int = 0,
         *,
@@ -353,15 +272,6 @@ def register_instrument_tools(  # noqa: PLR0915
             raise RuntimeError(msg)
         return res.zero_sensor
 
-    @mcp.tool(
-        annotations=ToolAnnotations(
-            title="Read native live configuration",
-            readOnlyHint=True,
-            destructiveHint=False,
-            idempotentHint=True,
-            openWorldHint=False,
-        ),
-    )
     async def capstone_live_configuration(
         debug_port: Annotated[int, Field(ge=1024, le=65535)] = 9223,
     ) -> NativeInventory:
@@ -373,15 +283,6 @@ def register_instrument_tools(  # noqa: PLR0915
         """
         return await anyio.to_thread.run_sync(read_inventory, debug_port)
 
-    @mcp.tool(
-        annotations=ToolAnnotations(
-            title="Read current measurement value",
-            readOnlyHint=True,
-            destructiveHint=False,
-            idempotentHint=True,
-            openWorldHint=False,
-        ),
-    )
     async def capstone_current_value(
         measurement_euid: UUID,
         unit_type: Annotated[int, Field(ge=0)],
@@ -399,15 +300,6 @@ def register_instrument_tools(  # noqa: PLR0915
             unit_type,
         )
 
-    @mcp.tool(
-        annotations=ToolAnnotations(
-            title="Configure signal generator",
-            readOnlyHint=False,
-            destructiveHint=False,
-            idempotentHint=True,
-            openWorldHint=False,
-        ),
-    )
     async def capstone_set_signal_generator(  # noqa: PLR0913
         handle: int = 0,
         *,
@@ -444,15 +336,6 @@ def register_instrument_tools(  # noqa: PLR0915
             raise RuntimeError(msg)
         return res.configure_signal_generator
 
-    @mcp.tool(
-        annotations=ToolAnnotations(
-            title="Read signal generator status",
-            readOnlyHint=True,
-            destructiveHint=False,
-            idempotentHint=True,
-            openWorldHint=False,
-        ),
-    )
     async def capstone_read_signal_generator_status(
         handle: int = 0,
         *,
@@ -482,15 +365,6 @@ def register_instrument_tools(  # noqa: PLR0915
             raise RuntimeError(msg)
         return res.configure_signal_generator
 
-    @mcp.tool(
-        annotations=ToolAnnotations(
-            title="Create oscilloscope display",
-            readOnlyHint=False,
-            destructiveHint=False,
-            idempotentHint=False,
-            openWorldHint=False,
-        ),
-    )
     async def capstone_create_scope(
         handle: int = 0,
         *,
@@ -533,15 +407,6 @@ def register_instrument_tools(  # noqa: PLR0915
             raise RuntimeError(msg)
         return res.create_scope
 
-    @mcp.tool(
-        annotations=ToolAnnotations(
-            title="Set oscilloscope trigger",
-            readOnlyHint=False,
-            destructiveHint=False,
-            idempotentHint=True,
-            openWorldHint=False,
-        ),
-    )
     async def capstone_set_scope_trigger(  # noqa: PLR0913
         handle: int = 0,
         *,
@@ -593,15 +458,6 @@ def register_instrument_tools(  # noqa: PLR0915
             raise RuntimeError(msg)
         return res.set_scope_trigger
 
-    @mcp.tool(
-        annotations=ToolAnnotations(
-            title="Create FFT display",
-            readOnlyHint=False,
-            destructiveHint=False,
-            idempotentHint=False,
-            openWorldHint=False,
-        ),
-    )
     async def capstone_create_fft(
         handle: int = 0,
         *,
@@ -644,15 +500,6 @@ def register_instrument_tools(  # noqa: PLR0915
             raise RuntimeError(msg)
         return res.create_fft
 
-    @mcp.tool(
-        annotations=ToolAnnotations(
-            title="Read FFT peaks",
-            readOnlyHint=True,
-            destructiveHint=False,
-            idempotentHint=True,
-            openWorldHint=False,
-        ),
-    )
     async def capstone_read_fft_peaks(
         handle: int = 0,
         *,
@@ -695,15 +542,6 @@ def register_instrument_tools(  # noqa: PLR0915
             raise RuntimeError(msg)
         return res.read_fft_peaks
 
-    @mcp.tool(
-        annotations=ToolAnnotations(
-            title="Set recording conditions",
-            readOnlyHint=False,
-            destructiveHint=False,
-            idempotentHint=True,
-            openWorldHint=False,
-        ),
-    )
     async def capstone_set_recording_condition(
         handle: int = 0,
         *,
@@ -742,15 +580,6 @@ def register_instrument_tools(  # noqa: PLR0915
             raise RuntimeError(msg)
         return res.set_recording_condition
 
-    @mcp.tool(
-        annotations=ToolAnnotations(
-            title="Set sampling mode",
-            readOnlyHint=False,
-            destructiveHint=False,
-            idempotentHint=True,
-            openWorldHint=False,
-        ),
-    )
     async def capstone_set_sampling_mode(
         mode: SamplingMode = "continuous",
         handle: int = 0,
@@ -775,15 +604,6 @@ def register_instrument_tools(  # noqa: PLR0915
             raise RuntimeError(msg)
         return res.set_sampling_mode
 
-    @mcp.tool(
-        annotations=ToolAnnotations(
-            title="Keep manual sample point",
-            readOnlyHint=False,
-            destructiveHint=False,
-            idempotentHint=False,
-            openWorldHint=False,
-        ),
-    )
     async def capstone_keep_sample(
         handle: int = 0,
         *,
@@ -810,15 +630,6 @@ def register_instrument_tools(  # noqa: PLR0915
             raise RuntimeError(msg)
         return res.keep_sample
 
-    @mcp.tool(
-        annotations=ToolAnnotations(
-            title="Scan wireless sensors",
-            readOnlyHint=True,
-            destructiveHint=False,
-            idempotentHint=True,
-            openWorldHint=False,
-        ),
-    )
     async def capstone_scan_wireless_sensors(
         handle: int = 0,
         *,
@@ -845,15 +656,6 @@ def register_instrument_tools(  # noqa: PLR0915
             raise RuntimeError(msg)
         return res.scan_wireless
 
-    @mcp.tool(
-        annotations=ToolAnnotations(
-            title="Connect wireless sensor",
-            readOnlyHint=False,
-            destructiveHint=False,
-            idempotentHint=True,
-            openWorldHint=False,
-        ),
-    )
     async def capstone_connect_wireless_sensor(
         sensor_id: str,
         handle: int = 0,
@@ -880,15 +682,6 @@ def register_instrument_tools(  # noqa: PLR0915
             raise RuntimeError(msg)
         return res.connect_wireless
 
-    @mcp.tool(
-        annotations=ToolAnnotations(
-            title="Calibrate sensor",
-            readOnlyHint=False,
-            destructiveHint=False,
-            idempotentHint=False,
-            openWorldHint=False,
-        ),
-    )
     async def capstone_calibrate_sensor(  # noqa: PLR0913
         sensor_name: str,
         handle: int = 0,

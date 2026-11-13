@@ -147,15 +147,6 @@ def register_display_tools(  # noqa: PLR0915
             ),
         )
 
-    @mcp.tool(
-        annotations=ToolAnnotations(
-            title="Insert a graph in Capstone",
-            readOnlyHint=False,
-            destructiveHint=False,
-            idempotentHint=False,
-            openWorldHint=False,
-        ),
-    )
     async def capstone_create_graph(
         handle: int,
         *,
@@ -178,15 +169,6 @@ def register_display_tools(  # noqa: PLR0915
             delivered=True,
         )
 
-    @mcp.tool(
-        annotations=ToolAnnotations(
-            title="Select graph axis measurement",
-            readOnlyHint=False,
-            destructiveHint=False,
-            idempotentHint=False,
-            openWorldHint=False,
-        ),
-    )
     async def capstone_select_graph_measurement(
         handle: int,
         axis_point: Point,
@@ -217,16 +199,6 @@ def register_display_tools(  # noqa: PLR0915
             ),
         )
 
-    @mcp.tool(
-        structured_output=False,
-        annotations=ToolAnnotations(
-            title="Capture graph image and one-use frame receipt",
-            readOnlyHint=False,
-            destructiveHint=False,
-            idempotentHint=False,
-            openWorldHint=False,
-        ),
-    )
     async def capstone_observe_graph(handle: int) -> CallToolResult:
         """Return an original-size PNG and JSON frame_id for the next graph input.
 
@@ -260,15 +232,6 @@ def register_display_tools(  # noqa: PLR0915
             ),
         )
 
-    @mcp.tool(
-        annotations=ToolAnnotations(
-            title="Read the last structured graph failure",
-            readOnlyHint=True,
-            destructiveHint=False,
-            idempotentHint=True,
-            openWorldHint=False,
-        ),
-    )
     def capstone_graph_recovery() -> GraphFailure | None:
         """Read failure stage, confirmed steps and safe next action without replay.
 
@@ -280,15 +243,6 @@ def register_display_tools(  # noqa: PLR0915
             return get_last_failure()
         return None
 
-    @mcp.tool(
-        annotations=ToolAnnotations(
-            title="Compare native fits within matching data bindings",
-            readOnlyHint=False,
-            destructiveHint=False,
-            idempotentHint=True,
-            openWorldHint=False,
-        ),
-    )
     async def capstone_graph_report(
         handle: int,
         *,
@@ -304,15 +258,6 @@ def register_display_tools(  # noqa: PLR0915
         )
         return summarize_graph(state)
 
-    @mcp.tool(
-        annotations=ToolAnnotations(
-            title="Inspect selected graph and native results",
-            readOnlyHint=True,
-            destructiveHint=False,
-            idempotentHint=True,
-            openWorldHint=False,
-        ),
-    )
     async def capstone_read_graph(
         handle: int,
         *,
@@ -335,28 +280,10 @@ def register_display_tools(  # noqa: PLR0915
             raise RuntimeError(msg)
         return res.read.state
 
-    @mcp.tool(
-        annotations=ToolAnnotations(
-            title="List accepted native fitting model names",
-            readOnlyHint=True,
-            destructiveHint=False,
-            idempotentHint=True,
-            openWorldHint=False,
-        ),
-    )
     def capstone_fit_models() -> list[FitModel]:
         """List supported built-in native models; custom-expression editing is excluded."""
         return list(FitModel)
 
-    @mcp.tool(
-        annotations=ToolAnnotations(
-            title="Set and verify exact native fitting models",
-            readOnlyHint=False,
-            destructiveHint=True,
-            idempotentHint=True,
-            openWorldHint=False,
-        ),
-    )
     async def capstone_set_graph_fits(
         handle: int,
         request: GraphFitRequest,
@@ -386,15 +313,6 @@ def register_display_tools(  # noqa: PLR0915
             ),
         )
 
-    @mcp.tool(
-        annotations=ToolAnnotations(
-            title="Configure graph axes and analyze native fits",
-            readOnlyHint=False,
-            destructiveHint=True,
-            idempotentHint=False,
-            openWorldHint=False,
-        ),
-    )
     async def capstone_analyze_graph(
         handle: int,
         request: AnalyzeGraphRequest,
@@ -415,15 +333,6 @@ def register_display_tools(  # noqa: PLR0915
             raise RuntimeError(msg)
         return res.analyze.outcome
 
-    @mcp.tool(
-        annotations=ToolAnnotations(
-            title="Scale graph axes to fit data",
-            readOnlyHint=False,
-            destructiveHint=False,
-            idempotentHint=True,
-            openWorldHint=False,
-        ),
-    )
     async def capstone_fit_graph(
         handle: int = 0,
         *,
@@ -452,15 +361,6 @@ def register_display_tools(  # noqa: PLR0915
             raise RuntimeError(msg)
         return res.fit
 
-    @mcp.tool(
-        annotations=ToolAnnotations(
-            title="Toggle graph statistics box",
-            readOnlyHint=False,
-            destructiveHint=False,
-            idempotentHint=False,
-            openWorldHint=False,
-        ),
-    )
     async def capstone_toggle_graph_statistics(
         handle: int = 0,
         *,
@@ -487,15 +387,6 @@ def register_display_tools(  # noqa: PLR0915
             raise RuntimeError(msg)
         return res.toolbox_statistics
 
-    @mcp.tool(
-        annotations=ToolAnnotations(
-            title="Toggle graph area integration tool",
-            readOnlyHint=False,
-            destructiveHint=False,
-            idempotentHint=False,
-            openWorldHint=False,
-        ),
-    )
     async def capstone_measure_graph_area(
         handle: int = 0,
         *,
@@ -522,15 +413,6 @@ def register_display_tools(  # noqa: PLR0915
             raise RuntimeError(msg)
         return res.toolbox_area
 
-    @mcp.tool(
-        annotations=ToolAnnotations(
-            title="Measure graph coordinate delta",
-            readOnlyHint=False,
-            destructiveHint=False,
-            idempotentHint=False,
-            openWorldHint=False,
-        ),
-    )
     async def capstone_graph_delta(
         handle: int = 0,
         *,
@@ -559,15 +441,6 @@ def register_display_tools(  # noqa: PLR0915
             raise RuntimeError(msg)
         return res.toolbox_delta
 
-    @mcp.tool(
-        annotations=ToolAnnotations(
-            title="Insert Table display",
-            readOnlyHint=False,
-            destructiveHint=False,
-            idempotentHint=False,
-            openWorldHint=False,
-        ),
-    )
     async def capstone_create_table(
         handle: int = 0,
         *,
@@ -599,15 +472,6 @@ def register_display_tools(  # noqa: PLR0915
             raise RuntimeError(msg)
         return res.create_table
 
-    @mcp.tool(
-        annotations=ToolAnnotations(
-            title="Configure table columns",
-            readOnlyHint=False,
-            destructiveHint=False,
-            idempotentHint=True,
-            openWorldHint=False,
-        ),
-    )
     async def capstone_set_table_columns(
         columns: list[str],
         handle: int = 0,
@@ -642,15 +506,6 @@ def register_display_tools(  # noqa: PLR0915
             raise RuntimeError(msg)
         return res.set_table_columns
 
-    @mcp.tool(
-        annotations=ToolAnnotations(
-            title="Read table rows and statistics",
-            readOnlyHint=True,
-            destructiveHint=False,
-            idempotentHint=True,
-            openWorldHint=False,
-        ),
-    )
     async def capstone_read_table(  # noqa: PLR0913
         handle: int = 0,
         *,
@@ -691,15 +546,6 @@ def register_display_tools(  # noqa: PLR0915
             raise RuntimeError(msg)
         return res.read_table
 
-    @mcp.tool(
-        annotations=ToolAnnotations(
-            title="Insert Digits display",
-            readOnlyHint=False,
-            destructiveHint=False,
-            idempotentHint=False,
-            openWorldHint=False,
-        ),
-    )
     async def capstone_create_digits(
         handle: int = 0,
         *,
@@ -734,24 +580,6 @@ def register_display_tools(  # noqa: PLR0915
             raise RuntimeError(msg)
         return res.create_digits
 
-    @mcp.tool(
-        annotations=ToolAnnotations(
-            title="Rename experimental run",
-            readOnlyHint=False,
-            destructiveHint=False,
-            idempotentHint=True,
-            openWorldHint=False,
-        ),
-    )
-    @mcp.tool(
-        annotations=ToolAnnotations(
-            title="Add workbook page",
-            readOnlyHint=False,
-            destructiveHint=False,
-            idempotentHint=False,
-            openWorldHint=False,
-        ),
-    )
     async def capstone_add_page(
         handle: int = 0,
         *,
@@ -783,15 +611,6 @@ def register_display_tools(  # noqa: PLR0915
             raise RuntimeError(msg)
         return res.add_page
 
-    @mcp.tool(
-        annotations=ToolAnnotations(
-            title="Set workbook page layout",
-            readOnlyHint=False,
-            destructiveHint=False,
-            idempotentHint=True,
-            openWorldHint=False,
-        ),
-    )
     async def capstone_set_page_layout(
         layout: PageLayoutTemplate = "two_vertical",
         handle: int = 0,

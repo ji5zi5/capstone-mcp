@@ -14,7 +14,6 @@ from mcp.types import ImageContent
 from pydantic import BaseModel
 
 from capstone_mcp.agent_instructions import INSTRUCTIONS
-from capstone_mcp.graphs import GraphFrame
 from capstone_mcp.models import Snapshot, Window
 
 ROOT: Final = str(Path(__file__).resolve().parents[1])
@@ -51,23 +50,22 @@ async def exercise_protocol() -> None:
             initialized = await session.initialize()
             assert initialized.instructions == INSTRUCTIONS
             tools = await session.list_tools()
-            assert len(tools.tools) >= 9
-            assert {
-                "capstone_fit_models", "capstone_read_graph",
-                "capstone_set_graph_fits", "capstone_analyze_graph",
-            }.issubset({tool.name for tool in tools.tools})
-            input_tools = {
-                "capstone_action", "capstone_click", "capstone_drag",
-                "capstone_scroll", "capstone_keys", "capstone_type_text",
-                "capstone_set_recording", "capstone_step_sampling_rate",
-                "capstone_create_graph", "capstone_select_graph_measurement",
-                "capstone_read_graph",
+            assert len(tools.tools) <= 22
+            expected_core = {
+                "capstone_attach",
+                "capstone_windows",
+                "capstone_snapshot",
+                "capstone_screenshot",
+                "capstone_interact_ui",
+                "capstone_manage_graph",
+                "capstone_manage_display",
+                "capstone_manage_instrument",
+                "capstone_manage_run",
             }
-            advertised = [tool for tool in tools.tools if tool.name in input_tools]
-            assert {tool.name for tool in advertised} == input_tools
-            for tool in advertised:
-                schema = ForegroundSchema.model_validate(tool.inputSchema)
-                assert schema.properties.allow_foreground.default is True
+            assert expected_core.issubset({tool.name for tool in tools.tools})
+            interact_tool = next(t for t in tools.tools if t.name == "capstone_interact_ui")
+            schema = ForegroundSchema.model_validate(interact_tool.inputSchema)
+            assert schema.properties.allow_foreground.default is True
             attached = await session.call_tool("capstone_attach")
             if attached.isError:
                 pytest.skip("Could not attach to Capstone (not installed or running)")
@@ -84,20 +82,12 @@ async def exercise_protocol() -> None:
                 "capstone_screenshot", {"handle": handle},
             )
             assert not captured.isError, captured.content
-            graph_capture = await session.call_tool(
-                "capstone_observe_graph", {"handle": handle},
-            )
-            assert not graph_capture.isError, graph_capture.content
-            frame = GraphFrame.model_validate(graph_capture.structuredContent)
-            assert frame.handle == handle
-            assert frame.width > 0
-            assert frame.height > 0
-            assert frame.frame_id
-            assert len([
-                item for item in graph_capture.content if isinstance(item, ImageContent)
-            ]) == 1
             invalid = await session.call_tool(
-                "capstone_action", {"ref": "stale:0", "action": "invoke"},
+                "capstone_interact_ui", {
+                    "action": "action",
+                    "ref": "stale:0",
+                    "ui_action": "invoke",
+                },
             )
             # Then: real controls, actual PNG data, and stale-ref rejection.
             assert snapshot.controls

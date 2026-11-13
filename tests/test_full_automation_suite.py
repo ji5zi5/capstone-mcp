@@ -41,39 +41,22 @@ from capstone_mcp.native_loop import NativeDesktop
 from capstone_mcp.runs import SetRunVisibilityResult
 from capstone_mcp.server import MCP
 
-NEW_TOOLS = [
-    "capstone_create_table",
-    "capstone_set_table_columns",
-    "capstone_read_table",
-    "capstone_create_digits",
-    "capstone_toggle_graph_statistics",
-    "capstone_measure_graph_area",
-    "capstone_graph_delta",
+COMPOUND_TOOLS = [
+    "capstone_manage_display",
+    "capstone_manage_graph",
+    "capstone_manage_instrument",
     "capstone_manage_run",
-    "capstone_set_signal_generator",
-    "capstone_read_signal_generator_status",
-    "capstone_create_scope",
-    "capstone_set_scope_trigger",
-    "capstone_create_fft",
-    "capstone_read_fft_peaks",
-    "capstone_set_recording_condition",
-    "capstone_set_sampling_mode",
-    "capstone_keep_sample",
-    "capstone_scan_wireless_sensors",
-    "capstone_connect_wireless_sensor",
-    "capstone_calibrate_sensor",
-    "capstone_add_page",
-    "capstone_set_page_layout",
+    "capstone_interact_ui",
 ]
 
 
 @pytest.mark.anyio
-async def test_all_22_new_tools_registered_on_server() -> None:
-    """Ensure all 22 high-level tools are registered on FastMCP."""
+async def test_compound_management_tools_registered_on_server() -> None:
+    """Ensure compound management tools and UI escape hatch are registered on FastMCP."""
     tools = await MCP.list_tools()
     tool_names = {t.name for t in tools}
-    for tool_name in NEW_TOOLS:
-        msg = f"Tool {tool_name} was not registered on MCP server"
+    for tool_name in COMPOUND_TOOLS:
+        msg = f"Compound tool {tool_name} was not registered on MCP server"
         assert tool_name in tool_names, msg
 
 
