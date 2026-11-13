@@ -15,7 +15,7 @@ type NativeOperation = Literal[
     "select_sensor", "configure_sensor",
     "recording_initialize", "recording_observe", "recording_change",
     "save_experiment", "export_data", "open_experiment",
-    "manage_graph", "manage_instrument", "manage_display",
+    "manage_graph", "manage_instrument", "manage_display", "manage_run",
     "create_graph", "select_graph_measurement",
     "read_graph", "set_graph_fits", "analyze_graph", "observe_graph",
     "rename_run", "fit_graph", "create_calculation", "delete_run", "zero_sensor",
@@ -67,6 +67,7 @@ class NativeRequest(Model):
     graph_request: JsonValue = None
     instrument_request: JsonValue = None
     display_request: JsonValue = None
+    run_request: JsonValue = None
     frame_id: str = ""
     mode: str = "scale_to_fit"
     offset_x: int = 20

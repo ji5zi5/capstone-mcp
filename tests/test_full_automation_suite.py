@@ -49,7 +49,7 @@ NEW_TOOLS = [
     "capstone_toggle_graph_statistics",
     "capstone_measure_graph_area",
     "capstone_graph_delta",
-    "capstone_set_run_visibility",
+    "capstone_manage_run",
     "capstone_set_signal_generator",
     "capstone_read_signal_generator_status",
     "capstone_create_scope",

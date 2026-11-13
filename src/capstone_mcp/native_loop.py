@@ -91,8 +91,10 @@ from capstone_mcp.repetition import NativeRecordingBackend, RepeatPlan
 from capstone_mcp.runs import (
     DeleteRunRequest,
     RenameRunRequest,
+    RunRequest,
     SetRunVisibilityRequest,
     delete_run,
+    manage_run,
     rename_run,
     set_run_visibility,
 )
@@ -247,6 +249,12 @@ class NativeDesktop:
                 manage_display(
                     self.app,
                     DisplayRequest.model_validate(r.display_request),
+                ),
+            ),
+            "manage_run": lambda r: _json(
+                manage_run(
+                    self.app,
+                    RunRequest.model_validate(r.run_request),
                 ),
             ),
             "create_graph": lambda r: _json(
