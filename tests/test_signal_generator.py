@@ -7,10 +7,13 @@ import pytest
 
 from capstone_mcp.desktop import AutomationError, Capstone
 from capstone_mcp.instruments import (
-    ReadSignalGeneratorStatusRequest,
+    InstrumentAction,
+    InstrumentRequest,
+    InstrumentResult,
     SetSignalGeneratorRequest,
-    read_signal_generator_status,
-    set_signal_generator,
+    SetSignalGeneratorResult,
+    SignalGeneratorStatusResult,
+    manage_instrument,
 )
 from capstone_mcp.models import Bounds, Control, Snapshot, Window
 
@@ -28,21 +31,39 @@ def test_set_signal_generator_requires_foreground() -> None:
     app = Capstone()
     req = SetSignalGeneratorRequest(allow_foreground=False)
     with pytest.raises(AutomationError, match="allow_foreground=true"):
-        _ = set_signal_generator(app, req)
+        _ = manage_instrument(
+            app,
+            InstrumentRequest(
+                action=InstrumentAction.CONFIGURE_SIGNAL_GENERATOR,
+                configure_signal_generator=req,
+            ),
+        )
 
 
 def test_set_signal_generator_rejects_invalid_waveform() -> None:
     app = Capstone()
     req = SetSignalGeneratorRequest(waveform="InvalidWave")
     with pytest.raises(AutomationError, match="Unsupported waveform"):
-        _ = set_signal_generator(app, req)
+        _ = manage_instrument(
+            app,
+            InstrumentRequest(
+                action=InstrumentAction.CONFIGURE_SIGNAL_GENERATOR,
+                configure_signal_generator=req,
+            ),
+        )
 
 
 def test_set_signal_generator_rejects_negative_frequency() -> None:
     app = Capstone()
     req = SetSignalGeneratorRequest(frequency=-10.0)
     with pytest.raises(AutomationError, match="Frequency must be non-negative"):
-        _ = set_signal_generator(app, req)
+        _ = manage_instrument(
+            app,
+            InstrumentRequest(
+                action=InstrumentAction.CONFIGURE_SIGNAL_GENERATOR,
+                configure_signal_generator=req,
+            ),
+        )
 
 
 def test_set_signal_generator_raises_when_toggle_not_found() -> None:
@@ -66,7 +87,13 @@ def test_set_signal_generator_raises_when_toggle_not_found() -> None:
         AutomationError,
         match="Signal Generator palette toggle button not found",
     ):
-        _ = set_signal_generator(app, req)
+        _ = manage_instrument(
+            app,
+            InstrumentRequest(
+                action=InstrumentAction.CONFIGURE_SIGNAL_GENERATOR,
+                configure_signal_generator=req,
+            ),
+        )
 
 
 def test_set_signal_generator_success_opens_configures_and_restores() -> None:
@@ -156,7 +183,17 @@ def test_set_signal_generator_success_opens_configures_and_restores() -> None:
         enabled=True,
         keep_open=False,
     )
-    result = set_signal_generator(app, req)
+    inst_res = manage_instrument(
+        app,
+        InstrumentRequest(
+            action=InstrumentAction.CONFIGURE_SIGNAL_GENERATOR,
+            configure_signal_generator=req,
+        ),
+    )
+
+    assert isinstance(inst_res, InstrumentResult)
+    assert isinstance(inst_res.configure_signal_generator, SetSignalGeneratorResult)
+    result = inst_res.configure_signal_generator
 
     assert result.waveform == "Square"
     assert result.frequency == 500.0
@@ -206,7 +243,16 @@ def test_set_signal_generator_keep_open() -> None:
     app.control = MagicMock(side_effect=mock_ctrl)
 
     req = SetSignalGeneratorRequest(enabled=True, keep_open=True)
-    result = set_signal_generator(app, req)
+    inst_res = manage_instrument(
+        app,
+        InstrumentRequest(
+            action=InstrumentAction.CONFIGURE_SIGNAL_GENERATOR,
+            configure_signal_generator=req,
+        ),
+    )
+    assert isinstance(inst_res, InstrumentResult)
+    assert isinstance(inst_res.configure_signal_generator, SetSignalGeneratorResult)
+    result = inst_res.configure_signal_generator
     assert result.verified is True
 
     # 1 click to open, 0 to change power (already on), 0 to close (keep_open=True)
@@ -282,8 +328,18 @@ def test_read_signal_generator_status_success() -> None:
 
     app.control = mock_control
 
-    req = ReadSignalGeneratorStatusRequest()
-    result = read_signal_generator_status(app, req)
+    req = SetSignalGeneratorRequest(read_only=True)
+    inst_res = manage_instrument(
+        app,
+        InstrumentRequest(
+            action=InstrumentAction.CONFIGURE_SIGNAL_GENERATOR,
+            configure_signal_generator=req,
+        ),
+    )
+
+    assert isinstance(inst_res, InstrumentResult)
+    assert isinstance(inst_res.configure_signal_generator, SignalGeneratorStatusResult)
+    result = inst_res.configure_signal_generator
 
     assert result.enabled is True
     assert result.waveform == "Triangle"

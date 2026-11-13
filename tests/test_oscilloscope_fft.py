@@ -8,13 +8,17 @@ import pytest
 from capstone_mcp.desktop import AutomationError, Capstone
 from capstone_mcp.displays import (
     CreateFftRequest,
+    CreateFftResult,
     CreateScopeRequest,
+    CreateScopeResult,
+    DisplayAction,
+    DisplayRequest,
+    DisplayResult,
     ReadFftPeaksRequest,
+    ReadFftPeaksResult,
+    ScopeTriggerResult,
     SetScopeTriggerRequest,
-    create_fft,
-    create_scope,
-    read_fft_peaks,
-    set_scope_trigger,
+    manage_display,
 )
 from capstone_mcp.models import Bounds, Control, Snapshot, Window
 
@@ -32,7 +36,10 @@ def test_create_scope_requires_foreground() -> None:
     app = Capstone()
     req = CreateScopeRequest(allow_foreground=False)
     with pytest.raises(AutomationError, match="allow_foreground=true"):
-        _ = create_scope(app, req)
+        _ = manage_display(
+            app,
+            DisplayRequest(action=DisplayAction.CREATE_SCOPE, create_scope=req),
+        )
 
 
 def test_create_scope_raises_when_palette_not_found() -> None:
@@ -56,7 +63,10 @@ def test_create_scope_raises_when_palette_not_found() -> None:
         AutomationError,
         match="Expected Scope display palette item not found",
     ):
-        _ = create_scope(app, req)
+        _ = manage_display(
+            app,
+            DisplayRequest(action=DisplayAction.CREATE_SCOPE, create_scope=req),
+        )
 
 
 def test_create_scope_success() -> None:
@@ -115,7 +125,13 @@ def test_create_scope_success() -> None:
     app.control = mock_control
 
     req = CreateScopeRequest(timebase="2 ms/div", channel="Voltage (V)")
-    res = create_scope(app, req)
+    display_res = manage_display(
+        app,
+        DisplayRequest(action=DisplayAction.CREATE_SCOPE, create_scope=req),
+    )
+    assert isinstance(display_res, DisplayResult)
+    assert isinstance(display_res.create_scope, CreateScopeResult)
+    res = display_res.create_scope
 
     assert res.display_type == "Scope"
     assert res.timebase == "2 ms/div"
@@ -129,18 +145,36 @@ def test_set_scope_trigger_requires_foreground() -> None:
     app = Capstone()
     req = SetScopeTriggerRequest(allow_foreground=False)
     with pytest.raises(AutomationError, match="allow_foreground=true"):
-        _ = set_scope_trigger(app, req)
+        _ = manage_display(
+            app,
+            DisplayRequest(
+                action=DisplayAction.SET_SCOPE_TRIGGER,
+                set_scope_trigger=req,
+            ),
+        )
 
 
 def test_set_scope_trigger_rejects_invalid_inputs() -> None:
     app = Capstone()
     req1 = SetScopeTriggerRequest(trigger_slope="diagonal")
     with pytest.raises(AutomationError, match="Unsupported trigger slope"):
-        _ = set_scope_trigger(app, req1)
+        _ = manage_display(
+            app,
+            DisplayRequest(
+                action=DisplayAction.SET_SCOPE_TRIGGER,
+                set_scope_trigger=req1,
+            ),
+        )
 
     req2 = SetScopeTriggerRequest(trigger_mode="infinite")
     with pytest.raises(AutomationError, match="Unsupported trigger mode"):
-        _ = set_scope_trigger(app, req2)
+        _ = manage_display(
+            app,
+            DisplayRequest(
+                action=DisplayAction.SET_SCOPE_TRIGGER,
+                set_scope_trigger=req2,
+            ),
+        )
 
 
 def test_set_scope_trigger_success() -> None:
@@ -194,7 +228,16 @@ def test_set_scope_trigger_success() -> None:
         trigger_slope="falling",
         trigger_mode="single",
     )
-    res = set_scope_trigger(app, req)
+    display_res = manage_display(
+        app,
+        DisplayRequest(
+            action=DisplayAction.SET_SCOPE_TRIGGER,
+            set_scope_trigger=req,
+        ),
+    )
+    assert isinstance(display_res, DisplayResult)
+    assert isinstance(display_res.set_scope_trigger, ScopeTriggerResult)
+    res = display_res.set_scope_trigger
 
     assert res.trigger_level == 1.25
     assert res.trigger_slope == "falling"
@@ -261,7 +304,13 @@ def test_create_fft_success() -> None:
     app.control = mock_ctrl
 
     req = CreateFftRequest(measurement="Sound Sensor", frequency_range="0 - 5000 Hz")
-    res = create_fft(app, req)
+    display_res = manage_display(
+        app,
+        DisplayRequest(action=DisplayAction.CREATE_FFT, create_fft=req),
+    )
+    assert isinstance(display_res, DisplayResult)
+    assert isinstance(display_res.create_fft, CreateFftResult)
+    res = display_res.create_fft
 
     assert res.display_type == "FFT"
     assert res.measurement == "Sound Sensor"
@@ -301,7 +350,13 @@ def test_read_fft_peaks_success() -> None:
     ))
 
     req = ReadFftPeaksRequest(top_k=2)
-    res = read_fft_peaks(app, req)
+    display_res = manage_display(
+        app,
+        DisplayRequest(action=DisplayAction.READ_FFT_PEAKS, read_fft_peaks=req),
+    )
+    assert isinstance(display_res, DisplayResult)
+    assert isinstance(display_res.read_fft_peaks, ReadFftPeaksResult)
+    res = display_res.read_fft_peaks
 
     assert res.peak_count == 2
     assert len(res.peaks) == 2

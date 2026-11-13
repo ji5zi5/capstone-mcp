@@ -8,11 +8,15 @@ import pytest
 from capstone_mcp.desktop import AutomationError, Capstone
 from capstone_mcp.instruments import (
     CalibrateSensorRequest,
+    CalibrateSensorResult,
     ConnectWirelessSensorRequest,
+    ConnectWirelessSensorResult,
+    InstrumentAction,
+    InstrumentRequest,
+    InstrumentResult,
     ScanWirelessSensorsRequest,
-    calibrate_sensor,
-    connect_wireless_sensor,
-    scan_wireless_sensors,
+    ScanWirelessSensorsResult,
+    manage_instrument,
 )
 from capstone_mcp.models import Bounds, Control, Snapshot, Window
 
@@ -30,7 +34,10 @@ def test_scan_wireless_sensors_requires_foreground() -> None:
     app = Capstone()
     req = ScanWirelessSensorsRequest(allow_foreground=False)
     with pytest.raises(AutomationError, match="allow_foreground=true"):
-        _ = scan_wireless_sensors(app, req)
+        _ = manage_instrument(
+            app,
+            InstrumentRequest(action=InstrumentAction.SCAN_WIRELESS, scan_wireless=req),
+        )
 
 
 def test_scan_wireless_sensors_raises_when_toggle_missing() -> None:
@@ -43,7 +50,10 @@ def test_scan_wireless_sensors_raises_when_toggle_missing() -> None:
     ))
     req = ScanWirelessSensorsRequest()
     with pytest.raises(AutomationError, match="Hardware Setup palette toggle"):
-        _ = scan_wireless_sensors(app, req)
+        _ = manage_instrument(
+            app,
+            InstrumentRequest(action=InstrumentAction.SCAN_WIRELESS, scan_wireless=req),
+        )
 
 
 def test_scan_wireless_sensors_success_discovers_sensors() -> None:
@@ -83,7 +93,13 @@ def test_scan_wireless_sensors_success_discovers_sensors() -> None:
     app.control = MagicMock(return_value=toggle_node)
 
     req = ScanWirelessSensorsRequest()
-    res = scan_wireless_sensors(app, req)
+    inst_res = manage_instrument(
+        app,
+        InstrumentRequest(action=InstrumentAction.SCAN_WIRELESS, scan_wireless=req),
+    )
+    assert isinstance(inst_res, InstrumentResult)
+    assert isinstance(inst_res.scan_wireless, ScanWirelessSensorsResult)
+    res = inst_res.scan_wireless
 
     assert res.count == 2
     assert res.sensors[0].sensor_id == "642-108"
@@ -98,14 +114,20 @@ def test_connect_wireless_sensor_requires_foreground() -> None:
     app = Capstone()
     req = ConnectWirelessSensorRequest(sensor_id="642-108", allow_foreground=False)
     with pytest.raises(AutomationError, match="allow_foreground=true"):
-        _ = connect_wireless_sensor(app, req)
+        _ = manage_instrument(
+            app,
+            InstrumentRequest(action=InstrumentAction.CONNECT_WIRELESS, connect_wireless=req),
+        )
 
 
 def test_connect_wireless_sensor_rejects_empty_id() -> None:
     app = Capstone()
     req = ConnectWirelessSensorRequest(sensor_id="")
     with pytest.raises(AutomationError, match="sensor_id must not be empty"):
-        _ = connect_wireless_sensor(app, req)
+        _ = manage_instrument(
+            app,
+            InstrumentRequest(action=InstrumentAction.CONNECT_WIRELESS, connect_wireless=req),
+        )
 
 
 def test_connect_wireless_sensor_raises_when_not_found() -> None:
@@ -129,7 +151,10 @@ def test_connect_wireless_sensor_raises_when_not_found() -> None:
 
     req = ConnectWirelessSensorRequest(sensor_id="999-999")
     with pytest.raises(AutomationError, match="not found in Hardware Setup"):
-        _ = connect_wireless_sensor(app, req)
+        _ = manage_instrument(
+            app,
+            InstrumentRequest(action=InstrumentAction.CONNECT_WIRELESS, connect_wireless=req),
+        )
 
 
 def test_connect_wireless_sensor_success() -> None:
@@ -169,7 +194,13 @@ def test_connect_wireless_sensor_success() -> None:
     app.control = MagicMock(return_value=toggle_node)
 
     req = ConnectWirelessSensorRequest(sensor_id="642-108", handle=100)
-    res = connect_wireless_sensor(app, req)
+    inst_res = manage_instrument(
+        app,
+        InstrumentRequest(action=InstrumentAction.CONNECT_WIRELESS, connect_wireless=req),
+    )
+    assert isinstance(inst_res, InstrumentResult)
+    assert isinstance(inst_res.connect_wireless, ConnectWirelessSensorResult)
+    res = inst_res.connect_wireless
 
     assert res.sensor_id == "642-108"
     assert res.connected is True
@@ -181,14 +212,20 @@ def test_calibrate_sensor_requires_foreground() -> None:
     app = Capstone()
     req = CalibrateSensorRequest(sensor_name="Force", allow_foreground=False)
     with pytest.raises(AutomationError, match="allow_foreground=true"):
-        _ = calibrate_sensor(app, req)
+        _ = manage_instrument(
+            app,
+            InstrumentRequest(action=InstrumentAction.CALIBRATE_SENSOR, calibrate_sensor=req),
+        )
 
 
 def test_calibrate_sensor_rejects_invalid_type() -> None:
     app = Capstone()
     req = CalibrateSensorRequest(sensor_name="Force", calibration_type="3_point")
     with pytest.raises(AutomationError, match="Unsupported calibration type"):
-        _ = calibrate_sensor(app, req)
+        _ = manage_instrument(
+            app,
+            InstrumentRequest(action=InstrumentAction.CALIBRATE_SENSOR, calibrate_sensor=req),
+        )
 
 
 def test_calibrate_sensor_requires_standard_2_for_two_point() -> None:
@@ -200,7 +237,10 @@ def test_calibrate_sensor_requires_standard_2_for_two_point() -> None:
         standard_2=None,
     )
     with pytest.raises(AutomationError, match="standard_2 is required"):
-        _ = calibrate_sensor(app, req)
+        _ = manage_instrument(
+            app,
+            InstrumentRequest(action=InstrumentAction.CALIBRATE_SENSOR, calibrate_sensor=req),
+        )
 
 
 def test_calibrate_sensor_two_point_success() -> None:
@@ -285,7 +325,13 @@ def test_calibrate_sensor_two_point_success() -> None:
         standard_1=0.0,
         standard_2=9.8,
     )
-    res = calibrate_sensor(app, req)
+    inst_res = manage_instrument(
+        app,
+        InstrumentRequest(action=InstrumentAction.CALIBRATE_SENSOR, calibrate_sensor=req),
+    )
+    assert isinstance(inst_res, InstrumentResult)
+    assert isinstance(inst_res.calibrate_sensor, CalibrateSensorResult)
+    res = inst_res.calibrate_sensor
 
     assert res.sensor_name == "Force Sensor"
     assert res.calibration_type == "two_point"

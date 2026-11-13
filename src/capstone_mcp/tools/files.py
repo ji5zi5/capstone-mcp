@@ -23,14 +23,6 @@ from capstone_mcp.capfiles import (
 )
 from capstone_mcp.csv_data import CsvPage, read_csv_page
 from capstone_mcp.desktop import AutomationError
-from capstone_mcp.experiment_analysis import (
-    CapLinearFitRequest,
-    CapLinearFitResult,
-    CapRunComparisonRequest,
-    CapRunComparisonResult,
-    compare_cap_datasets,
-    fit_cap_datasets,
-)
 from capstone_mcp.file_workflows import FileArtifact, OpenedExperiment
 from capstone_mcp.models import Model
 
@@ -155,16 +147,6 @@ def register_file_tools(mcp: FastMCP, native: NativeCaller) -> dict[str, Any]:
         )
         return ExportedData(artifact=artifact, data=data)
 
-    async def capstone_csv_page(
-        path: str,
-        offset: Annotated[int, Field(ge=0)] = 0,
-        limit: Annotated[int, Field(ge=1, le=10_000)] = 1000,
-    ) -> CsvPage:
-        """Read another page of an existing CSV without repeating native export."""
-        return await anyio.to_thread.run_sync(
-            read_csv_page, path, offset, limit,
-        )
-
     @mcp.tool(
         annotations=ToolAnnotations(
             title="Inspect .cap file configuration",
@@ -275,29 +257,12 @@ def register_file_tools(mcp: FastMCP, native: NativeCaller) -> dict[str, Any]:
             independent_kind=dataset.independent_kind,
         )
 
-    def capstone_fit_file(
-        path: str,
-        request: CapLinearFitRequest,
-    ) -> CapLinearFitResult:
-        """Extract and fit two explicit saved datasets, returning their full provenance."""
-        return fit_cap_datasets(path, request)
-
-    def capstone_compare_file(
-        path: str,
-        request: CapRunComparisonRequest,
-    ) -> CapRunComparisonResult:
-        """Extract and compare saved datasets with matching declared unit IDs."""
-        return compare_cap_datasets(path, request)
-
     return {
         "capstone_save_experiment": capstone_save_experiment,
         "capstone_open_experiment": capstone_open_experiment,
         "capstone_export_data": capstone_export_data,
-        "capstone_csv_page": capstone_csv_page,
         "capstone_inspect_file": capstone_inspect_file,
         "capstone_file_datasets": capstone_file_datasets,
         "capstone_extract_dataset": capstone_extract_dataset,
-        "capstone_fit_file": capstone_fit_file,
-        "capstone_compare_file": capstone_compare_file,
     }
 

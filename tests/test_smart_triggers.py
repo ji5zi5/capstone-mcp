@@ -8,15 +8,16 @@ import pytest
 from capstone_mcp.desktop import AutomationError, Capstone
 from capstone_mcp.instruments import (
     ConditionSpec,
+    InstrumentAction,
+    InstrumentRequest,
+    InstrumentResult,
     KeepSampleRequest,
     KeepSampleResult,
     SetRecordingConditionRequest,
     SetRecordingConditionResult,
     SetSamplingModeRequest,
     SetSamplingModeResult,
-    keep_sample,
-    set_recording_condition,
-    set_sampling_mode,
+    manage_instrument,
 )
 from capstone_mcp.models import Bounds, Control, Snapshot, Window
 
@@ -41,14 +42,26 @@ def test_set_recording_condition_rejects_missing_foreground() -> None:
         allow_foreground=False,
     )
     with pytest.raises(AutomationError, match="allow_foreground"):
-        _ = set_recording_condition(app, req)
+        _ = manage_instrument(
+            app,
+            InstrumentRequest(
+                action=InstrumentAction.SET_RECORDING_CONDITION,
+                set_recording_condition=req,
+            ),
+        )
 
 
 def test_set_recording_condition_rejects_empty_conditions() -> None:
     app = Capstone()
     req = SetRecordingConditionRequest(handle=100)
     with pytest.raises(AutomationError, match="At least one"):
-        _ = set_recording_condition(app, req)
+        _ = manage_instrument(
+            app,
+            InstrumentRequest(
+                action=InstrumentAction.SET_RECORDING_CONDITION,
+                set_recording_condition=req,
+            ),
+        )
 
 
 def test_set_recording_condition_raises_when_toggle_not_found() -> None:
@@ -72,7 +85,13 @@ def test_set_recording_condition_raises_when_toggle_not_found() -> None:
         start_condition=ConditionSpec(condition_type="time", threshold=3.0),
     )
     with pytest.raises(AutomationError, match="Recording Conditions toggle button"):
-        _ = set_recording_condition(app, req)
+        _ = manage_instrument(
+            app,
+            InstrumentRequest(
+                action=InstrumentAction.SET_RECORDING_CONDITION,
+                set_recording_condition=req,
+            ),
+        )
 
 
 def test_set_recording_condition_success() -> None:
@@ -160,9 +179,17 @@ def test_set_recording_condition_success() -> None:
             threshold=10.0,
         ),
     )
-    result = set_recording_condition(app, req)
+    inst_res = manage_instrument(
+        app,
+        InstrumentRequest(
+            action=InstrumentAction.SET_RECORDING_CONDITION,
+            set_recording_condition=req,
+        ),
+    )
 
-    assert isinstance(result, SetRecordingConditionResult)
+    assert isinstance(inst_res, InstrumentResult)
+    assert isinstance(inst_res.set_recording_condition, SetRecordingConditionResult)
+    result = inst_res.set_recording_condition
     assert result.verified is True
     assert result.start_condition is not None
     assert result.start_condition.threshold == 5.0
@@ -179,7 +206,13 @@ def test_set_sampling_mode_requires_foreground() -> None:
     app = Capstone()
     req = SetSamplingModeRequest(handle=100, mode="keep_sample", allow_foreground=False)
     with pytest.raises(AutomationError, match="allow_foreground"):
-        _ = set_sampling_mode(app, req)
+        _ = manage_instrument(
+            app,
+            InstrumentRequest(
+                action=InstrumentAction.SET_SAMPLING_MODE,
+                set_sampling_mode=req,
+            ),
+        )
 
 
 def test_set_sampling_mode_raises_when_control_not_found() -> None:
@@ -193,7 +226,13 @@ def test_set_sampling_mode_raises_when_control_not_found() -> None:
 
     req = SetSamplingModeRequest(handle=100, mode="keep_sample")
     with pytest.raises(AutomationError, match="Sampling mode control"):
-        _ = set_sampling_mode(app, req)
+        _ = manage_instrument(
+            app,
+            InstrumentRequest(
+                action=InstrumentAction.SET_SAMPLING_MODE,
+                set_sampling_mode=req,
+            ),
+        )
 
 
 def test_set_sampling_mode_success() -> None:
@@ -216,9 +255,17 @@ def test_set_sampling_mode_success() -> None:
     app.control = MagicMock(return_value=btn_node)
 
     req = SetSamplingModeRequest(handle=100, mode="keep_sample")
-    result = set_sampling_mode(app, req)
+    inst_res = manage_instrument(
+        app,
+        InstrumentRequest(
+            action=InstrumentAction.SET_SAMPLING_MODE,
+            set_sampling_mode=req,
+        ),
+    )
 
-    assert isinstance(result, SetSamplingModeResult)
+    assert isinstance(inst_res, InstrumentResult)
+    assert isinstance(inst_res.set_sampling_mode, SetSamplingModeResult)
+    result = inst_res.set_sampling_mode
     assert result.mode == "keep_sample"
     assert result.verified is True
     btn_node.iface_selection_item.Select.assert_called_once()
@@ -231,7 +278,13 @@ def test_keep_sample_requires_foreground() -> None:
     app = Capstone()
     req = KeepSampleRequest(handle=100, allow_foreground=False)
     with pytest.raises(AutomationError, match="allow_foreground"):
-        _ = keep_sample(app, req)
+        _ = manage_instrument(
+            app,
+            InstrumentRequest(
+                action=InstrumentAction.KEEP_SAMPLE,
+                keep_sample=req,
+            ),
+        )
 
 
 def test_keep_sample_raises_when_button_not_found() -> None:
@@ -245,7 +298,13 @@ def test_keep_sample_raises_when_button_not_found() -> None:
 
     req = KeepSampleRequest(handle=100)
     with pytest.raises(AutomationError, match="Keep Sample button not found"):
-        _ = keep_sample(app, req)
+        _ = manage_instrument(
+            app,
+            InstrumentRequest(
+                action=InstrumentAction.KEEP_SAMPLE,
+                keep_sample=req,
+            ),
+        )
 
 
 def test_keep_sample_success_with_value_entry() -> None:
@@ -277,9 +336,17 @@ def test_keep_sample_success_with_value_entry() -> None:
     app.control = MagicMock(return_value=val_node)
 
     req = KeepSampleRequest(handle=100, value=0.25, variable_name="Position")
-    result = keep_sample(app, req)
+    inst_res = manage_instrument(
+        app,
+        InstrumentRequest(
+            action=InstrumentAction.KEEP_SAMPLE,
+            keep_sample=req,
+        ),
+    )
 
-    assert isinstance(result, KeepSampleResult)
+    assert isinstance(inst_res, InstrumentResult)
+    assert isinstance(inst_res.keep_sample, KeepSampleResult)
+    result = inst_res.keep_sample
     assert result.sample_retained is True
     assert result.recorded_value == 0.25
     assert result.variable_name == "Position"

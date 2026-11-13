@@ -8,6 +8,15 @@ import pytest
 
 from capstone_mcp import acquisition
 from capstone_mcp.desktop import AutomationError, Capstone
+from capstone_mcp.instruments import (
+    InstrumentAction,
+    InstrumentRequest,
+    InstrumentResult,
+    SamplingRateRequest,
+    SamplingRateSelection,
+    SensorSelection,
+    manage_instrument,
+)
 from capstone_mcp.instruments import sensors as sensor_settings
 from capstone_mcp.models import Action, Bounds, Control, Result, Snapshot, Window
 
@@ -167,11 +176,14 @@ def test_select_sensor_reports_exact_observed_before_and_after(
     app = SettingsAdapter()
     install_observer(monkeypatch, app)
     # When
-    result = sensor_settings.select_sensor(
-        app,
-        1,
-        sensor_settings.SensorSelectionRequest(sensor="Red"),
+    req = InstrumentRequest(
+        action=InstrumentAction.SET_SAMPLING_RATE,
+        set_sampling_rate=SamplingRateRequest(handle=1, sensor="Red"),
     )
+    inst_res = manage_instrument(app, req)
+    assert isinstance(inst_res, InstrumentResult)
+    assert isinstance(inst_res.set_sampling_rate, SensorSelection)
+    result = inst_res.set_sampling_rate
     # Then
     assert result.model_dump() == {
         "requested_sensor": "Red",
@@ -190,12 +202,12 @@ def test_select_sensor_rejects_duplicate_exact_names(
     app = SettingsAdapter(duplicate_sensor=True)
     install_observer(monkeypatch, app)
     # When / Then
+    req = InstrumentRequest(
+        action=InstrumentAction.SET_SAMPLING_RATE,
+        set_sampling_rate=SamplingRateRequest(handle=1, sensor="Red"),
+    )
     with pytest.raises(AutomationError, match="not unique"):
-        _ = sensor_settings.select_sensor(
-            app,
-            1,
-            sensor_settings.SensorSelectionRequest(sensor="Red"),
-        )
+        _ = manage_instrument(app, req)
     assert app.sensor == "Blue"
     assert not app.menu_open
 
@@ -207,14 +219,18 @@ def test_target_sampling_rate_attains_exact_native_display(
     app = SettingsAdapter()
     install_observer(monkeypatch, app)
     # When
-    result = sensor_settings.target_sampling_rate(
-        app,
-        1,
-        sensor_settings.SamplingRateRequest(
+    req = InstrumentRequest(
+        action=InstrumentAction.SET_SAMPLING_RATE,
+        set_sampling_rate=SamplingRateRequest(
+            handle=1,
             sensor="Blue",
             target="100.00 widget/s",
         ),
     )
+    inst_res = manage_instrument(app, req)
+    assert isinstance(inst_res, InstrumentResult)
+    assert isinstance(inst_res.set_sampling_rate, SamplingRateSelection)
+    result = inst_res.set_sampling_rate
     # Then
     assert (result.before, result.after, result.inputs_delivered) == (
         "50 widget/s",
@@ -230,15 +246,16 @@ def test_unsupported_sampling_rate_restores_original_display(
     app = SettingsAdapter()
     install_observer(monkeypatch, app)
     # When / Then
+    req = InstrumentRequest(
+        action=InstrumentAction.SET_SAMPLING_RATE,
+        set_sampling_rate=SamplingRateRequest(
+            handle=1,
+            sensor="Blue",
+            target="75 widget/s",
+        ),
+    )
     with pytest.raises(AutomationError, match="unsupported"):
-        _ = sensor_settings.target_sampling_rate(
-            app,
-            1,
-            sensor_settings.SamplingRateRequest(
-                sensor="Blue",
-                target="75 widget/s",
-            ),
-        )
+        _ = manage_instrument(app, req)
     assert app.rate == "50 widget/s"
     assert app.rate_inputs == 2
 
@@ -250,10 +267,14 @@ def test_lower_sampling_rate_does_not_search_higher_values(
     app = SettingsAdapter()
     install_observer(monkeypatch, app)
     # When
-    result = sensor_settings.target_sampling_rate(
-        app, 1,
-        sensor_settings.SamplingRateRequest(sensor="Blue", target="25 widget/s"),
+    req = InstrumentRequest(
+        action=InstrumentAction.SET_SAMPLING_RATE,
+        set_sampling_rate=SamplingRateRequest(handle=1, sensor="Blue", target="25 widget/s"),
     )
+    inst_res = manage_instrument(app, req)
+    assert isinstance(inst_res, InstrumentResult)
+    assert isinstance(inst_res.set_sampling_rate, SamplingRateSelection)
+    result = inst_res.set_sampling_rate
     # Then
     assert result.after == "25 widget/s"
     assert app.rate_inputs == 1
@@ -266,11 +287,12 @@ def test_rate_unit_mismatch_does_not_deliver_input(
     app = SettingsAdapter()
     install_observer(monkeypatch, app)
     # When / Then
+    req = InstrumentRequest(
+        action=InstrumentAction.SET_SAMPLING_RATE,
+        set_sampling_rate=SamplingRateRequest(handle=1, sensor="Blue", target="100 Hz"),
+    )
     with pytest.raises(AutomationError):
-        _ = sensor_settings.target_sampling_rate(
-            app, 1,
-            sensor_settings.SamplingRateRequest(sensor="Blue", target="100 Hz"),
-        )
+        _ = manage_instrument(app, req)
     assert app.rate_inputs == 0
 
 
@@ -290,11 +312,12 @@ def test_post_click_read_failure_reports_uncertainty_without_reverse_input(
         return original_snapshot(handle, depth, limit)
 
     monkeypatch.setattr(app, "snapshot", snapshot)
+    req = InstrumentRequest(
+        action=InstrumentAction.SET_SAMPLING_RATE,
+        set_sampling_rate=SamplingRateRequest(handle=1, sensor="Blue", target="175 widget/s"),
+    )
     with pytest.raises(AutomationError, match="Restoration was not verified") as exc:
-        _ = sensor_settings.target_sampling_rate(
-            app, 1,
-            sensor_settings.SamplingRateRequest(sensor="Blue", target="175 widget/s"),
-        )
+        _ = manage_instrument(app, req)
     assert app.rate_inputs == fail_on_input
     assert app.rate_index == 1 + fail_on_input
     assert isinstance(exc.value.__cause__, AutomationError)
@@ -316,36 +339,42 @@ def test_failed_restore_reports_unverified_state(
         return original_act(ref, action, allow_foreground=allow_foreground)
 
     monkeypatch.setattr(app, "act", act)
+    req = InstrumentRequest(
+        action=InstrumentAction.SET_SAMPLING_RATE,
+        set_sampling_rate=SamplingRateRequest(handle=1, sensor="Blue", target="75 widget/s"),
+    )
     with pytest.raises(
         AutomationError, match=r"restoration .* failed or is unverified",
     ):
-        _ = sensor_settings.target_sampling_rate(
-            app, 1,
-            sensor_settings.SamplingRateRequest(sensor="Blue", target="75 widget/s"),
-        )
+        _ = manage_instrument(app, req)
     assert app.rate == "100 widget/s"
     assert app.rate_inputs == 1
 
 
-def select_red(app: SettingsAdapter) -> sensor_settings.SensorSelection:
-    return sensor_settings.select_sensor(
-        app,
-        1,
-        sensor_settings.SensorSelectionRequest(sensor="Red"),
+def select_red(app: SettingsAdapter) -> SensorSelection:
+    req = InstrumentRequest(
+        action=InstrumentAction.SET_SAMPLING_RATE,
+        set_sampling_rate=SamplingRateRequest(handle=1, sensor="Red"),
     )
+    res = manage_instrument(app, req)
+    assert isinstance(res.set_sampling_rate, SensorSelection)
+    return res.set_sampling_rate
 
 
 def target_high_rate(
     app: SettingsAdapter,
-) -> sensor_settings.SamplingRateSelection:
-    return sensor_settings.target_sampling_rate(
-        app,
-        1,
-        sensor_settings.SamplingRateRequest(
+) -> SamplingRateSelection:
+    req = InstrumentRequest(
+        action=InstrumentAction.SET_SAMPLING_RATE,
+        set_sampling_rate=SamplingRateRequest(
+            handle=1,
             sensor="Blue",
             target="100 widget/s",
         ),
     )
+    res = manage_instrument(app, req)
+    assert isinstance(res.set_sampling_rate, SamplingRateSelection)
+    return res.set_sampling_rate
 
 
 @pytest.mark.parametrize(
@@ -356,7 +385,7 @@ def test_sensor_settings_require_stopped_acquisition(
     monkeypatch: pytest.MonkeyPatch,
     action: Callable[
         [SettingsAdapter],
-        sensor_settings.SensorSelection | sensor_settings.SamplingRateSelection,
+        SensorSelection | SamplingRateSelection,
     ],
 ) -> None:
     # Given
