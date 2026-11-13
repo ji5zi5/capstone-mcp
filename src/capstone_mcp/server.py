@@ -3,19 +3,36 @@
 
 import base64
 import json
-from collections.abc import AsyncGenerator
+import re
+from collections.abc import AsyncGenerator, Sequence
 from contextlib import asynccontextmanager, nullcontext, suppress
-from typing import Annotated, Final
+from typing import Annotated, Any, Final
 
 import anyio
 from mcp.server.fastmcp import FastMCP, Image
-from mcp.types import ToolAnnotations
+from mcp.server.fastmcp.exceptions import ToolError
+from mcp.types import (
+    CallToolRequest,
+    CallToolResult,
+    ContentBlock,
+    ServerResult,
+    TextContent,
+    ToolAnnotations,
+)
 from pydantic import Field, JsonValue, TypeAdapter
 
 from capstone_mcp.agent_instructions import INSTRUCTIONS, guide
 from capstone_mcp.automation_models import NativeRequest
 from capstone_mcp.automation_worker import AutomationWorker
-from capstone_mcp.models import Action, Button, Point, Result, Snapshot, Window
+from capstone_mcp.models import (
+    Action,
+    Button,
+    Point,
+    Result,
+    Snapshot,
+    ToolErrorPayload,
+    Window,
+)
 from capstone_mcp.repetition import AcquisitionJobs, JobStatus
 from capstone_mcp.tools import (
     register_display_tools,
@@ -644,6 +661,163 @@ def physics_lab_tutor(
     )
 
 
+@MCP.prompt()
+def data_analysis_workflow(
+    experiment_name: str = "generic",
+    fit_model: str = "Linear",
+) -> str:
+    """Guided prompt template for automated physics curve fitting and lab analysis."""
+    return (
+        f"Please execute a structured data analysis workflow for '{experiment_name}' "
+        "in PASCO Capstone:\n"
+        "1. Inspect active displays and windows using capstone_windows and "
+        "capstone_snapshot.\n"
+        "2. Observe and read the primary graph display using "
+        "capstone_manage_graph(action='read').\n"
+        f"3. Apply a '{fit_model}' curve fit to the active data series using "
+        f"capstone_manage_graph(action='fit', fit_type='{fit_model}').\n"
+        "4. Extract fit parameters (slope, intercept, r_squared, etc.) and calculate "
+        "residuals or theoretical percentage error.\n"
+        "5. Compile the final experimental findings into a structured lab report with "
+        "capstone_generate_lab_report."
+    )
+
+
+@MCP.prompt()
+def run_comparison_workflow(
+    run1: str = "Run #1",
+    run2: str = "Run #2",
+) -> str:
+    """Guided prompt template for multi-run comparison and percentage analysis."""
+    return (
+        "Please execute a multi-run comparison workflow in PASCO Capstone:\n"
+        f"1. Verify recorded experimental runs ({run1}, {run2}) via the "
+        "capstone://runs/active resource.\n"
+        f"2. Inspect the summary statistics for both {run1} and {run2} using "
+        "capstone_manage_graph(action='toolbox_statistics').\n"
+        f"3. Compare key metric parameters (mean, standard deviation, peak values) "
+        f"between {run1} and {run2}.\n"
+        "4. Calculate percentage difference and evaluate experimental reproducibility "
+        "or trendlines.\n"
+        "5. Present a comparative Markdown table summarizing the differences and "
+        "scientific conclusions."
+    )
+
+
+# ---------------------------------------------------------------------------
+# Structured MCP Protocol Error Envelopes
+# ---------------------------------------------------------------------------
+
+
+def format_tool_error(error_message: str) -> ToolErrorPayload:
+    """Classify and format an error string into a structured ToolErrorPayload."""
+    cleaned = re.sub(r"^Error executing tool \w+:\s*", "", error_message).strip()
+    with suppress(json.JSONDecodeError, KeyError, TypeError):
+        data = json.loads(cleaned)
+        if (
+            isinstance(data, dict)
+            and "error_code" in data
+            and "message" in data
+            and "remediation" in data
+        ):
+            return ToolErrorPayload(
+                error_code=str(data["error_code"]),
+                message=str(data["message"]),
+                remediation=str(data["remediation"]),
+            )
+
+    lower = cleaned.lower()
+    if "attach" in lower or "session" in lower:
+        code = "SESSION_NOT_ATTACHED"
+        remediation = (
+            "Call capstone_attach(launch=True) to attach to or launch PASCO Capstone."
+        )
+    elif "control" in lower and ("not found" in lower or "missing" in lower):
+        code = "CONTROL_NOT_FOUND"
+        remediation = (
+            "Inspect active window controls using capstone_snapshot to find "
+            "valid references."
+        )
+    elif "graph" in lower:
+        code = "GRAPH_OPERATION_ERROR"
+        remediation = (
+            "Verify graph display exists using capstone_manage_graph(action='read') "
+            "or snapshot."
+        )
+    elif "file" in lower or "path" in lower:
+        code = "FILE_NOT_FOUND"
+        remediation = "Verify the target file path exists and is accessible."
+    elif "invalid" in lower or "validation" in lower or "unsupported" in lower:
+        code = "INVALID_ARGUMENT"
+        remediation = (
+            "Check tool argument types, values, and schema constraints before "
+            "retrying."
+        )
+    elif "time" in lower and "out" in lower:
+        code = "TIMEOUT_ERROR"
+        remediation = (
+            "Operation timed out; inspect Capstone responsiveness and reattach "
+            "if needed."
+        )
+    else:
+        code = "AUTOMATION_ERROR"
+        remediation = (
+            "Check Capstone application state using capstone_windows and retry."
+        )
+
+    return ToolErrorPayload(
+        error_code=code,
+        message=cleaned,
+        remediation=remediation,
+    )
+
+
+_orig_call_tool_handler = MCP._mcp_server.request_handlers[CallToolRequest]  # noqa: SLF001
+
+
+async def _structured_call_tool_handler(req: CallToolRequest) -> ServerResult:
+    res = await _orig_call_tool_handler(req)
+    if isinstance(res, ServerResult) and res.root.isError:
+        raw_text = (
+            res.root.content[0].text
+            if res.root.content and hasattr(res.root.content[0], "text")
+            else ""
+        )
+        payload = format_tool_error(raw_text)
+        return ServerResult(
+            CallToolResult(
+                content=[
+                    TextContent(
+                        type="text",
+                        text=payload.model_dump_json(indent=2),
+                    ),
+                ],
+                isError=True,
+            ),
+        )
+    return res
+
+
+MCP._mcp_server.request_handlers[CallToolRequest] = _structured_call_tool_handler  # noqa: SLF001
+
+_orig_fastmcp_call_tool = MCP.call_tool
+
+
+async def _safe_fastmcp_call_tool(
+    name: str,
+    arguments: dict[str, Any],
+) -> Sequence[ContentBlock] | dict[str, Any]:
+    try:
+        return await _orig_fastmcp_call_tool(name, arguments)
+    except Exception as exc:
+        payload = format_tool_error(str(exc))
+        raise ToolError(payload.model_dump_json(indent=2)) from exc
+
+
+MCP.call_tool = _safe_fastmcp_call_tool
+
+
+
 def main() -> None:
     """Serve MCP over stdio; diagnostics must never go to stdout."""
     MCP.run(transport="stdio")
@@ -660,6 +834,7 @@ if __name__ == "__main__":
 __all__ = [
     "MCP",
     "ExportedData",
+    "ToolErrorPayload",
     "capstone_acquisition_job",
     "capstone_cancel_acquisition",
     "capstone_generate_lab_report",
@@ -667,7 +842,11 @@ __all__ = [
     "capstone_tutor_get_lesson",
     "capstone_tutor_guide_step",
     "capstone_tutor_lessons_resource",
+    "data_analysis_workflow",
+    "format_tool_error",
     "http_main",
     "main",
     "physics_lab_tutor",
+    "run_comparison_workflow",
 ]
+
