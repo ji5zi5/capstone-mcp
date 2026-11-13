@@ -106,7 +106,7 @@ def discover_target(port: int = DEFAULT_PORT) -> DebugTarget:
     )
     with httpx2.Client(
         transport=transport,
-        timeout=httpx2.Timeout(connect=5, read=10, write=10, pool=10),
+        timeout=httpx2.Timeout(connect=2.0, read=4.0, write=4.0, pool=4.0),
         trust_env=False,
         follow_redirects=False,
         event_hooks={"request": [log_request]},
