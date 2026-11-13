@@ -558,6 +558,80 @@ async def capstone_hardware_inventory_resource() -> str:
     return JSON_VALUE.dump_json(inventory_doc, indent=2).decode("utf-8")
 
 
+_DISPLAY_KIND_MAP: Final = (
+    ("table", "table_count"),
+    ("graph", "graph_count"),
+    ("digits", "digits_count"),
+    ("scope", "scope_count"),
+    ("oscilloscope", "scope_count"),
+    ("fft", "fft_count"),
+)
+
+
+def _tally_display_controls(
+    controls: Sequence[object],
+    displays_doc: dict[str, JsonValue],
+) -> None:
+    pages_list = displays_doc["pages"]
+    if not isinstance(pages_list, list):
+        return
+    for c in controls:
+        if not isinstance(c, dict):
+            continue
+        aid = str(c.get("automation_id", "")).lower()
+        name = str(c.get("name", ""))
+        name_lower = name.lower()
+        ctype = str(c.get("control_type", "")).lower()
+        if ("tabitem" in ctype or "page" in aid) and name and name not in pages_list:
+            pages_list.append(name)
+        for keyword, count_field in _DISPLAY_KIND_MAP:
+            if keyword in aid or keyword in name_lower:
+                val = displays_doc.get(count_field, 0)
+                displays_doc[count_field] = (val if isinstance(val, int) else 0) + 1
+                break
+
+
+@MCP.resource("capstone://displays/active")
+async def capstone_active_displays_resource() -> str:
+    """Return real-time active displays, workbook pages, and container metadata."""
+    displays_doc: dict[str, JsonValue] = {
+        "attached": not WORKER.retired and bool(WORKER.process_id),
+        "process_id": WORKER.process_id,
+        "active_page": None,
+        "pages": [],
+        "displays": [],
+        "table_count": 0,
+        "graph_count": 0,
+        "digits_count": 0,
+        "scope_count": 0,
+        "fft_count": 0,
+    }
+    if not WORKER.retired and WORKER.process_id:
+        with suppress(Exception):
+            snapshot_res = await _native(
+                NativeRequest(
+                    operation="snapshot",
+                    handle=0,
+                    depth=12,
+                    limit=5000,
+                ),
+                mutates=False,
+            )
+            controls: Sequence[object] = ()
+            if isinstance(snapshot_res, dict):
+                raw_ctrls = snapshot_res.get("controls")
+                if isinstance(raw_ctrls, list):
+                    controls = raw_ctrls
+            elif isinstance(snapshot_res, list):
+                controls = snapshot_res
+
+            _tally_display_controls(controls, displays_doc)
+
+            if displays_doc["pages"] and isinstance(displays_doc["pages"], list):
+                displays_doc["active_page"] = displays_doc["pages"][0]
+    return JSON_VALUE.dump_json(displays_doc, indent=2).decode("utf-8")
+
+
 @MCP.resource("capstone://guide")
 def capstone_guide_resource() -> str:
     """Return the complete workflow guidance manual for PASCO Capstone."""
@@ -918,6 +992,7 @@ __all__ = [
     "ExportedData",
     "ToolErrorPayload",
     "capstone_acquisition_job",
+    "capstone_active_displays_resource",
     "capstone_cancel_acquisition",
     "capstone_generate_lab_report",
     "capstone_hardware_inventory_resource",
