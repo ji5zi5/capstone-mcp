@@ -72,6 +72,8 @@ def double_click_control(
     app: Capstone,
     handle: int,
     ctrl: Control,
+    *,
+    allow_foreground: bool = True,
 ) -> None:
     """Deliver an explicit double-click to insert palette items onto the page."""
     with contextlib.suppress(Exception):
@@ -89,7 +91,7 @@ def double_click_control(
             )
             return
 
-    click_control(app, handle, ctrl, double=True, allow_foreground=True)
+    click_control(app, handle, ctrl, double=True, allow_foreground=allow_foreground)
 
 
 def drag_control(

@@ -6,7 +6,7 @@ from capstone_mcp.data_sources.models import (
     DatasetMetadata,
     ExperimentSeries,
 )
-from capstone_mcp.table_display import ReadTableResult
+from capstone_mcp.displays import ReadTableResult
 
 
 def read_live_table_datasets(result: ReadTableResult) -> list[DatasetMetadata]:

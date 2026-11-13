@@ -6,8 +6,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from capstone_mcp.desktop import AutomationError, Capstone
-from capstone_mcp.models import Bounds, Control, Snapshot, Window
-from capstone_mcp.workbook_layout import (
+from capstone_mcp.displays import (
     AddPageRequest,
     AddPageResult,
     SetPageLayoutRequest,
@@ -15,6 +14,7 @@ from capstone_mcp.workbook_layout import (
     add_page,
     set_page_layout,
 )
+from capstone_mcp.models import Bounds, Control, Snapshot, Window
 
 
 def _make_window() -> Window:

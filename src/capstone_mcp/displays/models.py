@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import re
 from enum import StrEnum
-from typing import Final, Literal
+from typing import Any, Final, Literal
 
 from pydantic import Field, computed_field, model_validator
 
@@ -128,6 +128,9 @@ class ReadTableRequest(Model):
     table_name: str | None = None
     start_row: int = 0
     limit: int = 100
+    page: int = 1
+    page_size: int = 50
+    include_statistics: bool = True
     handle: int = 0
     allow_foreground: bool = True
 
@@ -137,13 +140,13 @@ class ReadTableResult(Model):
 
     table_name: str = "Table"
     columns: list[str] = Field(default_factory=list)
-    rows: list[list[str]] = Field(default_factory=list)
+    rows: list[Any] = Field(default_factory=list)
     row_count: int = 0
     total_rows: int = 0
     page: int = 1
     page_size: int = 50
     total_pages: int = 1
-    statistics: dict[str, dict[str, str]] = Field(default_factory=dict)
+    statistics: dict[str, dict[str, Any]] | None = None
     has_more: bool = False
     verified: bool = True
     detail: str = ""
@@ -220,6 +223,8 @@ class ScopeTriggerResult(Model):
 class CreateFftRequest(Model):
     """Specification for creating an FFT frequency spectrum display."""
 
+    measurement: str | None = None
+    frequency_range: str | None = None
     handle: int = 0
     allow_foreground: bool = True
 
@@ -229,15 +234,21 @@ class CreateFftResult(Model):
 
     display_id: str
     display_type: str = "FFT"
+    measurement: str | None = None
+    frequency_range: str | None = None
     verified: bool = True
     detail: str = ""
 
 
-class FftPeakInfo(Model):
-    """Single frequency peak in FFT spectrum."""
+class FftPeak(Model):
+    """One frequency spectrum peak."""
 
     frequency_hz: float
     amplitude: float
+    unit: str = "Hz"
+
+
+FftPeakInfo = FftPeak
 
 
 class ReadFftPeaksRequest(Model):
@@ -254,8 +265,8 @@ class ReadFftPeaksResult(Model):
     """Prominent frequency peaks extracted from FFT display."""
 
     fft_id: str
-    peaks: list[FftPeakInfo]
-    peak_count: int
+    peaks: list[FftPeak] = Field(default_factory=list)
+    peak_count: int = 0
     dominant_frequency_hz: float | None = None
     verified: bool = True
     detail: str = ""
@@ -353,7 +364,8 @@ class AddPageResult(Model):
 class SetPageLayoutRequest(Model):
     """Specification for applying a multi-display layout template to current page."""
 
-    layout: PageLayoutTemplate = "single"
+    layout: PageLayoutTemplate = "two_vertical"
+    page_name: str | None = None
     handle: int = 0
     allow_foreground: bool = True
 
@@ -362,6 +374,7 @@ class SetPageLayoutResult(Model):
     """Result of applying a layout template."""
 
     layout: PageLayoutTemplate
+    page_name: str | None = None
     areas_created: int
     verified: bool = True
     detail: str = ""
@@ -375,7 +388,16 @@ _FLAT_FIELD_MAPPINGS: Final[dict[str, tuple[str, ...]]] = {
     "create_digits": ("measurement", "handle", "digits_name", "allow_foreground"),
     "create_table": ("handle", "table_name", "allow_foreground"),
     "set_table_columns": ("columns", "handle", "table_name", "allow_foreground"),
-    "read_table": ("table_name", "start_row", "limit", "handle", "allow_foreground"),
+    "read_table": (
+        "table_name",
+        "start_row",
+        "limit",
+        "page",
+        "page_size",
+        "include_statistics",
+        "handle",
+        "allow_foreground",
+    ),
     "create_scope": ("timebase", "channel", "handle", "allow_foreground"),
     "set_scope_trigger": (
         "scope_id",
@@ -386,7 +408,12 @@ _FLAT_FIELD_MAPPINGS: Final[dict[str, tuple[str, ...]]] = {
         "handle",
         "allow_foreground",
     ),
-    "create_fft": ("handle", "allow_foreground"),
+    "create_fft": (
+        "measurement",
+        "frequency_range",
+        "handle",
+        "allow_foreground",
+    ),
     "read_fft_peaks": (
         "fft_id",
         "top_k",
@@ -395,7 +422,7 @@ _FLAT_FIELD_MAPPINGS: Final[dict[str, tuple[str, ...]]] = {
         "allow_foreground",
     ),
     "add_page": ("title", "handle", "allow_foreground"),
-    "set_page_layout": ("layout", "handle", "allow_foreground"),
+    "set_page_layout": ("layout", "page_name", "handle", "allow_foreground"),
 }
 
 
@@ -450,7 +477,6 @@ class DisplayRequest(Model):
                 flat = {k: data[k] for k in fields if k in data}
                 if flat:
                     data[action_key] = flat
-        return data
         return data
 
 

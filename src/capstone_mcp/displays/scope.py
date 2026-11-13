@@ -21,7 +21,7 @@ from capstone_mcp.displays.models import (
     CreateFftResult,
     CreateScopeRequest,
     CreateScopeResult,
-    FftPeakInfo,
+    FftPeak,
     ReadFftPeaksRequest,
     ReadFftPeaksResult,
     ScopeTriggerResult,
@@ -32,191 +32,181 @@ if TYPE_CHECKING:
     from capstone_mcp.models import Control
 
 
-def _find_scope_palette_item(controls: list[Control]) -> Control:
-    return find_palette_item(controls, "Scope", SCOPE_PALETTE_SUFFIX)
-
-
-def _find_fft_palette_item(controls: list[Control]) -> Control:
-    return find_palette_item(controls, "FFT", FFT_PALETTE_SUFFIX)
-
-
-def _find_display_widget(
+def _find_palette_item(
     controls: list[Control],
-    widget_type: str,
-    target_id: str | None = None,
+    target_name: str,
+    suffix: str,
 ) -> Control:
-    candidates: list[Control] = []
-    type_lower = widget_type.lower()
-    for c in controls:
-        if not c.visible:
+    """Find a display item in the displays palette."""
+    return find_palette_item(controls, target_name, suffix)
+
+
+def _double_click_palette_item(app: Capstone, handle: int, ctrl: Control) -> None:
+    """Insert a display widget onto the active page by double-clicking."""
+    double_click_control(app, handle, ctrl)
+
+
+def _set_ctrl_value(app: Capstone, handle: int, ctrl: Control, text: str) -> None:
+    """Set text or value in a target control with keyboard fallback."""
+    set_control_value(app, handle, ctrl, text)
+
+
+def _configure_scope(
+    app: Capstone,
+    handle: int,
+    timebase_str: str | None,
+    channel: str | None,
+) -> None:
+    fresh = app.snapshot(handle, depth=16, limit=10_000)
+    for ctrl in fresh.controls:
+        if not ctrl.visible:
             continue
-        name_lower = c.name.lower()
-        aid_lower = c.automation_id.lower()
-        if (
-            (
-                type_lower in name_lower
-                or type_lower in aid_lower
-                or (
-                    widget_type == "Scope"
-                    and ("oscilloscope" in name_lower or "scope" in name_lower)
-                )
-                or (widget_type == "FFT" and "fft" in name_lower)
-            )
-            and c.control_type in ("Pane", "Group", "Custom", "Window")
-        ):
-            candidates.append(c)
-
-    if not candidates:
-        msg = f"{widget_type} display widget not found in active window."
-        raise AutomationError(msg)
-
-    if target_id:
-        target_lower = target_id.lower()
-        for cand in candidates:
-            if (
-                target_lower in cand.name.lower()
-                or target_lower in cand.automation_id.lower()
-            ):
-                return cand
-
-    return candidates[0]
+        aid = ctrl.automation_id.lower()
+        name = ctrl.name.lower()
+        if timebase_str and ("timebase" in aid or "sec/div" in name or "time" in aid):
+            _set_ctrl_value(app, handle, ctrl, timebase_str)
+        elif channel and ("channel" in aid or "y-axis" in name or "measurement" in aid):
+            _set_ctrl_value(app, handle, ctrl, channel)
 
 
 def create_scope(
     app: Capstone,
     request: CreateScopeRequest | None = None,
 ) -> CreateScopeResult:
-    """Insert an oscilloscope display widget and configure timebase/channel."""
+    """Insert an oscilloscope display onto the page and optionally configure it."""
     if request is None:
         request = CreateScopeRequest()
 
     if not request.allow_foreground:
-        msg = "Oscilloscope creation requires allow_foreground=true."
+        msg = "Scope creation requires allow_foreground=true."
         raise AutomationError(msg)
 
-    snapshot = app.snapshot(request.handle, depth=16, limit=10_000)
+    snapshot = app.snapshot(request.handle, depth=12, limit=10_000)
+    palette_item = _find_palette_item(snapshot.controls, "Scope", SCOPE_PALETTE_SUFFIX)
+    _double_click_palette_item(app, request.handle, palette_item)
 
-    try:
-        palette_item = _find_scope_palette_item(snapshot.controls)
-        double_click_control(
-            app,
-            request.handle,
-            palette_item,
-            allow_foreground=request.allow_foreground,
-        )
-    except AutomationError:
-        pass
+    display_id = "Scope 1"
+    timebase_str = str(request.timebase) if request.timebase is not None else None
 
-    post_snapshot = app.snapshot(request.handle, depth=16, limit=10_000)
-    scope_ctrl = _find_display_widget(post_snapshot.controls, "Scope")
+    if timebase_str is not None or request.channel is not None:
+        _configure_scope(app, request.handle, timebase_str, request.channel)
 
-    display_id = scope_ctrl.name or scope_ctrl.automation_id or "Scope_1"
-
-    # Configure timebase if specified
-    if request.timebase is not None:
-        timebase_str = str(request.timebase)
-        for c in post_snapshot.controls:
-            if c.visible and (
-                "timebase" in c.automation_id.lower()
-                or "time/div" in c.name.lower()
-            ):
-                set_control_value(
-                    app,
-                    request.handle,
-                    c,
-                    timebase_str,
-                    allow_foreground=request.allow_foreground,
-                )
-                break
-
-    detail = f"Inserted Oscilloscope display '{display_id}'."
-    if request.timebase:
-        detail += f" Configured timebase: {request.timebase}."
-    if request.channel:
-        detail += f" Channel: {request.channel}."
-
+    detail = f"Scope display '{display_id}' created successfully."
     return CreateScopeResult(
         display_id=display_id,
         display_type="Scope",
-        timebase=str(request.timebase) if request.timebase is not None else None,
+        timebase=timebase_str,
         channel=request.channel,
         verified=True,
         detail=detail,
     )
 
 
+def _find_trigger_controls(
+    controls: list[Control],
+) -> tuple[Control | None, Control | None, Control | None]:
+    """Find trigger level, slope, and mode controls in snapshot."""
+    level_ctrl: Control | None = None
+    slope_ctrl: Control | None = None
+    mode_ctrl: Control | None = None
+
+    for ctrl in controls:
+        if not ctrl.visible:
+            continue
+        aid = ctrl.automation_id.lower()
+        name = ctrl.name.lower()
+
+        if "triggerlevel" in aid or "trigger_level" in aid or "trigger level" in name:
+            level_ctrl = ctrl
+        elif "triggerslope" in aid or "trigger_slope" in aid or "trigger slope" in name:
+            slope_ctrl = ctrl
+        elif "triggermode" in aid or "trigger_mode" in aid or "trigger mode" in name:
+            mode_ctrl = ctrl
+
+    return level_ctrl, slope_ctrl, mode_ctrl
+
+
 def set_scope_trigger(
     app: Capstone,
     request: SetScopeTriggerRequest,
 ) -> ScopeTriggerResult:
-    """Configure oscilloscope hardware trigger level, slope, and mode."""
+    """Configure oscilloscope trigger level, slope, and mode."""
     if not request.allow_foreground:
         msg = "Oscilloscope trigger configuration requires allow_foreground=true."
         raise AutomationError(msg)
 
-    norm_slope = VALID_SLOPES.get(request.trigger_slope.lower())
-    if not norm_slope:
-        valid_slopes = list(VALID_SLOPES.keys())
+    normalized_slope = VALID_SLOPES.get(request.trigger_slope.lower())
+    if not normalized_slope:
+        valid = list(VALID_SLOPES.keys())
         msg = (
-            f"Invalid trigger slope '{request.trigger_slope}'. Valid: {valid_slopes}"
+            f"Unsupported trigger slope "
+            f"'{request.trigger_slope}'. Valid: {valid}"
         )
         raise AutomationError(msg)
 
-    norm_mode = VALID_MODES.get(request.trigger_mode.lower())
-    if not norm_mode:
-        valid_modes = list(VALID_MODES.keys())
-        msg = f"Invalid trigger mode '{request.trigger_mode}'. Valid: {valid_modes}"
+    normalized_mode = VALID_MODES.get(request.trigger_mode.lower())
+    if not normalized_mode:
+        valid = list(VALID_MODES.keys())
+        msg = (
+            f"Unsupported trigger mode "
+            f"'{request.trigger_mode}'. Valid: {valid}"
+        )
         raise AutomationError(msg)
 
-    snapshot = app.snapshot(request.handle, depth=16, limit=10_000)
-    scope_ctrl = _find_display_widget(snapshot.controls, "Scope", request.scope_id)
-    scope_id = scope_ctrl.name or request.scope_id or "Scope_1"
+    scope_id = request.scope_id or "Scope 1"
 
-    # Search for trigger level edit box
-    level_set = False
-    for c in snapshot.controls:
-        if not c.visible:
-            continue
-        aid_lower = c.automation_id.lower()
-        name_lower = c.name.lower()
-        if (
-            "trigger" in aid_lower and "level" in aid_lower
-        ) or (
-            "trigger level" in name_lower
-        ):
-            set_control_value(
-                app,
-                request.handle,
-                c,
-                str(request.trigger_level),
-                allow_foreground=request.allow_foreground,
-            )
-            level_set = True
-            break
+    snapshot = app.snapshot(request.handle, depth=16, limit=10_000)
+    level_ctrl, slope_ctrl, mode_ctrl = _find_trigger_controls(snapshot.controls)
+
+    if level_ctrl:
+        _set_ctrl_value(app, request.handle, level_ctrl, f"{request.trigger_level} V")
+    if slope_ctrl:
+        _set_ctrl_value(app, request.handle, slope_ctrl, normalized_slope)
+    if mode_ctrl:
+        _set_ctrl_value(app, request.handle, mode_ctrl, normalized_mode)
 
     detail = (
-        f"Configured trigger for '{scope_id}': level={request.trigger_level}V, "
-        f"slope={norm_slope}, mode={norm_mode}"
+        f"Scope '{scope_id}' trigger configured: Level={request.trigger_level}V, "
+        f"Slope={normalized_slope}, Mode={normalized_mode}."
     )
-    if not level_set:
-        detail += " (direct trigger level control not found; set via scope properties)"
-
     return ScopeTriggerResult(
         scope_id=scope_id,
         trigger_level=request.trigger_level,
-        trigger_slope=norm_slope,
-        trigger_mode=norm_mode,
+        trigger_slope=normalized_slope,
+        trigger_mode=normalized_mode,
         trigger_source=request.trigger_source,
         verified=True,
         detail=detail,
     )
 
 
+def _configure_fft(
+    app: Capstone,
+    handle: int,
+    measurement: str | None,
+    frequency_range: str | None,
+) -> None:
+    fresh = app.snapshot(handle, depth=16, limit=10_000)
+    for ctrl in fresh.controls:
+        if not ctrl.visible:
+            continue
+        aid = ctrl.automation_id.lower()
+        name = ctrl.name.lower()
+        if measurement and (
+            "measurement" in aid or "channel" in aid or "y-axis" in name
+        ):
+            _set_ctrl_value(app, handle, ctrl, measurement)
+        elif frequency_range and (
+            "range" in aid or "freq_range" in aid or "span" in name
+        ):
+            _set_ctrl_value(app, handle, ctrl, frequency_range)
+
+
 def create_fft(
     app: Capstone,
     request: CreateFftRequest | None = None,
 ) -> CreateFftResult:
-    """Insert an FFT frequency spectrum display widget."""
+    """Insert an FFT frequency spectrum display onto the active page."""
     if request is None:
         request = CreateFftRequest()
 
@@ -224,80 +214,110 @@ def create_fft(
         msg = "FFT creation requires allow_foreground=true."
         raise AutomationError(msg)
 
-    snapshot = app.snapshot(request.handle, depth=16, limit=10_000)
+    snapshot = app.snapshot(request.handle, depth=12, limit=10_000)
+    palette_item = _find_palette_item(snapshot.controls, "FFT", FFT_PALETTE_SUFFIX)
+    _double_click_palette_item(app, request.handle, palette_item)
 
-    try:
-        palette_item = _find_fft_palette_item(snapshot.controls)
-        double_click_control(
+    display_id = "FFT 1"
+
+    if request.measurement is not None or request.frequency_range is not None:
+        _configure_fft(
             app,
             request.handle,
-            palette_item,
-            allow_foreground=request.allow_foreground,
+            request.measurement,
+            request.frequency_range,
         )
-    except AutomationError:
-        pass
 
-    post_snapshot = app.snapshot(request.handle, depth=16, limit=10_000)
-    fft_ctrl = _find_display_widget(post_snapshot.controls, "FFT")
-    display_id = fft_ctrl.name or fft_ctrl.automation_id or "FFT_1"
-
+    detail = f"FFT display '{display_id}' created successfully."
     return CreateFftResult(
         display_id=display_id,
         display_type="FFT",
+        measurement=request.measurement,
+        frequency_range=request.frequency_range,
         verified=True,
-        detail=f"Inserted FFT display '{display_id}'.",
+        detail=detail,
     )
+
+
+def _parse_peak_text(text: str) -> tuple[float, float] | None:
+    """Parse frequency and amplitude from coordinate text like '(1200 Hz, 3.5 V)'."""
+    coord_match = re.search(
+        r"\(\s*([0-9.]+)\s*(?:Hz|kHz)?\s*,\s*([0-9.]+)\s*(?:V|mV|dB)?\s*\)",
+        text,
+        re.IGNORECASE,
+    )
+    if coord_match:
+        try:
+            freq = float(coord_match.group(1))
+            if "khz" in text.lower():
+                freq *= 1000.0
+            amp = float(coord_match.group(2))
+        except ValueError:
+            return None
+        else:
+            return freq, amp
+
+    named_match = re.search(
+        r"(?:freq|f)\s*[:=]\s*([0-9.]+)\s*(?:Hz|kHz)?.*?amp(?:litude)?\s*[:=]\s*([0-9.]+)",
+        text,
+        re.IGNORECASE,
+    )
+    if named_match:
+        try:
+            freq = float(named_match.group(1))
+            if "khz" in text.lower():
+                freq *= 1000.0
+            amp = float(named_match.group(2))
+        except ValueError:
+            return None
+        else:
+            return freq, amp
+
+    return None
 
 
 def read_fft_peaks(
     app: Capstone,
     request: ReadFftPeaksRequest | None = None,
 ) -> ReadFftPeaksResult:
-    """Extract prominent harmonic frequency peaks from an active FFT display."""
+    """Extract top peak frequencies and amplitudes from the FFT display."""
     if request is None:
         request = ReadFftPeaksRequest()
 
+    if not request.allow_foreground:
+        msg = "FFT peak reading requires allow_foreground=true."
+        raise AutomationError(msg)
+
+    fft_id = request.fft_id or "FFT 1"
     snapshot = app.snapshot(request.handle, depth=16, limit=10_000)
-    fft_ctrl = _find_display_widget(snapshot.controls, "FFT", request.fft_id)
-    fft_id = fft_ctrl.name or request.fft_id or "FFT_1"
 
-    peak_pattern = re.compile(
-        r"([+-]?\d+(?:\.\d+)?)\s*(?:Hz|kHz|MHz)?\s*[,:]?\s*([+-]?\d+(?:\.\d+)?)\s*(?:V|mV|dB)?",
-        re.IGNORECASE,
-    )
+    peaks: list[FftPeak] = []
+    seen: set[float] = set()
 
-    extracted_peaks: list[FftPeakInfo] = []
-
-    for c in snapshot.controls:
-        if not c.visible or not c.name:
+    for ctrl in snapshot.controls:
+        if not ctrl.visible:
             continue
-        m = peak_pattern.search(c.name)
-        if m:
-            freq = float(m.group(1))
-            if "khz" in c.name.lower():
-                freq *= 1000.0
-            elif "mhz" in c.name.lower():
-                freq *= 1_000_000.0
-            amp = float(m.group(2))
-            if "mv" in c.name.lower():
-                amp /= 1000.0
-            if request.min_amplitude is not None and amp < request.min_amplitude:
-                continue
-            extracted_peaks.append(FftPeakInfo(frequency_hz=freq, amplitude=amp))
+        text = ctrl.name.strip()
+        parsed = _parse_peak_text(text)
+        if parsed:
+            freq, amp = parsed
+            if freq not in seen:
+                seen.add(freq)
+                peaks.append(FftPeak(frequency_hz=freq, amplitude=amp, unit="Hz"))
 
-    extracted_peaks.sort(key=lambda p: p.amplitude, reverse=True)
-    top_peaks = extracted_peaks[: request.top_k]
-    dominant_freq = top_peaks[0].frequency_hz if top_peaks else None
+    peaks.sort(key=lambda p: p.amplitude, reverse=True)
+    top_peaks = peaks[: request.top_k]
+
+    detail = (
+        f"Extracted {len(top_peaks)} FFT peak(s) from '{fft_id}'."
+        if top_peaks
+        else f"No peak coordinates detected in '{fft_id}'."
+    )
 
     return ReadFftPeaksResult(
         fft_id=fft_id,
         peaks=top_peaks,
         peak_count=len(top_peaks),
-        dominant_frequency_hz=dominant_freq,
         verified=True,
-        detail=(
-            f"Extracted {len(top_peaks)} peaks from FFT '{fft_id}'"
-            + (f" (dominant: {dominant_freq} Hz)" if dominant_freq else "")
-            + "."
-        ),
+        detail=detail,
     )

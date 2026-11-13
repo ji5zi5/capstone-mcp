@@ -15,7 +15,7 @@ from capstone_mcp.data_sources import (
     list_source_datasets,
 )
 from capstone_mcp.data_sources.adapters.csv_file import read_csv_all_columns
-from capstone_mcp.table_display import ReadTableResult
+from capstone_mcp.displays import ReadTableResult
 
 
 def test_data_series_creation() -> None:

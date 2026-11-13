@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from capstone_mcp.desktop import AutomationError, Capstone
-from capstone_mcp.digits_display import (
+from capstone_mcp.displays import (
     CreateDigitsRequest,
     CreateDigitsResult,
     create_digits,

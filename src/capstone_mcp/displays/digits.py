@@ -106,11 +106,10 @@ def _extract_digits_value_and_unit(
 
         # Unit candidate (short text like 'm/s', 'N', 'V', 'Hz')
         if (
-            len(text) <= MAX_UNIT_STR_LEN
-            and not FLOAT_PATTERN.match(text)
-            and any(ch.isalpha() for ch in text)
-            and "digits" not in text.lower()
+            c.control_type in ("Text", "Custom")
+            and len(text) <= MAX_UNIT_STR_LEN
             and "select" not in text.lower()
+            and not found_unit
         ):
             found_unit = text
 
@@ -121,7 +120,7 @@ def create_digits(
     app: Capstone,
     request: CreateDigitsRequest | None = None,
 ) -> CreateDigitsResult:
-    """Insert a Digits display widget on the active page and select measurement."""
+    """Insert a Digits display into the active page and bind target measurement."""
     if request is None:
         request = CreateDigitsRequest()
 
@@ -129,51 +128,53 @@ def create_digits(
         msg = "Digits display creation requires allow_foreground=true."
         raise AutomationError(msg)
 
-    # 1. Inspect window snapshot
+    # 1. Locate and activate Digits palette item
     snapshot = app.snapshot(request.handle, depth=16, limit=10_000)
+    palette_item = _find_digits_palette_item(snapshot.controls)
 
-    # 2. Find and double-click Digits palette item
-    try:
-        palette_item = _find_digits_palette_item(snapshot.controls)
-        click_control(
-            app,
-            request.handle,
-            palette_item,
-            double=True,
-            allow_foreground=request.allow_foreground,
-        )
-    except AutomationError:
-        pass
-
-    # 3. Re-snapshot to find newly created Digits widget
-    post_snapshot = app.snapshot(request.handle, depth=16, limit=10_000)
-    digits_ctrl = _find_digits_control(post_snapshot.controls, request.digits_name)
-
-    result_name = digits_ctrl.name or request.digits_name or "Digits"
-    val, unit = _extract_digits_value_and_unit(post_snapshot.controls, digits_ctrl)
-
-    # 4. If measurement binding requested, click selector
-    if request.measurement:
-        selector = _find_measurement_selector(post_snapshot.controls, digits_ctrl)
-        if selector:
-            click_control(
-                app,
-                request.handle,
-                selector,
-                double=False,
-                allow_foreground=request.allow_foreground,
-            )
-
-    detail = (
-        f"Inserted Digits display '{result_name}'"
-        + (f" with measurement '{request.measurement}'" if request.measurement else "")
-        + (f" (current: {val} {unit or ''})".strip() if val is not None else "")
-        + "."
+    click_control(
+        app,
+        request.handle,
+        palette_item,
+        double=True,
+        allow_foreground=True,
     )
+
+    # 2. Take fresh snapshot to locate the inserted Digits display
+    snapshot = app.snapshot(request.handle, depth=16, limit=10_000)
+    digits_ctrl = _find_digits_control(snapshot.controls, request.digits_name)
+
+    # 3. Bind measurement if requested
+    if request.measurement:
+        selector = _find_measurement_selector(snapshot.controls, digits_ctrl)
+        if selector:
+            click_control(app, request.handle, selector, allow_foreground=True)
+            applied = False
+            with contextlib.suppress(Exception):
+                node = app.control(selector.ref)
+                if hasattr(node, "iface_value") and node.iface_value:
+                    node.iface_value.SetValue(request.measurement)
+                    applied = True
+
+            if not applied and hasattr(app, "keys"):
+                with contextlib.suppress(Exception):
+                    app.keys(request.handle, request.measurement + "{ENTER}")
+
+            # Re-snapshot to reflect updated binding
+            snapshot = app.snapshot(request.handle, depth=16, limit=10_000)
+            digits_ctrl = _find_digits_control(snapshot.controls, request.digits_name)
+
+    # 4. Read bound numerical value and unit
+    val, unit = _extract_digits_value_and_unit(snapshot.controls, digits_ctrl)
+
+    d_name = request.digits_name or digits_ctrl.name or "Digits"
+    meas_info = f" bound to '{request.measurement}'" if request.measurement else ""
+    val_info = f" with value {val} {unit or ''}".rstrip() if val is not None else ""
+    detail = f"Digits display '{d_name}' created{meas_info}{val_info}."
 
     return CreateDigitsResult(
         created=True,
-        digits_name=result_name,
+        digits_name=d_name,
         measurement=request.measurement,
         current_value=val,
         unit=unit,
