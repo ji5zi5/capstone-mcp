@@ -799,6 +799,31 @@ def data_analysis_workflow(
 
 
 @MCP.prompt()
+def display_layout_workflow(
+    page_title: str = "New Analysis",
+    layout: str = "two_vertical",
+    target_measurements: str = "Time, Position",
+) -> str:
+    """Guided prompt template for workbook page creation and multi-display layout."""
+    return (
+        f"Please execute a workbook display layout workflow for '{page_title}' "
+        "in PASCO Capstone:\n"
+        "1. Check existing workbook pages and display widgets via the "
+        "capstone://displays/active resource.\n"
+        f"2. Add a new workbook page tab titled '{page_title}' using "
+        f"capstone_manage_display(action='add_page', title='{page_title}').\n"
+        f"3. Apply the desired grid split layout template '{layout}' using "
+        f"capstone_manage_display(action='set_page_layout', layout='{layout}').\n"
+        "4. Insert appropriate display widgets into layout placeholders: "
+        "use capstone_manage_display with 'create_digits', 'create_table', "
+        "'create_graph', 'create_scope', or 'create_fft'.\n"
+        f"5. Bind target measurements ({target_measurements}) to display axes, "
+        "columns, or readout channels.\n"
+        "6. Verify the active display layout visually or via capstone_snapshot."
+    )
+
+
+@MCP.prompt()
 def run_comparison_workflow(
     run1: str = "Run #1",
     run2: str = "Run #2",
@@ -887,6 +912,21 @@ def format_tool_error(error_message: str) -> ToolErrorPayload:
         remediation = (
             "Verify graph display exists using capstone_manage_graph(action='read') "
             "or snapshot."
+        )
+    elif (
+        "display" in lower
+        or "digits" in lower
+        or "table" in lower
+        or "scope" in lower
+        or "fft" in lower
+        or "page" in lower
+        or "layout" in lower
+        or "workbook" in lower
+    ):
+        code = "DISPLAY_ERROR"
+        remediation = (
+            "Verify display widget container and workbook layout via "
+            "capstone://displays/active or reconfigure using capstone_manage_display."
         )
     elif (
         "sensor" in lower
@@ -1001,6 +1041,7 @@ __all__ = [
     "capstone_tutor_guide_step",
     "capstone_tutor_lessons_resource",
     "data_analysis_workflow",
+    "display_layout_workflow",
     "format_tool_error",
     "hardware_setup_workflow",
     "http_main",
