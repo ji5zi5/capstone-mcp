@@ -66,3 +66,25 @@ def test_inventory_still_requires_sensors_and_measurements(
     # When / Then
     with pytest.raises(ValueError, match="measurements"):
         _ = bridge.read_inventory(9223)
+
+
+def test_read_inventory_uses_default_debug_port(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Given: default port 9222
+    captured_port: list[int] = []
+
+    def mock_eval(port: int, _expression: str) -> JsonValue:
+        captured_port.append(port)
+        return {
+            "measurements": [],
+            "sensors": [],
+        }
+
+    monkeypatch.setattr(bridge, "evaluate", mock_eval)
+    # When
+    inv = bridge.read_inventory()
+    # Then
+    assert captured_port == [9222]
+    assert inv.sensors == []
+

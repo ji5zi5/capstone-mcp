@@ -15,6 +15,7 @@ from websockets.sync.client import connect
 from capstone_mcp.models import Model
 
 LOGGER: Final = logging.getLogger(__name__)
+DEFAULT_PORT: Final = 9222
 REQUEST_TIMEOUT: Final = 15.0
 TARGET_SUFFIX: Final = "/Capstone/Resources/www/index.html"
 
@@ -92,7 +93,7 @@ def log_request(request: httpx2.Request) -> None:
     LOGGER.debug("Capstone discovery %s %s", request.method, request.url)
 
 
-def discover_target(port: int) -> DebugTarget:
+def discover_target(port: int = DEFAULT_PORT) -> DebugTarget:
     """Resolve exactly one Capstone page on the explicit loopback debug port."""
     transport = httpx2.HTTPTransport(
         http2=True,
@@ -115,7 +116,7 @@ def discover_target(port: int) -> DebugTarget:
         targets = TypeAdapter(list[DebugTarget]).validate_json(response.content)
     matches = [
         target for target in targets
-        if target.type == "page" and target.url.endswith(TARGET_SUFFIX)
+        if target.type == "page" and target.url.lower().endswith(TARGET_SUFFIX.lower())
     ]
     if len(matches) != 1:
         msg = "Expected one Capstone Sense and Control page on the debug port."
@@ -171,7 +172,7 @@ def evaluate(port: int, expression: str) -> JsonValue:
             return result.result.value
 
 
-def read_inventory(port: int) -> NativeInventory:
+def read_inventory(port: int = DEFAULT_PORT) -> NativeInventory:
     """Read actual sensor and measurement metadata from the running application."""
     result = evaluate(
         port,
