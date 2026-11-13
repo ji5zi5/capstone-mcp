@@ -6,6 +6,7 @@ from typing import Annotated, Any
 
 import anyio
 from mcp.server.fastmcp import FastMCP
+from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from capstone_mcp.automation_models import NativeRequest
@@ -46,7 +47,15 @@ class ExportedData(Model):
 def register_file_tools(mcp: FastMCP, native: NativeCaller) -> dict[str, Any]:
     """Register all file inspection, dataset extraction, and export tools."""
 
-    @mcp.tool()
+    @mcp.tool(
+        annotations=ToolAnnotations(
+            title="Save experiment as .cap",
+            readOnlyHint=False,
+            destructiveHint=False,
+            idempotentHint=False,
+            openWorldHint=False,
+        ),
+    )
     async def capstone_save_experiment(
         handle: int,
         path: str,
@@ -70,7 +79,15 @@ def register_file_tools(mcp: FastMCP, native: NativeCaller) -> dict[str, Any]:
             ),
         )
 
-    @mcp.tool()
+    @mcp.tool(
+        annotations=ToolAnnotations(
+            title="Open experiment file",
+            readOnlyHint=False,
+            destructiveHint=True,
+            idempotentHint=False,
+            openWorldHint=False,
+        ),
+    )
     async def capstone_open_experiment(
         handle: int,
         path: str,
@@ -99,7 +116,15 @@ def register_file_tools(mcp: FastMCP, native: NativeCaller) -> dict[str, Any]:
             ),
         )
 
-    @mcp.tool()
+    @mcp.tool(
+        annotations=ToolAnnotations(
+            title="Export data to CSV",
+            readOnlyHint=False,
+            destructiveHint=False,
+            idempotentHint=False,
+            openWorldHint=False,
+        ),
+    )
     async def capstone_export_data(
         handle: int,
         path: str,
@@ -130,7 +155,15 @@ def register_file_tools(mcp: FastMCP, native: NativeCaller) -> dict[str, Any]:
         )
         return ExportedData(artifact=artifact, data=data)
 
-    @mcp.tool()
+    @mcp.tool(
+        annotations=ToolAnnotations(
+            title="Read CSV page",
+            readOnlyHint=True,
+            destructiveHint=False,
+            idempotentHint=True,
+            openWorldHint=False,
+        ),
+    )
     async def capstone_csv_page(
         path: str,
         offset: Annotated[int, Field(ge=0)] = 0,
@@ -141,7 +174,15 @@ def register_file_tools(mcp: FastMCP, native: NativeCaller) -> dict[str, Any]:
             read_csv_page, path, offset, limit,
         )
 
-    @mcp.tool()
+    @mcp.tool(
+        annotations=ToolAnnotations(
+            title="Inspect .cap file configuration",
+            readOnlyHint=True,
+            destructiveHint=False,
+            idempotentHint=True,
+            openWorldHint=False,
+        ),
+    )
     def capstone_inspect_file(
         path: str,
         sections: list[CapSection] | None = None,
@@ -159,7 +200,15 @@ def register_file_tools(mcp: FastMCP, native: NativeCaller) -> dict[str, Any]:
         """
         return select_configuration(read_cap_configuration(path), sections)
 
-    @mcp.tool()
+    @mcp.tool(
+        annotations=ToolAnnotations(
+            title="List datasets in .cap file",
+            readOnlyHint=True,
+            destructiveHint=False,
+            idempotentHint=True,
+            openWorldHint=False,
+        ),
+    )
     def capstone_file_datasets(path: str) -> list[CapDatasetSummary]:
         """List decodable saved datasets with source IDs, unit IDs and sample counts.
 
@@ -185,7 +234,15 @@ def register_file_tools(mcp: FastMCP, native: NativeCaller) -> dict[str, Any]:
             for index, dataset in enumerate(extract_cap_datasets(path))
         ]
 
-    @mcp.tool()
+    @mcp.tool(
+        annotations=ToolAnnotations(
+            title="Extract dataset samples",
+            readOnlyHint=True,
+            destructiveHint=False,
+            idempotentHint=True,
+            openWorldHint=False,
+        ),
+    )
     def capstone_extract_dataset(
         path: str,
         dataset_index: Annotated[int, Field(ge=0)],
@@ -227,7 +284,15 @@ def register_file_tools(mcp: FastMCP, native: NativeCaller) -> dict[str, Any]:
             independent_kind=dataset.independent_kind,
         )
 
-    @mcp.tool()
+    @mcp.tool(
+        annotations=ToolAnnotations(
+            title="Fit datasets from file",
+            readOnlyHint=True,
+            destructiveHint=False,
+            idempotentHint=True,
+            openWorldHint=False,
+        ),
+    )
     def capstone_fit_file(
         path: str,
         request: CapLinearFitRequest,
@@ -235,7 +300,15 @@ def register_file_tools(mcp: FastMCP, native: NativeCaller) -> dict[str, Any]:
         """Extract and fit two explicit saved datasets, returning their full provenance."""
         return fit_cap_datasets(path, request)
 
-    @mcp.tool()
+    @mcp.tool(
+        annotations=ToolAnnotations(
+            title="Compare datasets from file",
+            readOnlyHint=True,
+            destructiveHint=False,
+            idempotentHint=True,
+            openWorldHint=False,
+        ),
+    )
     def capstone_compare_file(
         path: str,
         request: CapRunComparisonRequest,

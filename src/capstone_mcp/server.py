@@ -4,11 +4,12 @@
 import base64
 import json
 from collections.abc import AsyncGenerator
-from contextlib import asynccontextmanager, nullcontext
+from contextlib import asynccontextmanager, nullcontext, suppress
 from typing import Annotated, Final
 
 import anyio
 from mcp.server.fastmcp import FastMCP, Image
+from mcp.types import ToolAnnotations
 from pydantic import Field, JsonValue, TypeAdapter
 
 from capstone_mcp.agent_instructions import INSTRUCTIONS, guide
@@ -71,7 +72,15 @@ MCP: Final = FastMCP(
 # ---------------------------------------------------------------------------
 
 
-@MCP.tool()
+@MCP.tool(
+    annotations=ToolAnnotations(
+        title="Attach to installed Capstone",
+        readOnlyHint=False,
+        destructiveHint=False,
+        idempotentHint=False,
+        openWorldHint=False,
+    ),
+)
 async def capstone_attach(
     *,
     launch: bool = False,
@@ -90,7 +99,15 @@ async def capstone_attach(
     )
 
 
-@MCP.tool()
+@MCP.tool(
+    annotations=ToolAnnotations(
+        title="List Capstone windows",
+        readOnlyHint=True,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=False,
+    ),
+)
 async def capstone_windows() -> list[Window]:
     """List Capstone windows, including file dialogs and modal dialogs."""
     return WINDOWS.validate_python(
@@ -98,7 +115,15 @@ async def capstone_windows() -> list[Window]:
     )
 
 
-@MCP.tool()
+@MCP.tool(
+    annotations=ToolAnnotations(
+        title="Inspect window controls and action references",
+        readOnlyHint=True,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=False,
+    ),
+)
 async def capstone_snapshot(
     handle: int,
     depth: Annotated[int, Field(ge=1, le=30)] = 12,
@@ -128,7 +153,15 @@ async def capstone_snapshot(
     )
 
 
-@MCP.tool()
+@MCP.tool(
+    annotations=ToolAnnotations(
+        title="Perform UI action on control",
+        readOnlyHint=False,
+        destructiveHint=False,
+        idempotentHint=False,
+        openWorldHint=False,
+    ),
+)
 async def capstone_action(
     ref: str,
     action: Action,
@@ -153,7 +186,15 @@ async def capstone_action(
     )
 
 
-@MCP.tool()
+@MCP.tool(
+    annotations=ToolAnnotations(
+        title="Read control value pattern text",
+        readOnlyHint=True,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=False,
+    ),
+)
 async def capstone_read_value(ref: str) -> str:
     """Read literal current text from a control's UIA Value pattern."""
     return TEXT.validate_python(
@@ -166,7 +207,15 @@ async def capstone_read_value(ref: str) -> str:
     )
 
 
-@MCP.tool()
+@MCP.tool(
+    annotations=ToolAnnotations(
+        title="Set control value pattern text",
+        readOnlyHint=False,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=False,
+    ),
+)
 async def capstone_set_value(ref: str, value: str) -> Result:
     """Set literal text in a control supporting the UIA Value pattern."""
     return Result.model_validate(
@@ -181,7 +230,15 @@ async def capstone_set_value(ref: str, value: str) -> Result:
     )
 
 
-@MCP.tool()
+@MCP.tool(
+    annotations=ToolAnnotations(
+        title="Capture window pixels",
+        readOnlyHint=True,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=False,
+    ),
+)
 async def capstone_screenshot(
     handle: int,
     *,
@@ -205,7 +262,15 @@ async def capstone_screenshot(
     return Image(data=base64.b64decode(encoded, validate=True), format="png")
 
 
-@MCP.tool()
+@MCP.tool(
+    annotations=ToolAnnotations(
+        title="Click window pixels",
+        readOnlyHint=False,
+        destructiveHint=False,
+        idempotentHint=False,
+        openWorldHint=False,
+    ),
+)
 async def capstone_click(
     handle: int,
     point: Point,
@@ -230,7 +295,15 @@ async def capstone_click(
     )
 
 
-@MCP.tool()
+@MCP.tool(
+    annotations=ToolAnnotations(
+        title="Drag between window coordinates",
+        readOnlyHint=False,
+        destructiveHint=False,
+        idempotentHint=False,
+        openWorldHint=False,
+    ),
+)
 async def capstone_drag(
     handle: int,
     start: Point,
@@ -253,7 +326,15 @@ async def capstone_drag(
     )
 
 
-@MCP.tool()
+@MCP.tool(
+    annotations=ToolAnnotations(
+        title="Scroll at window coordinates",
+        readOnlyHint=False,
+        destructiveHint=False,
+        idempotentHint=False,
+        openWorldHint=False,
+    ),
+)
 async def capstone_scroll(
     handle: int,
     point: Point,
@@ -276,7 +357,15 @@ async def capstone_scroll(
     )
 
 
-@MCP.tool()
+@MCP.tool(
+    annotations=ToolAnnotations(
+        title="Send pywinauto keyboard shortcuts",
+        readOnlyHint=False,
+        destructiveHint=False,
+        idempotentHint=False,
+        openWorldHint=False,
+    ),
+)
 async def capstone_keys(
     handle: int,
     keys: str,
@@ -297,7 +386,15 @@ async def capstone_keys(
     )
 
 
-@MCP.tool()
+@MCP.tool(
+    annotations=ToolAnnotations(
+        title="Type literal text into focused control",
+        readOnlyHint=False,
+        destructiveHint=False,
+        idempotentHint=False,
+        openWorldHint=False,
+    ),
+)
 async def capstone_type_text(
     handle: int,
     text: str,
@@ -360,21 +457,47 @@ capstone_tutor_guide_step = _physics_tools["capstone_tutor_guide_step"]
 @MCP.resource("capstone://status")
 async def capstone_status_resource() -> str:
     """Return JSON status of the local Capstone application and connection."""
-    windows_json = await _native(
-        NativeRequest(operation="windows"), mutates=False,
-    )
-    recording_json = await _native(
-        NativeRequest(operation="recording_status"),
-        mutates=False,
-    )
+    windows_json: JsonValue = []
+    recording_json: JsonValue = None
+    if not WORKER.retired and WORKER.process_id:
+        with suppress(Exception):
+            windows_json = await _native(
+                NativeRequest(operation="windows"), mutates=False,
+            )
+            recording_json = await _native(
+                NativeRequest(operation="recording_status"),
+                mutates=False,
+            )
     status_doc = {
         "server": "capstone-mcp",
         "version": "0.1.0",
+        "attached": not WORKER.retired and bool(WORKER.process_id),
         "worker_retired": WORKER.retired,
+        "process_id": WORKER.process_id,
+        "windows_count": len(windows_json) if isinstance(windows_json, list) else 0,
+        "active_jobs_count": len(JOBS.jobs),
         "windows": windows_json,
         "recording": recording_json,
+        "last_graph_failure": (
+            WORKER.last_graph_failure.model_dump()
+            if WORKER.last_graph_failure
+            else None
+        ),
     }
     return JSON_VALUE.dump_json(status_doc, indent=2).decode("utf-8")
+
+
+@MCP.resource("capstone://runs/active")
+async def capstone_active_runs_resource() -> str:
+    """Return real-time active runs and experiment metadata from Capstone."""
+    runs_info = {
+        "process_id": WORKER.process_id,
+        "active_jobs": [
+            {"job_id": jid, "state": job.observe().text}
+            for jid, job in JOBS.jobs.items()
+        ],
+    }
+    return json.dumps(runs_info, indent=2)
 
 
 @MCP.resource("capstone://guide")

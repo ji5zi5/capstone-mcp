@@ -51,6 +51,11 @@ class AutomationWorker:
         self.uncertain: bool = False
         self.last_graph_failure: GraphFailure | None = None
 
+    @property
+    def process_id(self) -> int | None:
+        """Return the native worker process ID if currently running."""
+        return self.process.pid if self.process is not None else None
+
     def _spawn(self) -> subprocess.Popen[str]:
         """Launch the fixed native bootstrap; test backends replace this boundary."""
         return subprocess.Popen(
