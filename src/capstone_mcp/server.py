@@ -4,11 +4,13 @@
 import base64
 import json
 import re
+import time
 from collections.abc import AsyncGenerator, Sequence
 from contextlib import asynccontextmanager, nullcontext, suppress
 from typing import Annotated, Any, Final, Literal
 
 import anyio
+import httpx2
 from mcp.server.fastmcp import FastMCP, Image
 from mcp.server.fastmcp.exceptions import ToolError
 from mcp.types import (
@@ -35,6 +37,7 @@ from capstone_mcp.models import (
 )
 from capstone_mcp.repetition import AcquisitionJobs, JobStatus
 from capstone_mcp.runs import register_run_tools
+from capstone_mcp.session import UnifiedSessionManager
 from capstone_mcp.tools import (
     register_display_tools,
     register_file_tools,
@@ -679,6 +682,53 @@ async def capstone_hardware_inventory_resource() -> str:
                 if isinstance(sw, dict) and "sensors" in sw:
                     inventory_doc["wireless_devices"] = sw["sensors"]
     return JSON_VALUE.dump_json(inventory_doc, indent=2).decode("utf-8")
+
+
+@MCP.resource("capstone://measurements/live")
+async def capstone_live_measurements_resource() -> str:
+    """Return real-time live sensor measurements via CDP WebSocket fast-path."""
+    session_mgr = UnifiedSessionManager(WORKER)
+    doc: dict[str, JsonValue] = {
+        "status": "disconnected",
+        "process_id": WORKER.process_id,
+        "debug_port": session_mgr.debug_port,
+        "timestamp": time.time(),
+        "sensors": [],
+        "measurements": [],
+    }
+
+    try:
+        inv = session_mgr.read_live_inventory()
+        doc["status"] = "connected"
+        doc["sensors"] = inv.sensors
+        measurements_data: list[JsonValue] = []
+        for m in inv.measurements:
+            if isinstance(m, dict):
+                euid = str(m.get("MeasurementEUID", ""))
+                name = str(m.get("MeasurementName", "Unknown"))
+                unit = str(m.get("Unit", ""))
+                val_entry: dict[str, JsonValue] = {
+                    "euid": euid,
+                    "name": name,
+                    "unit": unit,
+                    "value": None,
+                }
+                if euid:
+                    with suppress(
+                        httpx2.HTTPError,
+                        RuntimeError,
+                        OSError,
+                        ValueError,
+                        TimeoutError,
+                    ):
+                        val_entry["value"] = session_mgr.read_live_measurement(euid)
+                measurements_data.append(val_entry)
+        doc["measurements"] = measurements_data
+    except (httpx2.HTTPError, RuntimeError, OSError, ValueError, TimeoutError) as exc:
+        doc["error"] = str(exc)
+
+    return JSON_VALUE.dump_json(doc, indent=2).decode("utf-8")
+
 
 
 _DISPLAY_KIND_MAP: Final = (

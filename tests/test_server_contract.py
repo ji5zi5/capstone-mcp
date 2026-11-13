@@ -144,6 +144,7 @@ async def test_dynamic_resources_contract() -> None:
     assert "capstone://runs/active" in resources
     assert "capstone://hardware/inventory" in resources
     assert "capstone://displays/active" in resources
+    assert "capstone://measurements/live" in resources
 
     # Status resource read
     status_raw = await server.capstone_status_resource()
@@ -182,6 +183,14 @@ async def test_dynamic_resources_contract() -> None:
     assert "graph_count" in disp
     assert "digits_count" in disp
     assert "scope_count" in disp
+
+    # Live measurements resource read
+    live_raw = await server.capstone_live_measurements_resource()
+    live = json.loads(live_raw)
+    assert "status" in live
+    assert "sensors" in live
+    assert "measurements" in live
+
     assert "fft_count" in disp
 
 
