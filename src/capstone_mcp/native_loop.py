@@ -53,6 +53,25 @@ from capstone_mcp.graphs import (
     set_graph_fits,
     toggle_graph_statistics,
 )
+from capstone_mcp.instruments import (
+    CalibrateSensorRequest,
+    ConditionSpec,
+    ConnectWirelessSensorRequest,
+    InstrumentAction,
+    InstrumentRequest,
+    KeepSampleRequest,
+    SamplingRateRequest,
+    ScanWirelessSensorsRequest,
+    SensorConfiguration,
+    SensorSelectionRequest,
+    SetRecordingConditionRequest,
+    SetSamplingModeRequest,
+    SetSignalGeneratorRequest,
+    ZeroSensorRequest,
+    manage_instrument,
+    select_sensor,
+    target_sampling_rate,
+)
 from capstone_mcp.models import Point, Result
 from capstone_mcp.oscilloscope_fft import (
     CreateFftRequest,
@@ -73,29 +92,6 @@ from capstone_mcp.runs import (
     rename_run,
     set_run_visibility,
 )
-from capstone_mcp.sensor_settings import (
-    SamplingRateRequest,
-    SensorConfiguration,
-    SensorSelectionRequest,
-    select_sensor,
-    target_sampling_rate,
-)
-from capstone_mcp.sensor_zero import ZeroSensorRequest, zero_sensor
-from capstone_mcp.signal_generator import (
-    ReadSignalGeneratorStatusRequest,
-    SetSignalGeneratorRequest,
-    read_signal_generator_status,
-    set_signal_generator,
-)
-from capstone_mcp.smart_triggers import (
-    ConditionSpec,
-    KeepSampleRequest,
-    SetRecordingConditionRequest,
-    SetSamplingModeRequest,
-    keep_sample,
-    set_recording_condition,
-    set_sampling_mode,
-)
 from capstone_mcp.table_display import (
     CreateTableRequest,
     ReadTableRequest,
@@ -103,14 +99,6 @@ from capstone_mcp.table_display import (
     create_table,
     read_table,
     set_table_columns,
-)
-from capstone_mcp.wireless_calibration import (
-    CalibrateSensorRequest,
-    ConnectWirelessSensorRequest,
-    ScanWirelessSensorsRequest,
-    calibrate_sensor,
-    connect_wireless_sensor,
-    scan_wireless_sensors,
 )
 from capstone_mcp.workbook_layout import (
     AddPageRequest,
@@ -259,6 +247,12 @@ class NativeDesktop:
                     GraphRequest.model_validate(r.graph_request),
                 ),
             ),
+            "manage_instrument": lambda r: _json(
+                manage_instrument(
+                    self.app,
+                    InstrumentRequest.model_validate(r.instrument_request),
+                ),
+            ),
             "create_graph": lambda r: _json(
                 create_graph(
                     self.app,
@@ -342,14 +336,17 @@ class NativeDesktop:
                 ),
             ),
             "zero_sensor": lambda r: _json(
-                zero_sensor(
+                manage_instrument(
                     self.app,
-                    ZeroSensorRequest(
-                        handle=r.handle,
-                        sensor_name=r.sensor_name,
-                        allow_foreground=r.allow_foreground,
+                    InstrumentRequest(
+                        action=InstrumentAction.ZERO_SENSOR,
+                        zero_sensor=ZeroSensorRequest(
+                            handle=r.handle,
+                            sensor_name=r.sensor_name,
+                            allow_foreground=r.allow_foreground,
+                        ),
                     ),
-                ),
+                ).zero_sensor,  # type: ignore[arg-type]
             ),
             "create_table": lambda r: _json(
                 create_table(
@@ -443,31 +440,38 @@ class NativeDesktop:
                 ),
             ),
             "set_signal_generator": lambda r: _json(
-                set_signal_generator(
+                manage_instrument(
                     self.app,
-                    SetSignalGeneratorRequest(
-                        handle=r.handle,
-                        waveform=r.waveform,
-                        frequency=r.frequency,
-                        amplitude=r.amplitude,
-                        enabled=r.enabled,
-                        generator_name=r.generator_name,
-                        allow_foreground=r.allow_foreground,
-                        keep_open=r.keep_open,
-                    ),
-                ),
-            ),
-            "read_signal_generator_status": (
-                lambda r: _json(
-                    read_signal_generator_status(
-                        self.app,
-                        ReadSignalGeneratorStatusRequest(
+                    InstrumentRequest(
+                        action=InstrumentAction.CONFIGURE_SIGNAL_GENERATOR,
+                        configure_signal_generator=SetSignalGeneratorRequest(
                             handle=r.handle,
+                            waveform=r.waveform,
+                            frequency=r.frequency,
+                            amplitude=r.amplitude,
+                            enabled=r.enabled,
                             generator_name=r.generator_name,
                             allow_foreground=r.allow_foreground,
                             keep_open=r.keep_open,
                         ),
                     ),
+                ).configure_signal_generator,  # type: ignore[arg-type]
+            ),
+            "read_signal_generator_status": (
+                lambda r: _json(
+                    manage_instrument(
+                        self.app,
+                        InstrumentRequest(
+                            action=InstrumentAction.CONFIGURE_SIGNAL_GENERATOR,
+                            configure_signal_generator=SetSignalGeneratorRequest(
+                                handle=r.handle,
+                                generator_name=r.generator_name,
+                                allow_foreground=r.allow_foreground,
+                                keep_open=r.keep_open,
+                                read_only=True,
+                            ),
+                        ),
+                    ).configure_signal_generator,  # type: ignore[arg-type]
                 )
             ),
             "create_scope": lambda r: _json(
@@ -518,82 +522,100 @@ class NativeDesktop:
                 ),
             ),
             "set_recording_condition": lambda r: _json(
-                set_recording_condition(
+                manage_instrument(
                     self.app,
-                    SetRecordingConditionRequest(
-                        handle=r.handle,
-                        start_condition=(
-                            ConditionSpec.model_validate(r.start_condition)
-                            if r.start_condition is not None
-                            else None
+                    InstrumentRequest(
+                        action=InstrumentAction.SET_RECORDING_CONDITION,
+                        set_recording_condition=SetRecordingConditionRequest(
+                            handle=r.handle,
+                            start_condition=(
+                                ConditionSpec.model_validate(r.start_condition)
+                                if r.start_condition is not None
+                                else None
+                            ),
+                            stop_condition=(
+                                ConditionSpec.model_validate(r.stop_condition)
+                                if r.stop_condition is not None
+                                else None
+                            ),
+                            allow_foreground=r.allow_foreground,
+                            keep_open=r.keep_open,
                         ),
-                        stop_condition=(
-                            ConditionSpec.model_validate(r.stop_condition)
-                            if r.stop_condition is not None
-                            else None
-                        ),
-                        allow_foreground=r.allow_foreground,
-                        keep_open=r.keep_open,
                     ),
-                ),
+                ).set_recording_condition,  # type: ignore[arg-type]
             ),
             "set_sampling_mode": lambda r: _json(
-                set_sampling_mode(
+                manage_instrument(
                     self.app,
-                    SetSamplingModeRequest(
-                        handle=r.handle,
-                        mode=r.sampling_mode,  # type: ignore[arg-type]
-                        allow_foreground=r.allow_foreground,
+                    InstrumentRequest(
+                        action=InstrumentAction.SET_SAMPLING_MODE,
+                        set_sampling_mode=SetSamplingModeRequest(
+                            handle=r.handle,
+                            mode=r.sampling_mode,  # type: ignore[arg-type]
+                            allow_foreground=r.allow_foreground,
+                        ),
                     ),
-                ),
+                ).set_sampling_mode,  # type: ignore[arg-type]
             ),
             "keep_sample": lambda r: _json(
-                keep_sample(
+                manage_instrument(
                     self.app,
-                    KeepSampleRequest(
-                        handle=r.handle,
-                        value=r.sample_value,
-                        variable_name=r.variable_name,
-                        allow_foreground=r.allow_foreground,
+                    InstrumentRequest(
+                        action=InstrumentAction.KEEP_SAMPLE,
+                        keep_sample=KeepSampleRequest(
+                            handle=r.handle,
+                            value=r.sample_value,
+                            variable_name=r.variable_name,
+                            allow_foreground=r.allow_foreground,
+                        ),
                     ),
-                ),
+                ).keep_sample,  # type: ignore[arg-type]
             ),
             "scan_wireless_sensors": lambda r: _json(
-                scan_wireless_sensors(
+                manage_instrument(
                     self.app,
-                    ScanWirelessSensorsRequest(
-                        handle=r.handle,
-                        timeout_seconds=r.timeout_seconds,
-                        allow_foreground=r.allow_foreground,
-                        keep_open=r.keep_open,
+                    InstrumentRequest(
+                        action=InstrumentAction.SCAN_WIRELESS,
+                        scan_wireless=ScanWirelessSensorsRequest(
+                            handle=r.handle,
+                            timeout_seconds=r.timeout_seconds,
+                            allow_foreground=r.allow_foreground,
+                            keep_open=r.keep_open,
+                        ),
                     ),
-                ),
+                ).scan_wireless,  # type: ignore[arg-type]
             ),
             "connect_wireless_sensor": lambda r: _json(
-                connect_wireless_sensor(
+                manage_instrument(
                     self.app,
-                    ConnectWirelessSensorRequest(
-                        handle=r.handle,
-                        sensor_id=r.sensor_id,
-                        allow_foreground=r.allow_foreground,
-                        keep_open=r.keep_open,
+                    InstrumentRequest(
+                        action=InstrumentAction.CONNECT_WIRELESS,
+                        connect_wireless=ConnectWirelessSensorRequest(
+                            handle=r.handle,
+                            sensor_id=r.sensor_id,
+                            allow_foreground=r.allow_foreground,
+                            keep_open=r.keep_open,
+                        ),
                     ),
-                ),
+                ).connect_wireless,  # type: ignore[arg-type]
             ),
             "calibrate_sensor": lambda r: _json(
-                calibrate_sensor(
+                manage_instrument(
                     self.app,
-                    CalibrateSensorRequest(
-                        handle=r.handle,
-                        sensor_name=r.sensor_name or "",
-                        measurement_type=r.measurement_type,
-                        calibration_type=r.calibration_type,
-                        standard_1=r.standard_1,
-                        standard_2=r.standard_2,
-                        allow_foreground=r.allow_foreground,
-                        keep_open=r.keep_open,
+                    InstrumentRequest(
+                        action=InstrumentAction.CALIBRATE_SENSOR,
+                        calibrate_sensor=CalibrateSensorRequest(
+                            handle=r.handle,
+                            sensor_name=r.sensor_name or "",
+                            measurement_type=r.measurement_type,
+                            calibration_type=r.calibration_type,
+                            standard_1=r.standard_1,
+                            standard_2=r.standard_2,
+                            allow_foreground=r.allow_foreground,
+                            keep_open=r.keep_open,
+                        ),
                     ),
-                ),
+                ).calibrate_sensor,  # type: ignore[arg-type]
             ),
             "add_page": lambda r: _json(
                 add_page(
