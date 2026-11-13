@@ -7,7 +7,7 @@ import contextlib
 from typing import Final
 
 from capstone_mcp.desktop import AutomationError, Capstone
-from capstone_mcp.models import Action, Control
+from capstone_mcp.models import Action, Bounds, Control
 
 DEFAULT_DISPLAY_KEYWORDS: Final[tuple[str, ...]] = (
     "graph",
@@ -33,6 +33,11 @@ PALETTE_ITEM_CONTROL_TYPES: Final[tuple[str, ...]] = (
 )
 
 
+def center_coords(bounds: Bounds) -> tuple[int, int]:
+    """Calculate the integer center coordinate (x, y) of a bounding rectangle."""
+    return ((bounds.left + bounds.right) // 2, (bounds.top + bounds.bottom) // 2)
+
+
 def click_control(
     app: Capstone,
     handle: int,
@@ -49,8 +54,7 @@ def click_control(
     with contextlib.suppress(Exception):
         node = app.control(ctrl.ref)
         if double:
-            b = ctrl.bounds
-            coords = ((b.left + b.right) // 2, (b.top + b.bottom) // 2)
+            coords = center_coords(ctrl.bounds)
             node.click_input(button="left", double=True, coords=coords, absolute=True)
             return
         if hasattr(node, "invoke") and callable(node.invoke):
@@ -76,8 +80,7 @@ def double_click_control(
     with contextlib.suppress(Exception):
         node = app.control(ctrl.ref)
         if hasattr(node, "click_input"):
-            b = ctrl.bounds
-            coords = ((b.left + b.right) // 2, (b.top + b.bottom) // 2)
+            coords = center_coords(ctrl.bounds)
             node.click_input(
                 button="left",
                 double=True,
@@ -108,11 +111,7 @@ def drag_control(
     with contextlib.suppress(Exception):
         node = app.control(source.ref)
         if hasattr(node, "drag_mouse"):
-            dst_b = target.bounds
-            dst_coords = (
-                (dst_b.left + dst_b.right) // 2,
-                (dst_b.top + dst_b.bottom) // 2,
-            )
+            dst_coords = center_coords(target.bounds)
             node.drag_mouse(dst_coords)
             return
 

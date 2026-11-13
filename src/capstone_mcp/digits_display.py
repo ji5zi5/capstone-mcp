@@ -40,24 +40,6 @@ class CreateDigitsResult(Model):
     detail: str = ""
 
 
-def _click(
-    app: Capstone,
-    handle: int,
-    ctrl: Control,
-    *,
-    double: bool = False,
-    allow_foreground: bool = True,
-) -> None:
-    """Deliver a click or double-click compatible with real app and mocks."""
-    click_control(
-        app,
-        handle,
-        ctrl,
-        double=double,
-        allow_foreground=allow_foreground,
-    )
-
-
 def _find_digits_palette_item(controls: list[Control]) -> Control:
     """Find Digits display item in the Displays palette."""
     return find_palette_item(controls, DIGITS_PALETTE_NAME, ".ObjNameDigits")
@@ -163,7 +145,13 @@ def create_digits(
     snapshot = app.snapshot(request.handle, depth=16, limit=10_000)
     palette_item = _find_digits_palette_item(snapshot.controls)
 
-    _click(app, request.handle, palette_item, double=True, allow_foreground=True)
+    click_control(
+        app,
+        request.handle,
+        palette_item,
+        double=True,
+        allow_foreground=True,
+    )
 
     # 2. Take fresh snapshot to locate the inserted Digits display
     snapshot = app.snapshot(request.handle, depth=16, limit=10_000)
@@ -173,7 +161,7 @@ def create_digits(
     if request.measurement:
         selector = _find_measurement_selector(snapshot.controls, digits_ctrl)
         if selector:
-            _click(app, request.handle, selector, allow_foreground=True)
+            click_control(app, request.handle, selector, allow_foreground=True)
             applied = False
             with contextlib.suppress(Exception):
                 node = app.control(selector.ref)

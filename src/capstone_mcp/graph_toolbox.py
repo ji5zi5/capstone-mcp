@@ -8,7 +8,8 @@ from typing import Final
 from pydantic import Field
 
 from capstone_mcp.desktop import AutomationError, Capstone
-from capstone_mcp.models import Action, Control, Model, Point
+from capstone_mcp.displays import click_control
+from capstone_mcp.models import Control, Model, Point
 
 TOOLBAR_SEARCH_HEIGHT_PX: Final = 120
 MIN_COORDINATE_PAIRS: Final = 2
@@ -148,25 +149,6 @@ class GraphDeltaResult(Model):
     graph_name: str | None = None
     verified: bool = True
     detail: str = ""
-
-
-def _click(
-    app: Capstone,
-    handle: int,
-    ctrl: Control,
-    *,
-    allow_foreground: bool = True,
-) -> None:
-    """Deliver a click compatible with real app and mocks."""
-    if hasattr(app, "click"):
-        app.click(handle, ctrl.ref, allow_foreground=allow_foreground)
-        return
-    with contextlib.suppress(Exception):
-        node = app.control(ctrl.ref)
-        if hasattr(node, "invoke") and callable(node.invoke):
-            node.invoke()
-            return
-    app.act(handle, Action.INVOKE, ref=ctrl.ref, allow_foreground=allow_foreground)
 
 
 def _find_graph_control(
@@ -344,7 +326,7 @@ def toggle_graph_statistics(
     stats_btn = _find_toolbar_button(snapshot.controls, graph_ctrl, STATS_KEYWORDS)
 
     # Click toggle button
-    _click(app, request.handle, stats_btn, allow_foreground=True)
+    click_control(app, request.handle, stats_btn, allow_foreground=True)
 
     # Inspect graph overlay for statistics box
     snapshot = app.snapshot(request.handle, depth=16, limit=10_000)
@@ -405,7 +387,7 @@ def measure_graph_area(
     area_btn = _find_toolbar_button(snapshot.controls, graph_ctrl, AREA_KEYWORDS)
 
     # Click toggle button
-    _click(app, request.handle, area_btn, allow_foreground=True)
+    click_control(app, request.handle, area_btn, allow_foreground=True)
 
     # Read area from graph overlay
     snapshot = app.snapshot(request.handle, depth=16, limit=10_000)
@@ -512,7 +494,7 @@ def graph_delta(
     delta_btn = _find_toolbar_button(snapshot.controls, graph_ctrl, DELTA_KEYWORDS)
 
     # Click delta button to activate tool
-    _click(app, request.handle, delta_btn, allow_foreground=True)
+    click_control(app, request.handle, delta_btn, allow_foreground=True)
 
     # If positioning points provided, position crosshairs
     if request.point1 and hasattr(app, "click_point"):

@@ -52,17 +52,6 @@ from capstone_mcp.runs.models import (
 RUN_NAME_PATTERN: Final = re.compile(r"run\s*#?\s*\d+", re.IGNORECASE)
 
 
-def _click_control(
-    app: Capstone,
-    handle: int,
-    ctrl: Control,
-    *,
-    allow_foreground: bool = True,
-) -> None:
-    """Click a control using high-level click helper or act(INVOKE)."""
-    click_control(app, handle, ctrl, allow_foreground=allow_foreground)
-
-
 # ---------------------------------------------------------------------------
 # 1. Run Renaming
 # ---------------------------------------------------------------------------
@@ -181,7 +170,7 @@ def _dismiss_confirmation_dialog(app: Capstone, main_handle: int) -> None:
                 name_lower = ctrl.name.strip().lower()
                 modal_names = ("yes", "ok", "delete", "confirm", "예", "확인", "삭제")
                 if name_lower in modal_names:
-                    _click_control(app, win.handle, ctrl, allow_foreground=True)
+                    click_control(app, win.handle, ctrl, allow_foreground=True)
                     return
 
 
@@ -216,7 +205,7 @@ def delete_run(app: Capstone, request: DeleteRunRequest) -> DeleteRunResult:
         if hasattr(node, "select"):
             node.select()
 
-    _click_control(
+    click_control(
         app,
         request.handle,
         target_control,
@@ -357,7 +346,7 @@ def _set_control_visibility_state(
         return
 
     if not _try_toggle_or_select(node, visible):
-        _click_control(app, handle, ctrl, allow_foreground=True)
+        click_control(app, handle, ctrl, allow_foreground=True)
 
 
 def _resolve_targets(

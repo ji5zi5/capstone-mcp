@@ -33,7 +33,7 @@ Deepen the architecture by applying deep module design principles (small interfa
 
 ### 1. Deep Run Management Module (`src/capstone_mcp/runs/`)
 - Create `src/capstone_mcp/runs/` containing:
-  - `models.py`: Unified `RunAction` enum (`RENAME`, `DELETE`, `SET_VISIBILITY`, `CAPTURE`), `RunRequest`, and `RunResult`.
+  - `models.py`: Unified `RunAction` enum (`RENAME`, `DELETE`, `SET_VISIBILITY`), `RunRequest`, and `RunResult`.
   - `manager.py`: `RunManager` encapsulating TreeItem discovery, regex matching (`run\s*#?\s*\d+`), modal dialog auto-dismissal, and snapshot synchronization.
   - Seam: `manage_run(app: Capstone, request: RunRequest) -> RunResult`
 - Delete shallow files: `src/capstone_mcp/run_rename.py`, `src/capstone_mcp/run_delete.py`, `src/capstone_mcp/run_visibility.py`, `src/capstone_mcp/run_capture.py`.

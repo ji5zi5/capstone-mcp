@@ -21,7 +21,6 @@ class RunAction(StrEnum):
     RENAME = "rename"
     DELETE = "delete"
     SET_VISIBILITY = "set_visibility"
-    CAPTURE = "capture"
 
 
 # ---------------------------------------------------------------------------
@@ -185,7 +184,6 @@ class RunRequest(Model):
     rename: RenameRunRequest | None = None
     delete: DeleteRunRequest | None = None
     visibility: SetRunVisibilityRequest | None = None
-    capture_plan: CapturePlan | None = None
 
 
 class RunResult(Model):
@@ -195,4 +193,3 @@ class RunResult(Model):
     rename: RenameRunResult | None = None
     delete: DeleteRunResult | None = None
     visibility: SetRunVisibilityResult | None = None
-    capture: CaptureResult | None = None

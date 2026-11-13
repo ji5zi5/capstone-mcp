@@ -95,24 +95,6 @@ class ReadTableResult(Model):
     detail: str = ""
 
 
-def _click(
-    app: Capstone,
-    handle: int,
-    ctrl: Control,
-    *,
-    double: bool = False,
-    allow_foreground: bool = True,
-) -> None:
-    """Deliver a click or double-click compatible with real app and mocks."""
-    click_control(
-        app,
-        handle,
-        ctrl,
-        double=double,
-        allow_foreground=allow_foreground,
-    )
-
-
 def _find_table_palette_item(controls: list[Control]) -> Control:
     """Find Table display item in the Displays palette."""
     return find_palette_item(controls, TABLE_PALETTE_NAME, ".ObjNameTable")
@@ -200,7 +182,13 @@ def create_table(
     snapshot = app.snapshot(request.handle, depth=16, limit=10_000)
     palette_item = _find_table_palette_item(snapshot.controls)
 
-    _click(app, request.handle, palette_item, double=True, allow_foreground=True)
+    click_control(
+        app,
+        request.handle,
+        palette_item,
+        double=True,
+        allow_foreground=True,
+    )
 
     t_name = request.table_name or "Table"
     return CreateTableResult(
@@ -231,13 +219,13 @@ def set_table_columns(
 
     for i, col_name in enumerate(request.columns):
         if i >= len(headers) and add_btn:
-            _click(app, request.handle, add_btn, allow_foreground=True)
+            click_control(app, request.handle, add_btn, allow_foreground=True)
             snapshot = app.snapshot(request.handle, depth=16, limit=10_000)
             headers = _find_column_headers(snapshot.controls, table_ctrl)
 
         header_ctrl = headers[i] if i < len(headers) else None
         if header_ctrl:
-            _click(app, request.handle, header_ctrl, allow_foreground=True)
+            click_control(app, request.handle, header_ctrl, allow_foreground=True)
 
             applied = False
             with contextlib.suppress(Exception):

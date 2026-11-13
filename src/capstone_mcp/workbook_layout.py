@@ -89,17 +89,6 @@ class SetPageLayoutResult(Model):
     detail: str = ""
 
 
-def _click_control(
-    app: Capstone,
-    handle: int,
-    ctrl: Control,
-    *,
-    allow_foreground: bool = True,
-) -> None:
-    """Click a control using either the high-level click helper or act(INVOKE)."""
-    click_control(app, handle, ctrl, allow_foreground=allow_foreground)
-
-
 def _find_add_page_button(controls: list[Control]) -> Control:
     """Find the Add Page / New Page button in the active window."""
     for ctrl in controls:
@@ -131,7 +120,7 @@ def _rename_page_tab(
         return
 
     # Fallback inline rename
-    _click_control(app, handle, tab_ctrl, allow_foreground=True)
+    click_control(app, handle, tab_ctrl, allow_foreground=True)
     if hasattr(app, "keys"):
         _ = app.keys(handle, "{F2}", allow_foreground=True)
         _ = app.keys(handle, f"^a{title}{{ENTER}}", allow_foreground=True)
@@ -158,7 +147,7 @@ def add_page(
     page_index = len(existing_tabs)
 
     add_btn = _find_add_page_button(snapshot.controls)
-    _click_control(app, request.handle, add_btn, allow_foreground=True)
+    click_control(app, request.handle, add_btn, allow_foreground=True)
 
     # Rename new tab if specific title was requested
     post_snap = app.snapshot(request.handle, depth=16, limit=10_000)
@@ -205,7 +194,7 @@ def _switch_to_page(
         with contextlib.suppress(AttributeError, RuntimeError):
             node.iface_selection_item.Select()
             return
-    _click_control(app, handle, target_tab, allow_foreground=True)
+    click_control(app, handle, target_tab, allow_foreground=True)
 
 
 def _find_layout_template_control(
@@ -248,7 +237,7 @@ def set_page_layout(
         snapshot = app.snapshot(request.handle, depth=16, limit=10_000)
 
     template_ctrl = _find_layout_template_control(snapshot.controls, request.layout)
-    _click_control(app, request.handle, template_ctrl, allow_foreground=True)
+    click_control(app, request.handle, template_ctrl, allow_foreground=True)
 
     areas_count = LAYOUT_AREAS[request.layout]
     detail = f"Page layout template '{request.layout}' applied ({areas_count} areas)."

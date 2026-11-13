@@ -4,6 +4,7 @@
 from capstone_mcp.displays.harness import (
     DEFAULT_DISPLAY_KEYWORDS,
     DisplayHarness,
+    center_coords,
     click_control,
     double_click_control,
     drag_control,
@@ -17,6 +18,7 @@ from capstone_mcp.displays.harness import (
 __all__ = [
     "DEFAULT_DISPLAY_KEYWORDS",
     "DisplayHarness",
+    "center_coords",
     "click_control",
     "double_click_control",
     "drag_control",
