@@ -362,6 +362,51 @@ class CalibrateSensorResult(Model):
 # ---------------------------------------------------------------------------
 
 
+_FLAT_FIELD_MAPPINGS: Final[dict[str, tuple[str, ...]]] = {
+    "zero_sensor": ("sensor_name", "handle", "allow_foreground"),
+    "set_sampling_rate": (
+        "sampling_rate",
+        "rate_value",
+        "rate_unit",
+        "sensor_name",
+        "handle",
+        "allow_foreground",
+    ),
+    "configure_signal_generator": (
+        "waveform",
+        "frequency",
+        "amplitude",
+        "enabled",
+        "generator_name",
+        "handle",
+        "allow_foreground",
+        "keep_open",
+        "read_only",
+    ),
+    "set_recording_condition": (
+        "start_condition",
+        "stop_condition",
+        "handle",
+        "allow_foreground",
+        "keep_open",
+    ),
+    "set_sampling_mode": ("mode", "handle", "allow_foreground", "keep_open"),
+    "keep_sample": ("variable_value", "handle", "allow_foreground", "keep_open"),
+    "scan_wireless": ("timeout_seconds", "handle", "allow_foreground", "keep_open"),
+    "connect_wireless": ("sensor_id", "handle", "allow_foreground", "keep_open"),
+    "calibrate_sensor": (
+        "sensor_name",
+        "measurement_type",
+        "calibration_type",
+        "standard_1",
+        "standard_2",
+        "handle",
+        "allow_foreground",
+        "keep_open",
+    ),
+}
+
+
 class InstrumentRequest(Model):
     """Unified request for all Capstone instrument and hardware operations."""
 
@@ -380,6 +425,7 @@ class InstrumentRequest(Model):
     @classmethod
     def _normalize_payload(cls, data: object) -> object:
         if isinstance(data, dict):
+            # Backward-compatible dictionary keys
             if "sampling_rate" in data and "set_sampling_rate" not in data:
                 data["set_sampling_rate"] = data["sampling_rate"]
             if "signal_generator" in data and "configure_signal_generator" not in data:
@@ -388,6 +434,18 @@ class InstrumentRequest(Model):
                 data["set_recording_condition"] = data["recording_condition"]
             if "sampling_mode" in data and "set_sampling_mode" not in data:
                 data["set_sampling_mode"] = data["sampling_mode"]
+
+            action_raw = data.get("action")
+            action_key = (
+                action_raw.value
+                if isinstance(action_raw, InstrumentAction)
+                else str(action_raw)
+            )
+            fields = _FLAT_FIELD_MAPPINGS.get(action_key)
+            if fields and action_key not in data:
+                flat = {k: data[k] for k in fields if k in data}
+                if flat:
+                    data[action_key] = flat
         return data
 
 

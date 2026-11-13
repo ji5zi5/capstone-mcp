@@ -745,6 +745,35 @@ def run_comparison_workflow(
     )
 
 
+@MCP.prompt()
+def hardware_setup_workflow(
+    interface_type: str = "850 Universal Interface",
+    target_sensor: str = "Force Sensor",
+    sampling_rate: str = "100 Hz",
+) -> str:
+    """Guided prompt template for hardware setup, sensor zeroing, and calibration."""
+    return (
+        f"Please execute a hardware setup workflow for '{target_sensor}' "
+        f"on '{interface_type}' in PASCO Capstone:\n"
+        "1. Check hardware status and connected interfaces via the "
+        "capstone://hardware/inventory resource.\n"
+        "2. If using wireless sensors, scan and connect using "
+        "capstone_manage_instrument(action='scan_wireless') and "
+        "capstone_manage_instrument(action='connect_wireless', sensor_name=...).\n"
+        f"3. Select sensor and configure sampling rate to '{sampling_rate}' using "
+        f"capstone_manage_instrument(action='set_sampling_rate', "
+        f"sensor_name='{target_sensor}', sampling_rate='{sampling_rate}').\n"
+        "4. Zero or tare the sensor prior to data acquisition using "
+        f"capstone_manage_instrument(action='zero_sensor', "
+        f"sensor_name='{target_sensor}').\n"
+        "5. If a signal generator is required, configure waveform and frequency using "
+        "capstone_manage_instrument(action='set_signal_generator', ...).\n"
+        "6. Confirm live sensor values and readiness using "
+        "capstone_manage_instrument(action='read_signal_generator') or "
+        "capstone_snapshot."
+    )
+
+
 # ---------------------------------------------------------------------------
 # Structured MCP Protocol Error Envelopes
 # ---------------------------------------------------------------------------
@@ -784,6 +813,18 @@ def format_tool_error(error_message: str) -> ToolErrorPayload:
         remediation = (
             "Verify graph display exists using capstone_manage_graph(action='read') "
             "or snapshot."
+        )
+    elif (
+        "sensor" in lower
+        or "instrument" in lower
+        or "generator" in lower
+        or "calibration" in lower
+        or "hardware" in lower
+    ):
+        code = "INSTRUMENT_ERROR"
+        remediation = (
+            "Verify hardware connection via capstone://hardware/inventory or "
+            "check sensor configuration using capstone_manage_instrument."
         )
     elif "file" in lower or "path" in lower:
         code = "FILE_NOT_FOUND"
@@ -886,6 +927,7 @@ __all__ = [
     "capstone_tutor_lessons_resource",
     "data_analysis_workflow",
     "format_tool_error",
+    "hardware_setup_workflow",
     "http_main",
     "main",
     "physics_lab_tutor",
