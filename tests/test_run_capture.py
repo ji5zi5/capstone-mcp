@@ -12,7 +12,7 @@ import pytest
 
 from capstone_mcp.file_workflows import FileArtifact
 from capstone_mcp.repetition import RunReceipt, run_sequence
-from capstone_mcp.run_capture import (
+from capstone_mcp.runs import (
     CaptureError,
     CapturePlan,
     CaptureSession,

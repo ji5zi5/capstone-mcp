@@ -29,7 +29,7 @@ from capstone_mcp.record_events import (
     dispose_transition,
     verify_debug_process,
 )
-from capstone_mcp.run_capture import CapturePlan, CaptureResult, CaptureSession
+from capstone_mcp.runs import CapturePlan, CaptureResult, CaptureSession
 
 LOGGER: Final = logging.getLogger(__name__)
 MAX_JOB_HISTORY: Final = 16

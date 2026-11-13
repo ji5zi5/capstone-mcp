@@ -7,7 +7,7 @@ import pytest
 
 from capstone_mcp.desktop import AutomationError, Capstone
 from capstone_mcp.models import Bounds, Control, Snapshot, Window
-from capstone_mcp.run_delete import DeleteRunRequest, DeleteRunResult, delete_run
+from capstone_mcp.runs import DeleteRunRequest, DeleteRunResult, delete_run
 
 
 def test_delete_run_raises_when_no_runs_exist() -> None:

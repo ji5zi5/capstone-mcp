@@ -19,7 +19,7 @@ from capstone_mcp.oscilloscope_fft import (
     ReadFftPeaksResult,
     ScopeTriggerResult,
 )
-from capstone_mcp.run_visibility import SetRunVisibilityResult
+from capstone_mcp.runs import SetRunVisibilityResult
 from capstone_mcp.server import MCP
 from capstone_mcp.signal_generator import (
     SetSignalGeneratorResult,
