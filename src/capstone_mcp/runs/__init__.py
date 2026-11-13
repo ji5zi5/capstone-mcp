@@ -28,6 +28,7 @@ from capstone_mcp.runs.models import (
     SetRunVisibilityResult,
     SourceFit,
 )
+from capstone_mcp.runs.tool import register_run_tools
 
 __all__ = [
     "CaptureError",
@@ -51,6 +52,7 @@ __all__ = [
     "SourceFit",
     "delete_run",
     "manage_run",
+    "register_run_tools",
     "rename_run",
     "set_run_visibility",
 ]

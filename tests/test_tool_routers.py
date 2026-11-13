@@ -26,6 +26,7 @@ from capstone_mcp.instruments import (
     ZeroSensorRequest,
     ZeroSensorResult,
 )
+from capstone_mcp.runs import register_run_tools
 from capstone_mcp.server import MCP, ExportedData
 from capstone_mcp.tools import (
     register_display_tools,
@@ -75,9 +76,6 @@ def test_server_has_all_tool_domains_registered() -> None:
         "capstone_set_table_columns",
         "capstone_read_table",
         "capstone_create_digits",
-        "capstone_rename_run",
-        "capstone_delete_run",
-        "capstone_set_run_visibility",
         "capstone_add_page",
         "capstone_set_page_layout",
     }
@@ -124,6 +122,12 @@ def test_server_has_all_tool_domains_registered() -> None:
     }
     assert expected_physics.issubset(tool_names)
 
+    # 5. Run tools
+    expected_runs = {
+        "capstone_manage_run",
+    }
+    assert expected_runs.issubset(tool_names)
+
 
 def test_isolated_router_registration() -> None:
     """Verify each router can independently register tools on a blank FastMCP instance."""
@@ -142,8 +146,8 @@ def test_isolated_router_registration() -> None:
     display_tools = register_display_tools(
         mcp_displays, mock_native, get_last_failure=lambda: None,
     )
-    assert len(display_tools) == 24
-    assert len(mcp_displays._tool_manager.list_tools()) == 24
+    assert len(display_tools) == 21
+    assert len(mcp_displays._tool_manager.list_tools()) == 21
     assert "capstone_manage_graph" in display_tools
     assert "capstone_manage_display" in display_tools
 
@@ -159,6 +163,13 @@ def test_isolated_router_registration() -> None:
     physics_tools = register_physics_tools(mcp_physics, mock_native)
     assert len(physics_tools) == 7
     assert len(mcp_physics._tool_manager.list_tools()) == 7
+
+    # Run router
+    mcp_runs = FastMCP("test-runs")
+    run_tools = register_run_tools(mcp_runs, mock_native)
+    assert len(run_tools) == 1
+    assert len(mcp_runs._tool_manager.list_tools()) == 1
+    assert "capstone_manage_run" in run_tools
 
 
 def test_exported_data_backward_compatible() -> None:

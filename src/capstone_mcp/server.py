@@ -34,6 +34,7 @@ from capstone_mcp.models import (
     Window,
 )
 from capstone_mcp.repetition import AcquisitionJobs, JobStatus
+from capstone_mcp.runs import register_run_tools
 from capstone_mcp.tools import (
     register_display_tools,
     register_file_tools,
@@ -457,6 +458,7 @@ register_display_tools(
 )
 _instrument_tools = register_instrument_tools(MCP, _native, jobs=lambda: JOBS)
 _physics_tools = register_physics_tools(MCP, _native)
+_run_tools = register_run_tools(MCP, _native)
 
 
 # Backward-compatibility exports for test callers
@@ -472,6 +474,7 @@ def capstone_cancel_acquisition(job_id: str) -> JobStatus:
 
 capstone_run_experiment_macro = _physics_tools["capstone_run_experiment_macro"]
 capstone_generate_lab_report = _physics_tools["capstone_generate_lab_report"]
+capstone_manage_run = _run_tools["capstone_manage_run"]
 
 # ---------------------------------------------------------------------------
 # MCP Resources
@@ -1019,6 +1022,7 @@ __all__ = [
     "capstone_cancel_acquisition",
     "capstone_generate_lab_report",
     "capstone_hardware_inventory_resource",
+    "capstone_manage_run",
     "capstone_run_experiment_macro",
     "data_analysis_workflow",
     "display_layout_workflow",

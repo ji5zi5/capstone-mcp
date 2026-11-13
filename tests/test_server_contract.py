@@ -60,13 +60,14 @@ def test_fastmcp_tool_count_contract() -> None:
     """Ensure FastMCP tool count does not regress below full capacity."""
     tools = server.MCP._tool_manager.list_tools()
     tool_names = {t.name for t in tools}
-    assert len(tool_names) >= 75
+    assert len(tool_names) >= 70
     assert "capstone_attach" in tool_names
     assert "capstone_export_data" in tool_names
     assert "capstone_create_calculation" in tool_names
     assert "capstone_linear_fit" in tool_names
     assert "capstone_manage_graph" in tool_names
     assert "capstone_manage_display" in tool_names
+    assert "capstone_manage_run" in tool_names
 
 
 def test_systematic_tool_annotations() -> None:
@@ -100,7 +101,6 @@ def test_systematic_tool_annotations() -> None:
 
     # 2. Destructive modification tools
     destructive_tools = [
-        "capstone_delete_run",
         "capstone_open_experiment",
         "capstone_set_graph_fits",
         "capstone_analyze_graph",

@@ -3,6 +3,10 @@
 
 from unittest.mock import MagicMock
 
+import pytest
+from mcp.server.fastmcp import FastMCP
+
+from capstone_mcp.automation_models import NativeRequest
 from capstone_mcp.models import Bounds, Control, Snapshot, Window
 from capstone_mcp.runs import (
     DeleteRunRequest,
@@ -11,6 +15,7 @@ from capstone_mcp.runs import (
     RunRequest,
     SetRunVisibilityRequest,
     manage_run,
+    register_run_tools,
 )
 
 
@@ -135,3 +140,45 @@ def test_visibility_toggle_via_unified_manager() -> None:
     assert result.visibility is not None
     assert "Run #1" in result.visibility.visible_runs
     node_mock.iface_toggle.Toggle.assert_called_once()
+
+
+@pytest.mark.anyio
+async def test_capstone_manage_run_tool_delegation() -> None:
+    """Verify capstone_manage_run delegates correctly via NativeRequest."""
+    mcp = FastMCP("test-runs")
+    captured_requests: list[NativeRequest] = []
+
+    async def mock_native(
+        req: NativeRequest,
+        *,
+        mutates: bool = False,
+    ) -> dict[str, object]:
+        del mutates
+        captured_requests.append(req)
+        return {
+            "action": req.run_request["action"],  # pyright: ignore[reportIndexIssue]
+            "rename": {
+                "old_name": "Run #1",
+                "new_name": "Trial 1",
+                "verified": True,
+                "detail": "Renamed successfully",
+            },
+        }
+
+    tools = register_run_tools(mcp, mock_native)
+    assert "capstone_manage_run" in tools
+    manage_tool = tools["capstone_manage_run"]
+
+    result = await manage_tool(
+        RunRequest(
+            action=RunAction.RENAME,
+            rename=RenameRunRequest(old_name="Run #1", new_name="Trial 1"),
+        ),
+    )
+
+    assert result.action == RunAction.RENAME
+    assert result.rename is not None
+    assert result.rename.new_name == "Trial 1"
+    assert len(captured_requests) == 1
+    assert captured_requests[0].operation == "manage_run"
+    assert captured_requests[0].run_request["action"] == "rename"  # pyright: ignore[reportIndexIssue]

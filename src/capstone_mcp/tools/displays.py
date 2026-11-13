@@ -52,7 +52,6 @@ from capstone_mcp.graphs import (
     summarize_graph,
 )
 from capstone_mcp.models import Point, Result
-from capstone_mcp.runs import DeleteRunResult, RenameRunResult, SetRunVisibilityResult
 
 type NativeCaller = Callable[..., Awaitable[Any]]
 DEFAULT_FIT_OFFSET: Final = Point(x=20, y=20)
@@ -744,117 +743,6 @@ def register_display_tools(  # noqa: PLR0915
             openWorldHint=False,
         ),
     )
-    async def capstone_rename_run(
-        handle: int,
-        old_name: str,
-        new_name: str,
-        *,
-        allow_foreground: bool = True,
-    ) -> RenameRunResult:
-        """Rename a specific Run item in the Data Summary tree safely.
-
-        Args:
-            handle: Capstone main window handle.
-            old_name: Existing run name in Data Summary (e.g. 'Run #1').
-            new_name: Desired new name for the run (e.g. 'Baseline trial').
-            allow_foreground: Bring window to foreground for UI automation.
-
-        Returns:
-            RenameRunResult with rename confirmation and updated run list.
-        """
-        return RenameRunResult.model_validate(
-            await native(
-                NativeRequest(
-                    operation="rename_run",
-                    handle=handle,
-                    old_name=old_name,
-                    new_name=new_name,
-                    allow_foreground=allow_foreground,
-                ),
-                mutates=True,
-            ),
-        )
-
-    @mcp.tool(
-        annotations=ToolAnnotations(
-            title="Delete experimental run",
-            readOnlyHint=False,
-            destructiveHint=True,
-            idempotentHint=False,
-            openWorldHint=False,
-        ),
-    )
-    async def capstone_delete_run(
-        handle: int = 0,
-        *,
-        run_name: str = "last_run",
-        allow_foreground: bool = True,
-    ) -> DeleteRunResult:
-        """Delete a run from Data Summary, auto-confirming any modal dialog.
-
-        Args:
-            handle: Capstone main window handle (0 for active window).
-            run_name: Name of the run to delete, or 'last_run' for most recent run.
-            allow_foreground: Bring window to foreground for UI automation.
-
-        Returns:
-            DeleteRunResult with deleted run name and remaining runs.
-        """
-        return DeleteRunResult.model_validate(
-            await native(
-                NativeRequest(
-                    operation="delete_run",
-                    handle=handle,
-                    run_name=run_name,
-                    allow_foreground=allow_foreground,
-                ),
-                mutates=True,
-            ),
-        )
-
-    @mcp.tool(
-        annotations=ToolAnnotations(
-            title="Set run visibility",
-            readOnlyHint=False,
-            destructiveHint=False,
-            idempotentHint=True,
-            openWorldHint=False,
-        ),
-    )
-    async def capstone_set_run_visibility(
-        runs: list[str],
-        handle: int = 0,
-        *,
-        visible: bool = True,
-        target_displays: list[str] | None = None,
-        allow_foreground: bool = True,
-    ) -> SetRunVisibilityResult:
-        """Control visibility (show/hide) of specific runs on displays.
-
-        Args:
-            runs: List of run names (e.g. ['Run #1', 'Run #2']).
-            handle: Capstone main window handle (0 for active window).
-            visible: Whether to make the specified runs visible (True) or hidden (False).
-            target_displays: Specific display names to filter, or None for all displays.
-            allow_foreground: Bring window to foreground for UI automation.
-
-        Returns:
-            SetRunVisibilityResult with list of currently visible runs.
-        """
-        return SetRunVisibilityResult.model_validate(
-            await native(
-                NativeRequest(
-                    operation="set_run_visibility",
-                    handle=handle,
-                    runs=runs,
-                    visible=visible,
-                    target_displays=target_displays,
-                    allow_foreground=allow_foreground,
-                ),
-                mutates=True,
-            ),
-        )
-
     @mcp.tool(
         annotations=ToolAnnotations(
             title="Add workbook page",
@@ -959,9 +847,6 @@ def register_display_tools(  # noqa: PLR0915
         "capstone_set_table_columns": capstone_set_table_columns,
         "capstone_read_table": capstone_read_table,
         "capstone_create_digits": capstone_create_digits,
-        "capstone_rename_run": capstone_rename_run,
-        "capstone_delete_run": capstone_delete_run,
-        "capstone_set_run_visibility": capstone_set_run_visibility,
         "capstone_add_page": capstone_add_page,
         "capstone_set_page_layout": capstone_set_page_layout,
     }
