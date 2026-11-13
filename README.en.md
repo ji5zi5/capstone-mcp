@@ -31,8 +31,10 @@ Use it to analyze saved `.cap` files or work with an open experiment, from senso
 | **Smart triggers & manual sampling** | Sensor threshold or timer automated recording start/stop, continuous vs Keep Sample (manual) mode |
 | **Wireless sensors & calibration** | Bluetooth wireless sensor discovery and pairing, automated 1-point and 2-point calibration wizards, zeroing |
 | **Workbook pages & split layouts** | Add workbook page tabs, apply 2-split (H/V), 3-pane, and 4-grid layout templates automatically |
+| **One-click physics macros** | Automated execution of multi-step physics experiments, constant derivation, and report generation |
+| **Interactive lab tutor** | Interactive curriculum inspection, safety protocols, live Capstone configuration guidance, and quizzes |
 
-> File analysis, UI operations, sensor settings, saving, exporting, and the 7 domain automation packages have been verified with comprehensive unit and integration test suites. Physical acquisition with connected hardware should be verified in your lab environment.
+> File analysis, UI operations, sensor settings, saving, exporting, numerical calculations, and physics suite tools have been verified with comprehensive unit and integration test suites. Physical acquisition with connected hardware should be verified in your lab environment.
 
 ## Getting started
 
@@ -133,15 +135,15 @@ Saved-file and explicit-sample OLS also return residual, leverage, Cook's-distan
 
 > Record three runs of five seconds each, with a two-second pause between runs. Save each run's experiment snapshot in a new folder, `C:/Experiments/session-01`.
 
-**One-click physics experiment macros (Phase 3)**
+**One-click physics experiment macros**
 
 > Run the photoelectric effect experiment macro (`photoelectric_effect`) to sweep wavelengths, record stopping voltages, and compute Planck's constant ($h$).
 
-**Automated lab report generation (Phase 3)**
+**Automated lab report generation**
 
 > Ingest data from `photoelectric_effect.cap` and generate a formal Markdown and HTML physics lab report with theoretical comparison, $R^2$ regression, and error percentages.
 
-**Interactive pedagogical lab tutor (Phase 3)**
+**Interactive pedagogical lab tutor**
 
 > Load the full curriculum for `rlc_resonance`, verify the apparatus checklist, and guide me step-by-step through Capstone configuration and safety warnings.
 

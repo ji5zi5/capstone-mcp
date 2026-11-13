@@ -36,6 +36,7 @@ This document guides the review agent (`/code-review`) on repo-specific judgemen
 
 - **Action Dispatch Completeness**: Unified request models and action enums (`RunRequest`, `RunAction`) must only declare variants actively and immediately handled by the dispatcher. Never introduce speculative enum values or request fields that trigger unhandled branches.
 - **Stateful vs Stateless Boundary**: Multi-cycle, stateful workflows (such as `CaptureSession` or acquisition jobs) must remain encapsulated in dedicated session classes rather than being mixed into discrete, single-shot request/result dispatchers.
+- **Dispatcher Integration Test Synchronization**: When migrating discrete native operations into a unified domain seam (e.g., `manage_instrument` or `manage_graph`), update the dispatch integration suites (`tests/test_full_automation_suite.py`) within the same ticket to mock the unified seam rather than deleted discrete handler functions.
 
 ---
 
@@ -50,4 +51,6 @@ This document guides the review agent (`/code-review`) on repo-specific judgemen
 
 - **Structured Error Envelopes**: Tool execution failures must never leak raw Python exception tracebacks across the protocol boundary. All tool errors must return `CallToolResult(isError=True)` with consistent JSON payloads containing `error_code`, `message`, and actionable `remediation` instructions.
 - **Pydantic Model Field Aliasing**: When refining or deepening field names on public domain models (e.g., `renderers` vs legacy `groups`), always maintain backward compatibility for existing callers and test suites by exposing `@computed_field @property` aliases.
+- **Table-Driven Normalization Pattern**: When supporting ergonomic flat payload arguments alongside nested models on compound requests (e.g., `InstrumentRequest`, `GraphRequest`), use a static table mapping (`_FLAT_FIELD_MAPPINGS`) rather than verbose `if/elif` branches. Populate child model dictionaries strictly when flat arguments are non-empty (`if flat:`) to prevent spurious missing-field validation errors.
+- **FastMCP Tool Handler Mocking Convention**: When writing unit contract tests for registered FastMCP tools, mock execution at the worker boundary (`patch.object(server.WORKER, "call", ...)`) rather than patching `server._native`. Because tool registration captures the `native` callable at startup, patching `server._native` after registration has no effect.
 

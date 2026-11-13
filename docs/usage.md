@@ -314,7 +314,7 @@ PASCO 850 Universal Interface 또는 550 Interface의 내장 신호발생기 출
 }
 ```
 
-## 물리 실험 종합 패키지 (Phase 3)
+## 물리 실험 종합 패키지
 
 ### 1. 실험 원클릭 자동화 매크로 (`capstone_run_experiment_macro`)
 
