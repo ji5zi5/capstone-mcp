@@ -36,7 +36,7 @@ Single-context repository layout (`GLOSSARY.md`, `docs/adr/`). See `docs/agents/
 
 ### Architecture & Module Map
 
-FastMCP tool routers (`src/capstone_mcp/tools/`), deep numerics, and unified data sources. See `docs/architecture.md`.
+FastMCP tool routers (`src/capstone_mcp/tools/`), deep graph domain (`src/capstone_mcp/graphs/`), deep run management (`src/capstone_mcp/runs/`), deep numerics (`numerics/`), and unified data sources (`data_sources/`). See `docs/architecture.md`.
 
 ### Review standards
 

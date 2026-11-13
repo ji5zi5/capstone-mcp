@@ -36,3 +36,18 @@ This document guides the review agent (`/code-review`) on repo-specific judgemen
 
 - **Action Dispatch Completeness**: Unified request models and action enums (`RunRequest`, `RunAction`) must only declare variants actively and immediately handled by the dispatcher. Never introduce speculative enum values or request fields that trigger unhandled branches.
 - **Stateful vs Stateless Boundary**: Multi-cycle, stateful workflows (such as `CaptureSession` or acquisition jobs) must remain encapsulated in dedicated session classes rather than being mixed into discrete, single-shot request/result dispatchers.
+
+---
+
+## 6. Native Deserialization & Reverse-Engineered Schema Fidelity
+
+- **Exact Schema & Tag Preservation**: When decoding native desktop serialization formats (such as Capstone clipboard XML, COM property bags, or binary archive streams), never substitute hypothetical, sanitized, or speculative attribute names (`ActualParameter`, `ZBundleInputIndex`) for verified native identifiers. Always preserve the exact tags, attributes (`BundleMeasID`, `ZCFDICurveFitParameterDefinition`), and boolean representation conventions (`"TRUE"`/`"FALSE"`, `"1"`/`"0"`) discovered from primary sources and IDA disassembly.
+- **Fail-Closed on Unknown Constructs**: Parser logic must validate element counts and schema bounds strictly, raising domain-specific parse errors rather than returning incomplete or corrupted state models.
+
+---
+
+## 7. FastMCP Protocol Envelopes & Backward Compatibility
+
+- **Structured Error Envelopes**: Tool execution failures must never leak raw Python exception tracebacks across the protocol boundary. All tool errors must return `CallToolResult(isError=True)` with consistent JSON payloads containing `error_code`, `message`, and actionable `remediation` instructions.
+- **Pydantic Model Field Aliasing**: When refining or deepening field names on public domain models (e.g., `renderers` vs legacy `groups`), always maintain backward compatibility for existing callers and test suites by exposing `@computed_field @property` aliases.
+
