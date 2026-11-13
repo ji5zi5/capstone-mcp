@@ -38,6 +38,7 @@ class RequestDefinition(Model):
     )
     properties: dict[str, JsonValue] = Field(default_factory=dict)
     required: list[str] = Field(default_factory=list)
+    enum: list[str] = Field(default_factory=list)
 
 
 class RecoveryResult(Model):
@@ -126,43 +127,27 @@ async def exercise_ai_graph_contract() -> None:
             _ = await session.initialize()
             listed = await session.list_tools()
             tools = {tool.name: tool for tool in listed.tools}
-            fit_tool = tools["capstone_set_graph_fits"]
-            assert fit_tool.annotations is not None
-            assert fit_tool.annotations.idempotentHint is True
-            assert fit_tool.annotations.destructiveHint is True
-            schema = GraphToolSchema.model_validate(fit_tool.inputSchema)
-            request = schema.definitions["GraphFitRequest"]
-            assert request.additional_properties is False
-            assert "expected_data_signature" in request.properties
-            assert "frame_id" in request.required
-            # When: discover a valid model, then submit an invented option.
-            response = await session.call_tool("capstone_fit_models", {})
-            choices = FitChoices.model_validate(response.structuredContent).result
-            assert FitModel.QUADRATIC in choices
-            invalid = await session.call_tool("capstone_set_graph_fits", {
-                "handle": 0,
+            graph_tool = tools["capstone_manage_graph"]
+            assert graph_tool.annotations is not None
+            assert graph_tool.annotations.destructiveHint is False
+            schema = GraphToolSchema.model_validate(graph_tool.inputSchema)
+            graph_req = schema.definitions["GraphRequest"]
+            assert "action" in graph_req.required
+            assert "create" in graph_req.properties
+            assert "fit" in graph_req.properties
+            assert "select_measurement" in graph_req.properties
+            assert "analyze" in graph_req.properties
+            fit_models = schema.definitions["FitModel"]
+            assert FitModel.QUADRATIC.value in fit_models.enum
+
+            # When: call manage_graph with invalid action
+            invalid = await session.call_tool("capstone_manage_graph", {
                 "request": {
-                    "frame_id": "not-an-issued-frame",
-                    "menu_point": {"x": 0, "y": 0},
-                    "models": [FitModel.QUADRATIC.value],
-                    "preserve_existing_models": True,
+                    "action": "invented_invalid_action",
                 },
             })
-            # Then: reject the invented contract before native app input.
+            # Then: reject the invalid request before native app input.
             assert invalid.isError
-            no_frame = await session.call_tool(
-                "capstone_select_graph_measurement", {
-                    "handle": 0, "axis_point": {"x": 0, "y": 0},
-                    "menu_path": ["Index"], "frame_id": "not-issued",
-                },
-            )
-            assert no_frame.isError
-            recovery = await session.call_tool("capstone_graph_recovery", {})
-            failure = RecoveryResult.model_validate(recovery.structuredContent).result
-            assert failure.code == "FRAME_REQUIRED"
-            assert failure.request_id
-            assert not failure.graph_input_may_have_been_sent
-            assert failure.next_action == "observe_graph"
 
 
 def test_ai_graph_contract_over_mcp() -> None:

@@ -2,11 +2,13 @@
 """Regression contract test for capstone_mcp.server public exports."""
 
 import json
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
 from capstone_mcp import server
 from capstone_mcp.acquisition import RecordingStatus
+from capstone_mcp.models import Action, Button, Point
 from capstone_mcp.repetition import (
     AcquisitionJob,
     JobStatus,
@@ -56,43 +58,49 @@ def test_acquisition_job_delegation_to_jobs_instance() -> None:
         server.JOBS.jobs.pop("test_contract_job", None)
 
 
-def test_fastmcp_tool_count_contract() -> None:
-    """Ensure FastMCP tool count does not regress below full capacity."""
+def test_fastmcp_tool_surface_ceiling() -> None:
+    """Ensure FastMCP tool surface remains bounded within token budget (<= 22 tools)."""
     tools = server.MCP._tool_manager.list_tools()
     tool_names = {t.name for t in tools}
-    assert len(tool_names) >= 70
+    assert len(tool_names) <= 22
     assert "capstone_attach" in tool_names
-    assert "capstone_export_data" in tool_names
-    assert "capstone_create_calculation" in tool_names
-    assert "capstone_linear_fit" in tool_names
+    assert "capstone_windows" in tool_names
+    assert "capstone_snapshot" in tool_names
+    assert "capstone_screenshot" in tool_names
+    assert "capstone_interact_ui" in tool_names
+    assert "capstone_manage_run" in tool_names
     assert "capstone_manage_graph" in tool_names
     assert "capstone_manage_display" in tool_names
-    assert "capstone_manage_run" in tool_names
+    assert "capstone_manage_instrument" in tool_names
+    assert "capstone_save_experiment" in tool_names
+    assert "capstone_open_experiment" in tool_names
+    assert "capstone_export_data" in tool_names
+    assert "capstone_inspect_file" in tool_names
+    assert "capstone_file_datasets" in tool_names
+    assert "capstone_extract_dataset" in tool_names
+    assert "capstone_linear_fit" in tool_names
+    assert "capstone_plot" in tool_names
+    assert "capstone_compare_runs" in tool_names
+    assert "capstone_create_calculation" in tool_names
+    assert "capstone_generate_lab_report" in tool_names
+    assert "capstone_run_experiment_macro" in tool_names
 
 
 def test_systematic_tool_annotations() -> None:
-    """Verify readOnlyHint and destructiveHint annotations across MCP tools."""
+    """Verify readOnlyHint and destructiveHint annotations across active MCP tools."""
     tools = {t.name: t for t in server.MCP._tool_manager.list_tools()}
 
     # 1. Read-only inspection tools
     read_only_tools = [
         "capstone_windows",
         "capstone_snapshot",
-        "capstone_read_value",
         "capstone_screenshot",
-        "capstone_read_graph",
-        "capstone_read_table",
         "capstone_inspect_file",
         "capstone_file_datasets",
         "capstone_extract_dataset",
-        "capstone_recording_status",
         "capstone_linear_fit",
-        "capstone_scan_wireless_sensors",
-        "capstone_read_signal_generator_status",
-        "capstone_live_configuration",
-        "capstone_current_value",
-        "capstone_acquisition_job",
-        "capstone_read_fft_peaks",
+        "capstone_plot",
+        "capstone_compare_runs",
     ]
     for name in read_only_tools:
         tool = tools[name]
@@ -102,48 +110,27 @@ def test_systematic_tool_annotations() -> None:
     # 2. Destructive modification tools
     destructive_tools = [
         "capstone_open_experiment",
-        "capstone_set_graph_fits",
-        "capstone_analyze_graph",
     ]
     for name in destructive_tools:
         tool = tools[name]
         assert tool.annotations is not None, f"Tool {name} missing annotations"
         assert tool.annotations.destructiveHint is True, f"Tool {name} expected destructiveHint=True"
 
-    # 3. Instrument tool annotations systematic completeness
-    instrument_tools = [
+    # 3. Compound and non-destructive management tools
+    compound_tools = [
+        "capstone_attach",
+        "capstone_interact_ui",
         "capstone_manage_instrument",
-        "capstone_set_recording",
-        "capstone_step_sampling_rate",
-        "capstone_select_sensor",
-        "capstone_configure_sensor",
-        "capstone_zero_sensor",
-        "capstone_set_signal_generator",
-        "capstone_create_scope",
-        "capstone_set_scope_trigger",
-        "capstone_create_fft",
-        "capstone_set_recording_condition",
-        "capstone_set_sampling_mode",
-        "capstone_keep_sample",
-        "capstone_connect_wireless_sensor",
-        "capstone_calibrate_sensor",
-    ]
-    for name in instrument_tools:
-        tool = tools[name]
-        assert tool.annotations is not None, f"Tool {name} missing annotations"
-        assert tool.annotations.destructiveHint is False, f"Tool {name} expected destructiveHint=False"
-
-    # 4. Display tool annotations systematic completeness
-    display_tools = [
         "capstone_manage_display",
-        "capstone_create_table",
-        "capstone_set_table_columns",
-        "capstone_read_table",
-        "capstone_create_digits",
-        "capstone_add_page",
-        "capstone_set_page_layout",
+        "capstone_manage_graph",
+        "capstone_manage_run",
+        "capstone_save_experiment",
+        "capstone_export_data",
+        "capstone_create_calculation",
+        "capstone_generate_lab_report",
+        "capstone_run_experiment_macro",
     ]
-    for name in display_tools:
+    for name in compound_tools:
         tool = tools[name]
         assert tool.annotations is not None, f"Tool {name} missing annotations"
         assert tool.annotations.destructiveHint is False, f"Tool {name} expected destructiveHint=False"
@@ -196,3 +183,94 @@ async def test_dynamic_resources_contract() -> None:
     assert "digits_count" in disp
     assert "scope_count" in disp
     assert "fft_count" in disp
+
+
+@pytest.mark.anyio
+async def test_capstone_interact_ui_dispatch() -> None:
+    """Verify capstone_interact_ui correctly dispatches all UI action types."""
+    with patch.object(server, "_native", new_callable=AsyncMock) as mock_native:
+        mock_native.return_value = {"detail": "success", "delivered": True}
+
+        # 1. Click
+        res_click = await server.capstone_interact_ui(
+            "click", handle=10, point=Point(x=100, y=200), button=Button.LEFT,
+        )
+        assert res_click.delivered is True
+        mock_native.assert_called_with(
+            server.NativeRequest(
+                operation="click",
+                handle=10,
+                point=Point(x=100, y=200),
+                button=Button.LEFT,
+                double=False,
+                allow_foreground=True,
+            ),
+            mutates=True,
+        )
+
+        # 2. Double Click
+        await server.capstone_interact_ui(
+            "double_click", handle=10, point=Point(x=50, y=60),
+        )
+        assert mock_native.call_args[0][0].double is True
+
+        # 3. Drag
+        await server.capstone_interact_ui(
+            "drag", handle=10, start=Point(x=10, y=20), end=Point(x=30, y=40),
+        )
+        assert mock_native.call_args[0][0].operation == "drag"
+
+        # 4. Scroll
+        await server.capstone_interact_ui(
+            "scroll", handle=10, point=Point(x=10, y=10), notches=5,
+        )
+        assert mock_native.call_args[0][0].operation == "scroll"
+
+        # 5. Keys
+        await server.capstone_interact_ui(
+            "keys", handle=10, keys="{ENTER}",
+        )
+        assert mock_native.call_args[0][0].operation == "keys"
+
+        # 6. Type
+        await server.capstone_interact_ui(
+            "type", handle=10, text="sample",
+        )
+        assert mock_native.call_args[0][0].operation == "keys"
+        assert mock_native.call_args[0][0].unicode_input is True
+
+        # 7. Action
+        await server.capstone_interact_ui(
+            "action", ref="ctrl_1", ui_action=Action.INVOKE,
+        )
+        assert mock_native.call_args[0][0].operation == "action"
+
+        # 8. Read Value
+        mock_native.return_value = "read_text_result"
+        res_read = await server.capstone_interact_ui(
+            "read_value", ref="ctrl_2",
+        )
+        assert res_read.detail == "read_text_result"
+
+        # 9. Set Value
+        mock_native.return_value = {"detail": "value_set", "delivered": True}
+        await server.capstone_interact_ui(
+            "set_value", ref="ctrl_3", value="new_text",
+        )
+        assert mock_native.call_args[0][0].operation == "set_value"
+
+    # 10. Validation errors
+    with pytest.raises(ValueError, match="requires both start and end points"):
+        await server.capstone_interact_ui("drag", handle=10)
+
+    with pytest.raises(ValueError, match="requires ref"):
+        await server.capstone_interact_ui("action", handle=10)
+
+    with pytest.raises(ValueError, match="requires both ref and ui_action"):
+        await server.capstone_interact_ui("action", ref="ctrl_1")
+
+    with pytest.raises(ValueError, match="requires ref"):
+        await server.capstone_interact_ui("read_value", handle=10)
+
+    with pytest.raises(ValueError, match="requires ref"):
+        await server.capstone_interact_ui("set_value", handle=10)

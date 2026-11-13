@@ -57,15 +57,6 @@ def _write_report_file(
 def register_physics_tools(mcp: FastMCP, native: NativeCaller) -> dict[str, Any]:
     """Register all math analysis, plotting, and recipe macro tools."""
 
-    @mcp.tool(
-        annotations=ToolAnnotations(
-            title="Read Capstone workflow rules",
-            readOnlyHint=True,
-            destructiveHint=False,
-            idempotentHint=True,
-            openWorldHint=False,
-        ),
-    )
     def capstone_guide(topic: GuideTopic | None = None) -> str:
         """Return targeted instructions for common Capstone workflow scenarios.
 
