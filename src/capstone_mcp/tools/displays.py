@@ -10,19 +10,29 @@ from pydantic import JsonValue, TypeAdapter
 
 from capstone_mcp.automation_models import NativeRequest
 from capstone_mcp.digits_display import CreateDigitsResult
-from capstone_mcp.graph_control import FitGraphResult
-from capstone_mcp.graph_execution import GraphCapture, GraphFailure
-from capstone_mcp.graph_report import GraphAnalysisReport, summarize_graph
-from capstone_mcp.graph_requests import (
-    GraphAnalysisRequest,
+from capstone_mcp.graphs import (
+    AnalyzeGraphRequest,
+    CreateGraphRequest,
+    FitGraphRequest,
+    FitGraphResult,
+    FitModel,
+    GraphAction,
+    GraphAnalysisReport,
+    GraphCapture,
+    GraphDeltaRequest,
+    GraphDeltaResult,
+    GraphFailure,
     GraphFitOutcome,
     GraphFitRequest,
-)
-from capstone_mcp.graph_state import FitModel, GraphState
-from capstone_mcp.graph_toolbox import (
-    GraphDeltaResult,
+    GraphRequest,
+    GraphResult,
+    GraphState,
+    MeasureGraphAreaRequest,
     MeasureGraphAreaResult,
+    ReadGraphRequest,
+    ToggleGraphStatisticsRequest,
     ToggleGraphStatisticsResult,
+    summarize_graph,
 )
 from capstone_mcp.models import Point, Result
 from capstone_mcp.runs import DeleteRunResult, RenameRunResult, SetRunVisibilityResult
@@ -42,12 +52,53 @@ DEFAULT_FIT_OFFSET: Final = Point(x=20, y=20)
 JSON_VALUE: Final = TypeAdapter(JsonValue)
 
 
-def register_display_tools(
+def register_display_tools(  # noqa: PLR0915
     mcp: FastMCP,
     native: NativeCaller,
     get_last_failure: Callable[[], GraphFailure | None] | None = None,
 ) -> dict[str, Any]:
     """Register all graph, table, digits, and display layout tools."""
+
+    @mcp.tool(
+        annotations=ToolAnnotations(
+            title="Unified graph management seam",
+            readOnlyHint=False,
+            destructiveHint=False,
+            idempotentHint=False,
+            openWorldHint=False,
+        ),
+    )
+    async def capstone_manage_graph(
+        request: GraphRequest,
+    ) -> GraphResult:
+        """Unified entry point for all Capstone graph display operations.
+
+        Supported actions (request.action):
+        - create: Insert a new graph onto active page (request.create)
+        - read: Read graph curves, fits, and data signatures (request.read)
+        - fit: Scale graph axes to fit all data (request.fit)
+        - select_measurement: Select axis measurement via popup menu path
+          (request.select_measurement)
+        - toolbox_delta: Measure coordinates difference with delta crosshair
+          (request.toolbox_delta)
+        - toolbox_area: Integrate area under curve with area tool
+          (request.toolbox_area)
+        - toolbox_statistics: Toggle statistics box and read summary stats
+          (request.toolbox_statistics)
+        - analyze: Set axes, fit curves, and compile analytical report
+          (request.analyze)
+        """
+        return GraphResult.model_validate(
+            await native(
+                NativeRequest(
+                    operation="manage_graph",
+                    graph_request=JSON_VALUE.validate_json(
+                        request.model_dump_json(),
+                    ),
+                ),
+                mutates=request.action != GraphAction.READ,
+            ),
+        )
 
     @mcp.tool(
         annotations=ToolAnnotations(
@@ -65,18 +116,19 @@ def register_display_tools(
     ) -> Result:
         """Insert a real graph into the active Capstone page, not a standalone PNG.
 
-        Inspect a fresh screenshot afterward. Custom graph axes are not exposed in
-        UIA; use their observed window-relative coordinates for measurement selection.
+        Delegates to capstone_manage_graph(action='create').
         """
-        return Result.model_validate(
-            await native(
-                NativeRequest(
-                    operation="create_graph",
-                    handle=handle,
-                    allow_foreground=allow_foreground,
-                ),
-                mutates=True,
+        req = GraphRequest(
+            action=GraphAction.CREATE,
+            create=CreateGraphRequest(
+                handle=handle,
+                allow_foreground=allow_foreground,
             ),
+        )
+        res = await capstone_manage_graph(req)
+        return Result(
+            detail=res.create.detail if res.create else "Graph created",
+            delivered=True,
         )
 
     @mcp.tool()
@@ -189,21 +241,11 @@ def register_display_tools(
     ) -> GraphAnalysisReport:
         """Read a selected graph and group fit comparisons by exact renderer/run/units.
 
-        Returns native parameters, free parameter counts, valid common metrics and
-        descriptive MSE/RMSE minima, never an overall best-model recommendation.
-        Missing sample count/residuals prevent AIC/BIC and residual-based conclusions.
-        request_model contains an accepted API enum when the native model is settable.
-        Uses Copy Display and replaces the clipboard; does not change fitted models.
+        Delegates to capstone_read_graph and summarizes.
         """
-        state = GraphState.model_validate(
-            await native(
-                NativeRequest(
-                    operation="read_graph",
-                    handle=handle,
-                    allow_foreground=allow_foreground,
-                ),
-                mutates=True,
-            ),
+        state = await capstone_read_graph(
+            handle,
+            allow_foreground=allow_foreground,
         )
         return summarize_graph(state)
 
@@ -223,22 +265,20 @@ def register_display_tools(
     ) -> GraphState:
         """Read selected graph's actual models, native coefficients and run/unit IDs.
 
-        Uses Display > Copy Display and replaces the Windows clipboard with the
-        selected graph. Does not save or modify the experiment. Select exactly one
-        graph and close menus first. Values come from Capstone, not an external fit.
-        Copy data_signature into the next fitting request to guard source/run/unit
-        identity. It does not fingerprint live sample contents or screenshot layout.
+        Delegates to capstone_manage_graph(action='read').
         """
-        return GraphState.model_validate(
-            await native(
-                NativeRequest(
-                    operation="read_graph",
-                    handle=handle,
-                    allow_foreground=allow_foreground,
-                ),
-                mutates=True,
+        req = GraphRequest(
+            action=GraphAction.READ,
+            read=ReadGraphRequest(
+                handle=handle,
+                allow_foreground=allow_foreground,
             ),
         )
+        res = await capstone_manage_graph(req)
+        if res.read is None:
+            msg = "Expected read result from manage_graph"
+            raise RuntimeError(msg)
+        return res.read.state
 
     @mcp.tool(
         annotations=ToolAnnotations(
@@ -302,30 +342,23 @@ def register_display_tools(
     )
     async def capstone_analyze_graph(
         handle: int,
-        request: GraphAnalysisRequest,
+        request: AnalyzeGraphRequest,
     ) -> GraphFitOutcome:
         """Configure optional X/Y axes, apply model choices, and read native results.
 
-        Create/select a graph and inspect its screenshot first. This combines named
-        measurement selection with idempotent native fitting in one worker session.
-        Uses the clipboard for verification. Existing unrelated displays are retained.
-        fitting.expected_data_signature checks the original graph before changing
-        either axis; the updated bindings are then verified for the fitting stage.
-        fitting.frame_id must be the latest capstone_observe_graph receipt.
+        Delegates to capstone_manage_graph(action='analyze').
         """
-        return GraphFitOutcome.model_validate(
-            await native(
-                NativeRequest(
-                    operation="analyze_graph",
-                    handle=handle,
-                    frame_id=request.fitting.frame_id,
-                    graph_request=JSON_VALUE.validate_json(
-                        request.model_dump_json(),
-                    ),
-                ),
-                mutates=True,
-            ),
+        if handle and request.handle != handle:
+            request = request.model_copy(update={"handle": handle})
+        req = GraphRequest(
+            action=GraphAction.ANALYZE,
+            analyze=request,
         )
+        res = await capstone_manage_graph(req)
+        if res.analyze is None:
+            msg = "Expected analyze result from manage_graph"
+            raise RuntimeError(msg)
+        return res.analyze.outcome
 
     @mcp.tool()
     async def capstone_fit_graph(
@@ -338,29 +371,23 @@ def register_display_tools(
     ) -> FitGraphResult:
         """Scale graph axes to fit all data or adjust bounds deterministically.
 
-        Args:
-            handle: Capstone main window handle (0 for active window).
-            mode: Scaling mode ('scale_to_fit' or 'manual_bounds').
-            graph_name: Target graph display name (None for active graph).
-            offset: Offset coordinate point for scale-to-fit toolbar icon.
-            allow_foreground: Bring window to foreground for UI automation.
-
-        Returns:
-            FitGraphResult with scaling outcome and graph identity.
+        Delegates to capstone_manage_graph(action='fit').
         """
-        return FitGraphResult.model_validate(
-            await native(
-                NativeRequest(
-                    operation="fit_graph",
-                    handle=handle,
-                    mode=mode,
-                    target=graph_name or "",
-                    point=offset,
-                    allow_foreground=allow_foreground,
-                ),
-                mutates=True,
+        req = GraphRequest(
+            action=GraphAction.FIT,
+            fit=FitGraphRequest(
+                handle=handle,
+                mode=mode,
+                graph_name=graph_name,
+                offset=offset,
+                allow_foreground=allow_foreground,
             ),
         )
+        res = await capstone_manage_graph(req)
+        if res.fit is None:
+            msg = "Expected fit result from manage_graph"
+            raise RuntimeError(msg)
+        return res.fit
 
     @mcp.tool()
     async def capstone_toggle_graph_statistics(
@@ -372,27 +399,22 @@ def register_display_tools(
     ) -> ToggleGraphStatisticsResult:
         """Toggle graph statistics box (Σ) and read descriptive statistics.
 
-        Args:
-            handle: Capstone main window handle (0 for active window).
-            graph_name: Specific graph display name (None targets active graph).
-            enable: Explicitly enable (True), disable (False), or toggle (None).
-            allow_foreground: Bring window to foreground for UI automation.
-
-        Returns:
-            ToggleGraphStatisticsResult with statistics dict (mean, min, max, std_dev).
+        Delegates to capstone_manage_graph(action='toolbox_statistics').
         """
-        return ToggleGraphStatisticsResult.model_validate(
-            await native(
-                NativeRequest(
-                    operation="toggle_graph_statistics",
-                    handle=handle,
-                    graph_name=graph_name,
-                    enable=enable,
-                    allow_foreground=allow_foreground,
-                ),
-                mutates=True,
+        req = GraphRequest(
+            action=GraphAction.TOOLBOX_STATISTICS,
+            toolbox_statistics=ToggleGraphStatisticsRequest(
+                handle=handle,
+                graph_name=graph_name,
+                enable=enable,
+                allow_foreground=allow_foreground,
             ),
         )
+        res = await capstone_manage_graph(req)
+        if res.toolbox_statistics is None:
+            msg = "Expected toolbox_statistics result from manage_graph"
+            raise RuntimeError(msg)
+        return res.toolbox_statistics
 
     @mcp.tool()
     async def capstone_measure_graph_area(
@@ -404,27 +426,22 @@ def register_display_tools(
     ) -> MeasureGraphAreaResult:
         """Toggle graph area integration tool (∫ydx) and extract integral value.
 
-        Args:
-            handle: Capstone main window handle (0 for active window).
-            graph_name: Specific graph display name (None targets active graph).
-            enable: Explicitly enable (True), disable (False), or toggle (None).
-            allow_foreground: Bring window to foreground for UI automation.
-
-        Returns:
-            MeasureGraphAreaResult with area value, integral units, and active status.
+        Delegates to capstone_manage_graph(action='toolbox_area').
         """
-        return MeasureGraphAreaResult.model_validate(
-            await native(
-                NativeRequest(
-                    operation="measure_graph_area",
-                    handle=handle,
-                    graph_name=graph_name,
-                    enable=enable,
-                    allow_foreground=allow_foreground,
-                ),
-                mutates=True,
+        req = GraphRequest(
+            action=GraphAction.TOOLBOX_AREA,
+            toolbox_area=MeasureGraphAreaRequest(
+                handle=handle,
+                graph_name=graph_name,
+                enable=enable,
+                allow_foreground=allow_foreground,
             ),
         )
+        res = await capstone_manage_graph(req)
+        if res.toolbox_area is None:
+            msg = "Expected toolbox_area result from manage_graph"
+            raise RuntimeError(msg)
+        return res.toolbox_area
 
     @mcp.tool()
     async def capstone_graph_delta(
@@ -437,29 +454,23 @@ def register_display_tools(
     ) -> GraphDeltaResult:
         """Activate delta crosshair tool and read coordinate differences (Δx, Δy).
 
-        Args:
-            handle: Capstone main window handle (0 for active window).
-            graph_name: Specific graph display name (None targets active graph).
-            point1: First reference coordinate point (Point(x=..., y=...)).
-            point2: Second reference coordinate point (Point(x=..., y=...)).
-            allow_foreground: Bring window to foreground for UI automation.
-
-        Returns:
-            GraphDeltaResult with delta_x, delta_y, slope, and crosshair state.
+        Delegates to capstone_manage_graph(action='toolbox_delta').
         """
-        return GraphDeltaResult.model_validate(
-            await native(
-                NativeRequest(
-                    operation="graph_delta",
-                    handle=handle,
-                    graph_name=graph_name,
-                    point1=point1,
-                    point2=point2,
-                    allow_foreground=allow_foreground,
-                ),
-                mutates=True,
+        req = GraphRequest(
+            action=GraphAction.TOOLBOX_DELTA,
+            toolbox_delta=GraphDeltaRequest(
+                handle=handle,
+                graph_name=graph_name,
+                point1=point1,
+                point2=point2,
+                allow_foreground=allow_foreground,
             ),
         )
+        res = await capstone_manage_graph(req)
+        if res.toolbox_delta is None:
+            msg = "Expected toolbox_delta result from manage_graph"
+            raise RuntimeError(msg)
+        return res.toolbox_delta
 
     @mcp.tool()
     async def capstone_create_table(
@@ -751,6 +762,7 @@ def register_display_tools(
         )
 
     return {
+        "capstone_manage_graph": capstone_manage_graph,
         "capstone_create_graph": capstone_create_graph,
         "capstone_select_graph_measurement": capstone_select_graph_measurement,
         "capstone_observe_graph": capstone_observe_graph,

@@ -310,6 +310,10 @@ class GraphAnalysisReport(Model):
 # 6. Execution Tracking & Failure Envelopes
 # ---------------------------------------------------------------------------
 
+GRAPH_INPUT_OPERATIONS: Final = frozenset({
+    "select_graph_measurement", "set_graph_fits", "analyze_graph",
+})
+
 
 class GraphFrame(Model):
     """A worker-issued screenshot receipt, valid for one graph input request."""
@@ -441,7 +445,7 @@ class SelectMeasurementResult(Model):
     verified: bool = True
 
 
-class SetGraphFitsRequest(Model):
+class GraphFitRequest(Model):
     """Set the exact model set on the currently selected native graph."""
 
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True, extra="forbid")
@@ -466,8 +470,8 @@ class SetGraphFitsRequest(Model):
         return self
 
 
-# Backward-compatible alias
-GraphFitRequest = SetGraphFitsRequest
+# Unified and backward-compatible alias
+SetGraphFitsRequest = GraphFitRequest
 
 
 class GraphFitOutcome(Model):

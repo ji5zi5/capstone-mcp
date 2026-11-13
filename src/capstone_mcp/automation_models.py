@@ -5,7 +5,7 @@ from typing import Literal
 
 from pydantic import Field, JsonValue
 
-from capstone_mcp.graph_execution import GraphFailure
+from capstone_mcp.graphs import GraphFailure
 from capstone_mcp.models import Action, Button, Model, Point
 
 type NativeOperation = Literal[
@@ -15,6 +15,7 @@ type NativeOperation = Literal[
     "select_sensor", "configure_sensor",
     "recording_initialize", "recording_observe", "recording_change",
     "save_experiment", "export_data", "open_experiment",
+    "manage_graph",
     "create_graph", "select_graph_measurement",
     "read_graph", "set_graph_fits", "analyze_graph", "observe_graph",
     "rename_run", "fit_graph", "create_calculation", "delete_run", "zero_sensor",

@@ -61,3 +61,4 @@ def test_fastmcp_tool_count_contract() -> None:
     assert "capstone_export_data" in tool_names
     assert "capstone_create_calculation" in tool_names
     assert "capstone_linear_fit" in tool_names
+    assert "capstone_manage_graph" in tool_names

@@ -18,7 +18,7 @@ import win32job
 from pydantic import JsonValue, TypeAdapter
 
 from capstone_mcp.automation_models import NativeReply, NativeRequest, RequestPacket
-from capstone_mcp.graph_execution import GRAPH_INPUT_OPERATIONS, GraphFailure
+from capstone_mcp.graphs import GRAPH_INPUT_OPERATIONS, GraphFailure
 
 TEXT_VALUE: Final = TypeAdapter(str)
 LOGGER: Final = logging.getLogger(__name__)
