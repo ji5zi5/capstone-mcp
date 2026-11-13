@@ -1,8 +1,17 @@
 # Copyright 2026 Capstone MCP contributors.
 """Integration tests verifying domain tool routers and FastMCP registration."""
 
+import pytest
 from mcp.server.fastmcp import FastMCP
 
+from capstone_mcp.automation_models import NativeRequest
+from capstone_mcp.graphs import (
+    CreateGraphRequest,
+    CreateGraphResult,
+    GraphAction,
+    GraphRequest,
+    GraphResult,
+)
 from capstone_mcp.server import MCP, ExportedData
 from capstone_mcp.tools import (
     register_display_tools,
@@ -118,8 +127,9 @@ def test_isolated_router_registration() -> None:
     display_tools = register_display_tools(
         mcp_displays, mock_native, get_last_failure=lambda: None,
     )
-    assert len(display_tools) == 22
-    assert len(mcp_displays._tool_manager.list_tools()) == 22
+    assert len(display_tools) == 23
+    assert len(mcp_displays._tool_manager.list_tools()) == 23
+    assert "capstone_manage_graph" in display_tools
 
     # Instrument router
     mcp_instruments = FastMCP("test-instruments")
@@ -137,3 +147,63 @@ def test_isolated_router_registration() -> None:
 def test_exported_data_backward_compatible() -> None:
     """Verify ExportedData can be imported from server module."""
     assert ExportedData is not None
+
+
+@pytest.mark.anyio
+async def test_manage_graph_tool_delegation() -> None:
+    """Verify capstone_manage_graph invokes native with operation='manage_graph'."""
+    captured_requests: list[NativeRequest] = []
+
+    async def mock_native(
+        req: NativeRequest,
+        *_args: object,
+        **_kwargs: object,
+    ) -> dict[str, object]:
+        captured_requests.append(req)
+        return GraphResult(
+            action=GraphAction.CREATE,
+            create=CreateGraphResult(detail="Graph created", verified=True),
+        ).model_dump()
+
+    mcp = FastMCP("test-manage-graph")
+    tools = register_display_tools(mcp, mock_native)
+    manage_fn = tools["capstone_manage_graph"]
+
+    res = await manage_fn(
+        GraphRequest(
+            action=GraphAction.CREATE,
+            create=CreateGraphRequest(handle=42),
+        ),
+    )
+    assert isinstance(res, GraphResult)
+    assert len(captured_requests) == 1
+    assert captured_requests[0].operation == "manage_graph"
+    assert captured_requests[0].graph_request["action"] == "create"
+
+
+@pytest.mark.anyio
+async def test_legacy_graph_tools_delegate_to_manage_graph() -> None:
+    """Verify legacy tool capstone_create_graph delegates to manage_graph."""
+    captured_requests: list[NativeRequest] = []
+
+    async def mock_native(
+        req: NativeRequest,
+        *_args: object,
+        **_kwargs: object,
+    ) -> dict[str, object]:
+        captured_requests.append(req)
+        return GraphResult(
+            action=GraphAction.CREATE,
+            create=CreateGraphResult(detail="Legacy created", verified=True),
+        ).model_dump()
+
+    mcp = FastMCP("test-legacy-graph")
+    tools = register_display_tools(mcp, mock_native)
+    create_fn = tools["capstone_create_graph"]
+
+    res = await create_fn(handle=100)
+    assert res.delivered is True
+    assert res.detail == "Legacy created"
+    assert len(captured_requests) == 1
+    assert captured_requests[0].operation == "manage_graph"
+    assert captured_requests[0].graph_request["action"] == "create"

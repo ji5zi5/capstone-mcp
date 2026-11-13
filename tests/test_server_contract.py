@@ -1,6 +1,10 @@
 # Copyright 2026 Capstone MCP contributors.
 """Regression contract test for capstone_mcp.server public exports."""
 
+import json
+
+import pytest
+
 from capstone_mcp import server
 from capstone_mcp.acquisition import RecordingStatus
 from capstone_mcp.repetition import (
@@ -61,3 +65,63 @@ def test_fastmcp_tool_count_contract() -> None:
     assert "capstone_export_data" in tool_names
     assert "capstone_create_calculation" in tool_names
     assert "capstone_linear_fit" in tool_names
+    assert "capstone_manage_graph" in tool_names
+
+
+def test_systematic_tool_annotations() -> None:
+    """Verify readOnlyHint and destructiveHint annotations across MCP tools."""
+    tools = {t.name: t for t in server.MCP._tool_manager.list_tools()}
+
+    # 1. Read-only inspection tools
+    read_only_tools = [
+        "capstone_windows",
+        "capstone_snapshot",
+        "capstone_read_value",
+        "capstone_screenshot",
+        "capstone_read_graph",
+        "capstone_read_table",
+        "capstone_inspect_file",
+        "capstone_file_datasets",
+        "capstone_extract_dataset",
+        "capstone_recording_status",
+        "capstone_linear_fit",
+    ]
+    for name in read_only_tools:
+        tool = tools[name]
+        assert tool.annotations is not None, f"Tool {name} missing annotations"
+        assert tool.annotations.readOnlyHint is True, f"Tool {name} expected readOnlyHint=True"
+
+    # 2. Destructive modification tools
+    destructive_tools = [
+        "capstone_delete_run",
+        "capstone_open_experiment",
+        "capstone_set_graph_fits",
+        "capstone_analyze_graph",
+    ]
+    for name in destructive_tools:
+        tool = tools[name]
+        assert tool.annotations is not None, f"Tool {name} missing annotations"
+        assert tool.annotations.destructiveHint is True, f"Tool {name} expected destructiveHint=True"
+
+
+@pytest.mark.anyio
+async def test_dynamic_resources_contract() -> None:
+    """Verify capstone://status and capstone://runs/active dynamic state resources."""
+    resources = {str(r.uri): r for r in server.MCP._resource_manager.list_resources()}
+    assert "capstone://status" in resources
+    assert "capstone://runs/active" in resources
+
+    # Status resource read
+    status_raw = await server.capstone_status_resource()
+    status = json.loads(status_raw)
+    assert "attached" in status
+    assert "process_id" in status
+    assert "windows_count" in status
+    assert "active_jobs_count" in status
+    assert "last_graph_failure" in status
+
+    # Runs active resource read
+    runs_raw = await server.capstone_active_runs_resource()
+    runs = json.loads(runs_raw)
+    assert "process_id" in runs
+    assert "active_jobs" in runs

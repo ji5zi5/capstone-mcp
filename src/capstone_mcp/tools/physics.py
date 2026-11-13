@@ -81,7 +81,15 @@ def register_physics_tools(mcp: FastMCP, native: NativeCaller) -> dict[str, Any]
         """
         return guide(topic)
 
-    @mcp.tool()
+    @mcp.tool(
+        annotations=ToolAnnotations(
+            title="Plot numerical samples",
+            readOnlyHint=True,
+            destructiveHint=False,
+            idempotentHint=True,
+            openWorldHint=False,
+        ),
+    )
     def capstone_plot(samples: PlotInput) -> Image:
         """Render a scatter/line plot of labeled numerical samples as a PNG image.
 
@@ -90,19 +98,43 @@ def register_physics_tools(mcp: FastMCP, native: NativeCaller) -> dict[str, Any]
         """
         return Image(data=render_plot(samples), format="png")
 
-    @mcp.tool()
+    @mcp.tool(
+        annotations=ToolAnnotations(
+            title="Run OLS linear regression",
+            readOnlyHint=True,
+            destructiveHint=False,
+            idempotentHint=True,
+            openWorldHint=False,
+        ),
+    )
     def capstone_linear_fit(samples: FitInput) -> LinearFit:
         """Run standard OLS linear regression (y = slope*x + intercept) on points."""
         return linear_fit(samples)
 
-    @mcp.tool()
+    @mcp.tool(
+        annotations=ToolAnnotations(
+            title="Compare experiment runs",
+            readOnlyHint=True,
+            destructiveHint=False,
+            idempotentHint=True,
+            openWorldHint=False,
+        ),
+    )
     def capstone_compare_runs(
         runs: list[RunSamples],
     ) -> list[RunComparison]:
         """Group and compare sample metrics across multiple named experimental runs."""
         return compare_runs(runs)
 
-    @mcp.tool()
+    @mcp.tool(
+        annotations=ToolAnnotations(
+            title="Create calculator expression",
+            readOnlyHint=False,
+            destructiveHint=False,
+            idempotentHint=False,
+            openWorldHint=False,
+        ),
+    )
     async def capstone_create_calculation(
         expression: str,
         handle: int = 0,
@@ -137,7 +169,15 @@ def register_physics_tools(mcp: FastMCP, native: NativeCaller) -> dict[str, Any]
             ),
         )
 
-    @mcp.tool()
+    @mcp.tool(
+        annotations=ToolAnnotations(
+            title="Generate physics lab report",
+            readOnlyHint=False,
+            destructiveHint=False,
+            idempotentHint=False,
+            openWorldHint=False,
+        ),
+    )
     async def capstone_generate_lab_report(
         file_path_or_run: str,
         experiment_id: str = "generic",
@@ -244,7 +284,15 @@ def register_physics_tools(mcp: FastMCP, native: NativeCaller) -> dict[str, Any]
         """
         return guide_lesson_step(experiment_id, step_index)
 
-    @mcp.tool()
+    @mcp.tool(
+        annotations=ToolAnnotations(
+            title="Run experiment macro",
+            readOnlyHint=False,
+            destructiveHint=False,
+            idempotentHint=False,
+            openWorldHint=False,
+        ),
+    )
     async def capstone_run_experiment_macro(
         experiment_id: str,
         action: str = "run",

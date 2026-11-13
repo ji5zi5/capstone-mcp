@@ -14,8 +14,7 @@ from pydantic import Field, JsonValue
 
 from capstone_mcp.analysis import LinearFit
 from capstone_mcp.capfile_models import CapDatasetPage, CapDatasetSummary
-from capstone_mcp.graph_execution import GraphFailure
-from capstone_mcp.graph_state import FitModel
+from capstone_mcp.graphs import FitModel, GraphFailure
 from capstone_mcp.models import Model
 
 ROOT: Final = str(Path(__file__).resolve().parents[1])

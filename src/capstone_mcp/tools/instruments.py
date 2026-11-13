@@ -7,6 +7,7 @@ from uuid import UUID
 
 import anyio
 from mcp.server.fastmcp import FastMCP
+from mcp.types import ToolAnnotations
 from pydantic import Field, JsonValue
 
 from capstone_mcp.acquisition import (
@@ -67,7 +68,15 @@ def register_instrument_tools(
             return jobs
         return AcquisitionJobs()
 
-    @mcp.tool()
+    @mcp.tool(
+        annotations=ToolAnnotations(
+            title="Read recording status",
+            readOnlyHint=True,
+            destructiveHint=False,
+            idempotentHint=True,
+            openWorldHint=False,
+        ),
+    )
     async def capstone_recording_status(handle: int) -> RecordingStatus:
         """Read actual recording toggle, enabled state, and displayed time/rate."""
         return RecordingStatus.model_validate(
@@ -184,7 +193,15 @@ def register_instrument_tools(
         """
         return await anyio.to_thread.run_sync(_get_jobs().start, plan)
 
-    @mcp.tool()
+    @mcp.tool(
+        annotations=ToolAnnotations(
+            title="Read acquisition job status",
+            readOnlyHint=True,
+            destructiveHint=False,
+            idempotentHint=True,
+            openWorldHint=False,
+        ),
+    )
     def capstone_acquisition_job(job_id: str) -> JobStatus:
         """Read a repeat job's completion and confirmed-cycle receipts."""
         return _get_jobs().status(job_id)
@@ -223,7 +240,15 @@ def register_instrument_tools(
             ),
         )
 
-    @mcp.tool()
+    @mcp.tool(
+        annotations=ToolAnnotations(
+            title="Read native live configuration",
+            readOnlyHint=True,
+            destructiveHint=False,
+            idempotentHint=True,
+            openWorldHint=False,
+        ),
+    )
     async def capstone_live_configuration(
         debug_port: Annotated[int, Field(ge=1024, le=65535)] = 9223,
     ) -> NativeInventory:
@@ -235,7 +260,15 @@ def register_instrument_tools(
         """
         return await anyio.to_thread.run_sync(read_inventory, debug_port)
 
-    @mcp.tool()
+    @mcp.tool(
+        annotations=ToolAnnotations(
+            title="Read current measurement value",
+            readOnlyHint=True,
+            destructiveHint=False,
+            idempotentHint=True,
+            openWorldHint=False,
+        ),
+    )
     async def capstone_current_value(
         measurement_euid: UUID,
         unit_type: Annotated[int, Field(ge=0)],
@@ -297,7 +330,15 @@ def register_instrument_tools(
             ),
         )
 
-    @mcp.tool()
+    @mcp.tool(
+        annotations=ToolAnnotations(
+            title="Read signal generator status",
+            readOnlyHint=True,
+            destructiveHint=False,
+            idempotentHint=True,
+            openWorldHint=False,
+        ),
+    )
     async def capstone_read_signal_generator_status(
         handle: int = 0,
         *,
@@ -434,7 +475,15 @@ def register_instrument_tools(
             ),
         )
 
-    @mcp.tool()
+    @mcp.tool(
+        annotations=ToolAnnotations(
+            title="Read FFT peaks",
+            readOnlyHint=True,
+            destructiveHint=False,
+            idempotentHint=True,
+            openWorldHint=False,
+        ),
+    )
     async def capstone_read_fft_peaks(
         handle: int = 0,
         *,
@@ -562,7 +611,15 @@ def register_instrument_tools(
             ),
         )
 
-    @mcp.tool()
+    @mcp.tool(
+        annotations=ToolAnnotations(
+            title="Scan wireless sensors",
+            readOnlyHint=True,
+            destructiveHint=False,
+            idempotentHint=True,
+            openWorldHint=False,
+        ),
+    )
     async def capstone_scan_wireless_sensors(
         handle: int = 0,
         *,

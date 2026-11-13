@@ -28,30 +28,30 @@ from capstone_mcp.file_workflows import (
     open_experiment,
     save_experiment,
 )
-from capstone_mcp.graph_control import FitGraphRequest, fit_graph
-from capstone_mcp.graph_execution import (
+from capstone_mcp.graphs import (
     GRAPH_INPUT_OPERATIONS,
+    AnalyzeGraphRequest,
+    FitGraphRequest,
     GraphCapture,
+    GraphDeltaRequest,
     GraphFailure,
     GraphFrame,
     GraphOperationError,
     GraphProgress,
-)
-from capstone_mcp.graph_requests import GraphAnalysisRequest, GraphFitRequest
-from capstone_mcp.graph_toolbox import (
-    GraphDeltaRequest,
+    GraphRequest,
     MeasureGraphAreaRequest,
+    SetGraphFitsRequest,
     ToggleGraphStatisticsRequest,
-    graph_delta,
-    measure_graph_area,
-    toggle_graph_statistics,
-)
-from capstone_mcp.graph_workflows import (
     analyze_graph,
     create_graph,
+    fit_graph,
+    graph_delta,
+    manage_graph,
+    measure_graph_area,
     read_graph,
     select_graph_measurement,
     set_graph_fits,
+    toggle_graph_statistics,
 )
 from capstone_mcp.models import Point, Result
 from capstone_mcp.oscilloscope_fft import (
@@ -253,6 +253,12 @@ class NativeDesktop:
                     allow_foreground=r.allow_foreground,
                 ),
             ),
+            "manage_graph": lambda r: _json(
+                manage_graph(
+                    self.app,
+                    GraphRequest.model_validate(r.graph_request),
+                ),
+            ),
             "create_graph": lambda r: _json(
                 create_graph(
                     self.app,
@@ -280,14 +286,14 @@ class NativeDesktop:
                 set_graph_fits(
                     self.app,
                     r.handle,
-                    GraphFitRequest.model_validate(r.graph_request),
+                    SetGraphFitsRequest.model_validate(r.graph_request),
                 ),
             ),
             "analyze_graph": lambda r: _json(
                 analyze_graph(
                     self.app,
                     r.handle,
-                    GraphAnalysisRequest.model_validate(r.graph_request),
+                    AnalyzeGraphRequest.model_validate(r.graph_request),
                 ),
             ),
             "fit_graph": lambda r: _json(
@@ -618,6 +624,7 @@ class NativeDesktop:
             "read_graph",
             "observe_graph",
             "create_graph",
+            "manage_graph",
         }:
             return self.handlers[request.operation](request)
         self.graph_progress = GraphProgress()

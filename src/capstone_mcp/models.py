@@ -86,3 +86,11 @@ class Result(Model):
     interrupted: bool = False
     typed_text: str | None = None
     popup_window: Window | None = None
+
+
+class ToolErrorPayload(Model):
+    """Structured error envelope for MCP tool failures."""
+
+    error_code: str
+    message: str
+    remediation: str

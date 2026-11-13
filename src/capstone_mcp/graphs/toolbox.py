@@ -1,15 +1,26 @@
 # Copyright 2026 Capstone MCP contributors.
 """Graph toolbar analysis tools: statistics (Σ), area under curve (∫ydx), delta (Δ)."""
 
+from __future__ import annotations
+
 import contextlib
 import re
-from typing import Final
-
-from pydantic import Field
+from typing import TYPE_CHECKING, Final
 
 from capstone_mcp.desktop import AutomationError, Capstone
 from capstone_mcp.displays import click_control
-from capstone_mcp.models import Control, Model, Point
+from capstone_mcp.graphs.models import (
+    GraphDeltaRequest,
+    GraphDeltaResult,
+    GraphStatistics,
+    MeasureGraphAreaRequest,
+    MeasureGraphAreaResult,
+    ToggleGraphStatisticsRequest,
+    ToggleGraphStatisticsResult,
+)
+
+if TYPE_CHECKING:
+    from capstone_mcp.models import Control
 
 TOOLBAR_SEARCH_HEIGHT_PX: Final = 120
 MIN_COORDINATE_PAIRS: Final = 2
@@ -72,85 +83,6 @@ COORD_PAIR_RE: Final = re.compile(
 )
 
 
-class GraphStatistics(Model):
-    """Extracted summary statistics from graph statistics box."""
-
-    mean: float | None = None
-    std_dev: float | None = None
-    min: float | None = None
-    max: float | None = None
-    count: int | None = None
-    raw_values: dict[str, str] = Field(default_factory=dict)
-
-
-class ToggleGraphStatisticsRequest(Model):
-    """Specification for toggling statistics box and extracting values."""
-
-    handle: int = 0
-    graph_name: str | None = None
-    enable: bool | None = None
-    allow_foreground: bool = True
-
-
-class ToggleGraphStatisticsResult(Model):
-    """Outcome of toggling graph statistics."""
-
-    visible: bool = True
-    statistics: GraphStatistics | None = None
-    graph_name: str | None = None
-    verified: bool = True
-    detail: str = ""
-
-
-class MeasureGraphAreaRequest(Model):
-    """Specification for area under curve (integral) measurement."""
-
-    handle: int = 0
-    graph_name: str | None = None
-    enable: bool | None = None
-    allow_foreground: bool = True
-
-
-class MeasureGraphAreaResult(Model):
-    """Outcome of curve area integration."""
-
-    visible: bool = True
-    area: float | None = None
-    unit: str | None = None
-    raw_text: str | None = None
-    graph_name: str | None = None
-    verified: bool = True
-    detail: str = ""
-
-
-class GraphDeltaRequest(Model):
-    """Specification for activating delta tool and reading coordinate differences."""
-
-    handle: int = 0
-    graph_name: str | None = None
-    point1: Point | None = None
-    point2: Point | None = None
-    allow_foreground: bool = True
-
-
-class GraphDeltaResult(Model):
-    """Outcome of delta crosshair measurement."""
-
-    active: bool = True
-    delta_x: float | None = None
-    delta_y: float | None = None
-    x1: float | None = None
-    y1: float | None = None
-    x2: float | None = None
-    y2: float | None = None
-    unit_x: str | None = None
-    unit_y: str | None = None
-    raw_text: str | None = None
-    graph_name: str | None = None
-    verified: bool = True
-    detail: str = ""
-
-
 def _find_graph_control(
     controls: list[Control],
     graph_name: str | None = None,
@@ -164,7 +96,7 @@ def _find_graph_control(
                 or g_lower in ctrl.automation_id.lower()
             ):
                 return ctrl
-        msg = f"Graph control matching '{graph_name}' not found."
+        msg = f"Target graph control not found: matching '{graph_name}'."
         raise AutomationError(msg)
 
     # Search for Graph widget
@@ -325,7 +257,7 @@ def toggle_graph_statistics(
     graph_ctrl = _find_graph_control(snapshot.controls, request.graph_name)
     stats_btn = _find_toolbar_button(snapshot.controls, graph_ctrl, STATS_KEYWORDS)
 
-    # Click toggle button
+    # Click toggle button using display harness primitive
     click_control(app, request.handle, stats_btn, allow_foreground=True)
 
     # Inspect graph overlay for statistics box
@@ -386,7 +318,7 @@ def measure_graph_area(
     graph_ctrl = _find_graph_control(snapshot.controls, request.graph_name)
     area_btn = _find_toolbar_button(snapshot.controls, graph_ctrl, AREA_KEYWORDS)
 
-    # Click toggle button
+    # Click toggle button using display harness primitive
     click_control(app, request.handle, area_btn, allow_foreground=True)
 
     # Read area from graph overlay
@@ -493,7 +425,7 @@ def graph_delta(
     graph_ctrl = _find_graph_control(snapshot.controls, request.graph_name)
     delta_btn = _find_toolbar_button(snapshot.controls, graph_ctrl, DELTA_KEYWORDS)
 
-    # Click delta button to activate tool
+    # Click delta button to activate tool using display harness primitive
     click_control(app, request.handle, delta_btn, allow_foreground=True)
 
     # If positioning points provided, position crosshairs
@@ -530,6 +462,8 @@ def graph_delta(
         active=True,
         delta_x=dx,
         delta_y=dy,
+        dx=dx,
+        dy=dy,
         x1=x1,
         y1=y1,
         x2=x2,

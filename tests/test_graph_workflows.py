@@ -8,20 +8,18 @@ import win32gui
 import win32process
 from pydantic import ValidationError
 
-from capstone_mcp import graph_workflows
 from capstone_mcp.desktop import AutomationError, Capstone
-from capstone_mcp.graph_requests import GraphFitRequest
-from capstone_mcp.graph_state import (
+from capstone_mcp.graphs import (
     FitModel,
+    GraphFitRequest,
     GraphSeries,
     GraphState,
     NativeFit,
-)
-from capstone_mcp.graph_workflows import (
     create_graph,
     select_graph_measurement,
     set_graph_fits,
 )
+from capstone_mcp.graphs import manager as graph_workflows
 from capstone_mcp.models import Bounds, Control, Point, Result, Snapshot, Window
 
 

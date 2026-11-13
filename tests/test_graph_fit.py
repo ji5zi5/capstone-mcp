@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from capstone_mcp.desktop import AutomationError, Capstone
-from capstone_mcp.graph_control import FitGraphRequest, fit_graph
+from capstone_mcp.graphs import FitGraphRequest, fit_graph
 from capstone_mcp.models import Bounds, Control, Point, Snapshot, Window
 
 

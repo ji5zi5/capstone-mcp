@@ -18,7 +18,7 @@ import win32job
 from pydantic import JsonValue, TypeAdapter
 
 from capstone_mcp.automation_models import NativeReply, NativeRequest, RequestPacket
-from capstone_mcp.graph_execution import GRAPH_INPUT_OPERATIONS, GraphFailure
+from capstone_mcp.graphs import GRAPH_INPUT_OPERATIONS, GraphFailure
 
 TEXT_VALUE: Final = TypeAdapter(str)
 LOGGER: Final = logging.getLogger(__name__)
@@ -50,6 +50,11 @@ class AutomationWorker:
         self.retired: bool = False
         self.uncertain: bool = False
         self.last_graph_failure: GraphFailure | None = None
+
+    @property
+    def process_id(self) -> int | None:
+        """Return the native worker process ID if currently running."""
+        return self.process.pid if self.process is not None else None
 
     def _spawn(self) -> subprocess.Popen[str]:
         """Launch the fixed native bootstrap; test backends replace this boundary."""
