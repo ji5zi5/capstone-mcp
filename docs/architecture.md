@@ -338,10 +338,85 @@ flowchart TD
 
 ---
 
-## 9. Quality & Verification Guardrails
+## 9. Tool Catalog Surface Consolidation & Phase 9 Telemetry Architecture
 
-1. **Automated Test Coverage**: 524 unit and integration tests across 59 test suites, executed with `uv run --no-sync pytest` (100% pass rate).
+Phase 9 streamlined the entire MCP tool surface, purged legacy educational trivia modules, reverse-engineered Capstone's native QtWebEngine / Chromium debugging layer, and introduced high-speed CDP WebSocket telemetry:
+
+```mermaid
+flowchart TD
+    subgraph ClientLayer ["Client / AI Agent Context"]
+        Tools["21 Consolidated Tools (Ceiling <= 22)\nCompound Managers + Escape Hatch"]
+        LiveResource["Dynamic Resource (capstone://measurements/live)"]
+    end
+
+    subgraph ServerLayer ["MCP Protocol Boundary (server.py)"]
+        SessionMgr["UnifiedSessionManager (session.py)"]
+        Worker["AutomationWorker (automation_worker.py)"]
+        WorkerStderr["Circular Deque Stderr Pipe (200 lines / 4KB)"]
+    end
+
+    subgraph NativeDualPath ["Dual-Channel Capstone Runtime"]
+        subgraph FastPath ["Fast-Path Telemetry (< 15 ms)"]
+            CDP["CDP WebSocket (port 9222)"]
+            QWebChannel["QWebChannel & window.app\n(53 native C++ RPC methods)"]
+            CDP --> QWebChannel
+        end
+
+        subgraph SlowPath ["Desktop Automation (STA)"]
+            UIA["pywinauto / Windows UIA Engine"]
+            QtWidgets["Native Qt Windows & Controls"]
+            UIA --> QtWidgets
+        end
+    end
+
+    Tools --> SessionMgr
+    LiveResource --> SessionMgr
+    SessionMgr -->|Live Sensors & Values| FastPath
+    SessionMgr -->|Layout, Graph, File I/O| Worker
+    Worker --> SlowPath
+```
+
+### Key Architectural Enhancements:
+
+1. **Tool Catalog Surface Ceiling (`len(tools) <= 22`)**:
+   - De-registered 35 individual shallow macro tools (`click`, `drag`, `scroll`, `keys`, `type_text`, individual graph fit buttons, individual display creators).
+   - Introduced a single consolidated escape hatch: `capstone_interact_ui(action=...)` for raw coordinate/ref clicks, drags, and keystrokes.
+   - Preserves 4 compound managers: `capstone_manage_display`, `capstone_manage_graph`, `capstone_manage_instrument`, and `capstone_manage_run`.
+   - The total registered FastMCP tool surface is strictly capped at **exactly 21 tools**, mitigating LLM tool-selection hallucinations and context overhead.
+
+2. **Complete Removal of High School Physics Tutor**:
+   - Deleted the obsolete `src/capstone_mcp/tutor/` package, curriculum questions, and trivia evaluators.
+   - 100% preserved all professional numerical regression, OLS fitting, SVG/ASCII plotting, mathematical calculation modeling, and lab report generators.
+
+3. **Subprocess Stderr & IPC Diagnostics**:
+   - `AutomationWorker` captures up to 200 lines of child process `stderr` in a circular deque (capped at 4KB).
+   - Thread-safe non-blocking pump passes diagnostic logs to parents upon sudden worker terminations, eliminating opaque silent crashes.
+   - Structured IPC error envelopes (`error_code`, `remediation`) ensure deterministic self-correction across AI agent workflows.
+
+4. **CDP WebSocket Debug Port Launch (`desktop.py`)**:
+   - `capstone_attach(launch=True)` automatically injects `--remote-debugging-port=9222` and `--remote-allow-origins=*` into Capstone's command line.
+   - Sets `QTWEBENGINE_REMOTE_DEBUGGING=9222` environment variable for seamless Qt 5.15 WebEngine remote debugging.
+
+5. **UnifiedSessionManager & Live Telemetry Fast-Path (`capstone_mcp.session`)**:
+   - Routes sensor discovery (`read_live_inventory`) and live value polling (`read_live_measurement`) over CDP WebSocket to port 9222 with < 15 ms latency.
+   - Establishes a strict technical boundary: high-speed sensor streams bypass slow GUI automation, while graph displays, dialogs, and layouts remain on Desktop UIA.
+
+6. **Dynamic Live Measurement Resource (`capstone://measurements/live`)**:
+   - Exposes a dynamic JSON resource streaming real-time sensor inventory and channel measurements directly to the AI agent context.
+
+7. **Threshold Stop Condition Triggers**:
+   - `monitor_until_stop` and `StopCondition` evaluate mathematical comparators (`>`, `<`, `>=`, `<=`, `==`, `above`, `below`, `reaches`) against live sensor streams and automatically halt recording when boundaries are crossed.
+
+8. **Live E2E Smoke Test Isolation (`tests/test_live_smoke.py`)**:
+   - Isolates actual hardware/desktop GUI smoke tests behind `@pytest.mark.skipif(not HAS_CAPSTONE)`, ensuring deterministic passes in headless CI environments.
+
+---
+
+## 10. Quality & Verification Guardrails
+
+1. **Automated Test Coverage**: 527 unit, integration, and smoke tests across 61 test suites, executed with `uv run --no-sync pytest` (100% pass rate: 526 passed, 1 skipped).
 2. **Deterministic Offline CI**: Hardware-dependent and live GUI tests include fallback guards (`pytest.mark.skipif`), allowing CI pipelines to pass deterministically in headless environments.
 3. **Windows Process Lock Guard**: Tool and test runner commands strictly enforce `--no-sync` to avoid `os error 32` file locking when background MCP processes hold `capstone-mcp.exe`.
 4. **Strict Type Safety & Linting**: Ruff compliance across all rulesets (`ruff check src tests`) with 0 errors, and Basedpyright type validation (`basedpyright src`) with 0 errors, 0 warnings.
+
 
