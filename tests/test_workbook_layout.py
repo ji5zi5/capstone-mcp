@@ -9,10 +9,12 @@ from capstone_mcp.desktop import AutomationError, Capstone
 from capstone_mcp.displays import (
     AddPageRequest,
     AddPageResult,
+    DisplayAction,
+    DisplayRequest,
+    DisplayResult,
     SetPageLayoutRequest,
     SetPageLayoutResult,
-    add_page,
-    set_page_layout,
+    manage_display,
 )
 from capstone_mcp.models import Bounds, Control, Snapshot, Window
 
@@ -33,14 +35,20 @@ def test_add_page_rejects_empty_title() -> None:
     app = Capstone()
     req = AddPageRequest(handle=100, title="")
     with pytest.raises(AutomationError, match="title must not be empty"):
-        _ = add_page(app, req)
+        _ = manage_display(
+            app,
+            DisplayRequest(action=DisplayAction.ADD_PAGE, add_page=req),
+        )
 
 
 def test_add_page_requires_foreground() -> None:
     app = Capstone()
     req = AddPageRequest(handle=100, title="Page 2", allow_foreground=False)
     with pytest.raises(AutomationError, match="allow_foreground"):
-        _ = add_page(app, req)
+        _ = manage_display(
+            app,
+            DisplayRequest(action=DisplayAction.ADD_PAGE, add_page=req),
+        )
 
 
 def test_add_page_raises_when_add_button_not_found() -> None:
@@ -54,7 +62,10 @@ def test_add_page_raises_when_add_button_not_found() -> None:
 
     req = AddPageRequest(handle=100, title="Page 2")
     with pytest.raises(AutomationError, match="Add Page button not found"):
-        _ = add_page(app, req)
+        _ = manage_display(
+            app,
+            DisplayRequest(action=DisplayAction.ADD_PAGE, add_page=req),
+        )
 
 
 def test_add_page_success() -> None:
@@ -105,9 +116,14 @@ def test_add_page_success() -> None:
     app.control = MagicMock(return_value=tab2_node)
 
     req = AddPageRequest(handle=100, title="Experiment Results")
-    result = add_page(app, req)
+    display_res = manage_display(
+        app,
+        DisplayRequest(action=DisplayAction.ADD_PAGE, add_page=req),
+    )
 
-    assert isinstance(result, AddPageResult)
+    assert isinstance(display_res, DisplayResult)
+    assert isinstance(display_res.add_page, AddPageResult)
+    result = display_res.add_page
     assert result.page_index == 1
     assert result.title == "Experiment Results"
     assert result.verified is True
@@ -126,7 +142,13 @@ def test_set_page_layout_requires_foreground() -> None:
         allow_foreground=False,
     )
     with pytest.raises(AutomationError, match="allow_foreground"):
-        _ = set_page_layout(app, req)
+        _ = manage_display(
+            app,
+            DisplayRequest(
+                action=DisplayAction.SET_PAGE_LAYOUT,
+                set_page_layout=req,
+            ),
+        )
 
 
 def test_set_page_layout_raises_when_page_not_found() -> None:
@@ -151,7 +173,13 @@ def test_set_page_layout_raises_when_page_not_found() -> None:
         page_name="Nonexistent Page",
     )
     with pytest.raises(AutomationError, match="Workbook page 'Nonexistent Page'"):
-        _ = set_page_layout(app, req)
+        _ = manage_display(
+            app,
+            DisplayRequest(
+                action=DisplayAction.SET_PAGE_LAYOUT,
+                set_page_layout=req,
+            ),
+        )
 
 
 def test_set_page_layout_raises_when_template_not_found() -> None:
@@ -165,7 +193,13 @@ def test_set_page_layout_raises_when_template_not_found() -> None:
 
     req = SetPageLayoutRequest(handle=100, layout="four_grid")
     with pytest.raises(AutomationError, match="Layout template control"):
-        _ = set_page_layout(app, req)
+        _ = manage_display(
+            app,
+            DisplayRequest(
+                action=DisplayAction.SET_PAGE_LAYOUT,
+                set_page_layout=req,
+            ),
+        )
 
 
 def test_set_page_layout_two_vertical_success() -> None:
@@ -186,9 +220,17 @@ def test_set_page_layout_two_vertical_success() -> None:
     app.click = MagicMock()
 
     req = SetPageLayoutRequest(handle=100, layout="two_vertical")
-    result = set_page_layout(app, req)
+    display_res = manage_display(
+        app,
+        DisplayRequest(
+            action=DisplayAction.SET_PAGE_LAYOUT,
+            set_page_layout=req,
+        ),
+    )
 
-    assert isinstance(result, SetPageLayoutResult)
+    assert isinstance(display_res, DisplayResult)
+    assert isinstance(display_res.set_page_layout, SetPageLayoutResult)
+    result = display_res.set_page_layout
     assert result.layout == "two_vertical"
     assert result.areas_created == 2
     assert result.verified is True
@@ -227,9 +269,17 @@ def test_set_page_layout_four_grid_with_page_selection_success() -> None:
         layout="four_grid",
         page_name="Analysis",
     )
-    result = set_page_layout(app, req)
+    display_res = manage_display(
+        app,
+        DisplayRequest(
+            action=DisplayAction.SET_PAGE_LAYOUT,
+            set_page_layout=req,
+        ),
+    )
 
-    assert isinstance(result, SetPageLayoutResult)
+    assert isinstance(display_res, DisplayResult)
+    assert isinstance(display_res.set_page_layout, SetPageLayoutResult)
+    result = display_res.set_page_layout
     assert result.layout == "four_grid"
     assert result.areas_created == 4
     assert result.page_name == "Analysis"

@@ -9,7 +9,10 @@ from capstone_mcp.desktop import AutomationError, Capstone
 from capstone_mcp.displays import (
     CreateDigitsRequest,
     CreateDigitsResult,
-    create_digits,
+    DisplayAction,
+    DisplayRequest,
+    DisplayResult,
+    manage_display,
 )
 from capstone_mcp.models import Bounds, Control, Snapshot, Window
 
@@ -25,9 +28,12 @@ def _mock_window(handle: int = 100) -> Window:
 
 def test_create_digits_refuses_disabled_foreground() -> None:
     app = Capstone()
-    req = CreateDigitsRequest(handle=100, allow_foreground=False)
+    req = DisplayRequest(
+        action=DisplayAction.CREATE_DIGITS,
+        create_digits=CreateDigitsRequest(handle=100, allow_foreground=False),
+    )
     with pytest.raises(AutomationError, match="allow_foreground=true"):
-        create_digits(app, req)
+        manage_display(app, req)
 
 
 def test_create_digits_raises_when_palette_missing() -> None:
@@ -52,7 +58,13 @@ def test_create_digits_raises_when_palette_missing() -> None:
         ),
     )
     with pytest.raises(AutomationError, match="Digits display palette item not found"):
-        create_digits(app, CreateDigitsRequest(handle=100))
+        manage_display(
+            app,
+            DisplayRequest(
+                action=DisplayAction.CREATE_DIGITS,
+                create_digits=CreateDigitsRequest(handle=100),
+            ),
+        )
 
 
 def test_create_digits_success_without_binding() -> None:
@@ -103,9 +115,17 @@ def test_create_digits_success_without_binding() -> None:
     app.snapshot = mock_snapshot
     app.click = MagicMock()
 
-    res = create_digits(app, CreateDigitsRequest(handle=100))
+    display_res = manage_display(
+        app,
+        DisplayRequest(
+            action=DisplayAction.CREATE_DIGITS,
+            create_digits=CreateDigitsRequest(handle=100),
+        ),
+    )
 
-    assert isinstance(res, CreateDigitsResult)
+    assert isinstance(display_res, DisplayResult)
+    assert isinstance(display_res.create_digits, CreateDigitsResult)
+    res = display_res.create_digits
     assert res.created is True
     assert res.digits_name == "Digits 1"
     assert res.current_value == 0.0
@@ -186,15 +206,20 @@ def test_create_digits_success_with_measurement_and_unit() -> None:
     mock_node.iface_value.SetValue = MagicMock()
     app.control = MagicMock(return_value=mock_node)
 
-    res = create_digits(
+    display_res = manage_display(
         app,
-        CreateDigitsRequest(
-            handle=100,
-            measurement="Acceleration (m/s^2)",
+        DisplayRequest(
+            action=DisplayAction.CREATE_DIGITS,
+            create_digits=CreateDigitsRequest(
+                handle=100,
+                measurement="Acceleration (m/s^2)",
+            ),
         ),
     )
 
-    assert isinstance(res, CreateDigitsResult)
+    assert isinstance(display_res, DisplayResult)
+    assert isinstance(display_res.create_digits, CreateDigitsResult)
+    res = display_res.create_digits
     assert res.created is True
     assert res.digits_name == "Digits"
     assert res.measurement == "Acceleration (m/s^2)"

@@ -9,13 +9,14 @@ from capstone_mcp.desktop import AutomationError, Capstone
 from capstone_mcp.displays import (
     CreateTableRequest,
     CreateTableResult,
+    DisplayAction,
+    DisplayRequest,
+    DisplayResult,
     ReadTableRequest,
     ReadTableResult,
     SetTableColumnsRequest,
     SetTableColumnsResult,
-    create_table,
-    read_table,
-    set_table_columns,
+    manage_display,
 )
 from capstone_mcp.models import Bounds, Control, Snapshot, Window
 
@@ -31,9 +32,12 @@ def _mock_window(handle: int = 100) -> Window:
 
 def test_create_table_refuses_disabled_foreground() -> None:
     app = Capstone()
-    req = CreateTableRequest(handle=100, allow_foreground=False)
+    req = DisplayRequest(
+        action=DisplayAction.CREATE_TABLE,
+        create_table=CreateTableRequest(handle=100, allow_foreground=False),
+    )
     with pytest.raises(AutomationError, match="allow_foreground=true"):
-        create_table(app, req)
+        manage_display(app, req)
 
 
 def test_create_table_raises_when_palette_item_missing() -> None:
@@ -58,7 +62,13 @@ def test_create_table_raises_when_palette_item_missing() -> None:
         ),
     )
     with pytest.raises(AutomationError, match="Table display palette item not found"):
-        create_table(app, CreateTableRequest(handle=100))
+        manage_display(
+            app,
+            DisplayRequest(
+                action=DisplayAction.CREATE_TABLE,
+                create_table=CreateTableRequest(handle=100),
+            ),
+        )
 
 
 def test_create_table_success() -> None:
@@ -83,8 +93,16 @@ def test_create_table_success() -> None:
     )
     app.click = MagicMock()
 
-    result = create_table(app, CreateTableRequest(handle=100))
-    assert isinstance(result, CreateTableResult)
+    display_res = manage_display(
+        app,
+        DisplayRequest(
+            action=DisplayAction.CREATE_TABLE,
+            create_table=CreateTableRequest(handle=100),
+        ),
+    )
+    assert isinstance(display_res, DisplayResult)
+    assert isinstance(display_res.create_table, CreateTableResult)
+    result = display_res.create_table
     assert result.created is True
     assert result.table_name == "Table"
     assert result.verified is True
@@ -94,15 +112,24 @@ def test_create_table_success() -> None:
 def test_set_table_columns_validates_inputs() -> None:
     app = Capstone()
     with pytest.raises(AutomationError, match="columns must not be empty"):
-        set_table_columns(app, SetTableColumnsRequest(columns=[], handle=100))
+        manage_display(
+            app,
+            DisplayRequest(
+                action=DisplayAction.SET_TABLE_COLUMNS,
+                set_table_columns=SetTableColumnsRequest(columns=[], handle=100),
+            ),
+        )
 
     with pytest.raises(AutomationError, match="allow_foreground=true"):
-        set_table_columns(
+        manage_display(
             app,
-            SetTableColumnsRequest(
-                columns=["Time (s)"],
-                handle=100,
-                allow_foreground=False,
+            DisplayRequest(
+                action=DisplayAction.SET_TABLE_COLUMNS,
+                set_table_columns=SetTableColumnsRequest(
+                    columns=["Time (s)"],
+                    handle=100,
+                    allow_foreground=False,
+                ),
             ),
         )
 
@@ -170,16 +197,21 @@ def test_set_table_columns_configures_and_auto_expands() -> None:
     mock_node.iface_value.SetValue = MagicMock()
     app.control = MagicMock(return_value=mock_node)
 
-    res = set_table_columns(
+    display_res = manage_display(
         app,
-        SetTableColumnsRequest(
-            columns=["Time (s)", "Velocity (m/s)"],
-            handle=100,
-            table_name="Table 1",
+        DisplayRequest(
+            action=DisplayAction.SET_TABLE_COLUMNS,
+            set_table_columns=SetTableColumnsRequest(
+                columns=["Time (s)", "Velocity (m/s)"],
+                handle=100,
+                table_name="Table 1",
+            ),
         ),
     )
 
-    assert isinstance(res, SetTableColumnsResult)
+    assert isinstance(display_res, DisplayResult)
+    assert isinstance(display_res.set_table_columns, SetTableColumnsResult)
+    res = display_res.set_table_columns
     assert res.table_name == "Table 1"
     assert res.column_count == 2
     assert res.columns == ["Time (s)", "Velocity (m/s)"]
@@ -190,10 +222,22 @@ def test_set_table_columns_configures_and_auto_expands() -> None:
 def test_read_table_validates_pagination_bounds() -> None:
     app = Capstone()
     with pytest.raises(AutomationError, match="page must be >= 1"):
-        read_table(app, ReadTableRequest(handle=100, page=0))
+        manage_display(
+            app,
+            DisplayRequest(
+                action=DisplayAction.READ_TABLE,
+                read_table=ReadTableRequest(handle=100, page=0),
+            ),
+        )
 
     with pytest.raises(AutomationError, match="page_size must be > 0"):
-        read_table(app, ReadTableRequest(handle=100, page=1, page_size=0))
+        manage_display(
+            app,
+            DisplayRequest(
+                action=DisplayAction.READ_TABLE,
+                read_table=ReadTableRequest(handle=100, page=1, page_size=0),
+            ),
+        )
 
 
 def test_read_table_extracts_data_and_statistics() -> None:
@@ -328,9 +372,17 @@ def test_read_table_extracts_data_and_statistics() -> None:
         ),
     )
 
-    res = read_table(app, ReadTableRequest(handle=100, page=1, page_size=2))
+    display_res = manage_display(
+        app,
+        DisplayRequest(
+            action=DisplayAction.READ_TABLE,
+            read_table=ReadTableRequest(handle=100, page=1, page_size=2),
+        ),
+    )
 
-    assert isinstance(res, ReadTableResult)
+    assert isinstance(display_res, DisplayResult)
+    assert isinstance(display_res.read_table, ReadTableResult)
+    res = display_res.read_table
     assert res.columns == ["Time (s)", "Position (m)"]
     assert res.total_rows == 3
     assert res.total_pages == 2
