@@ -134,4 +134,6 @@ class NativeReply(Model):
     identifier: str
     result: JsonValue = None
     error: str | None = None
+    error_code: str | None = None
+    remediation: str | None = None
     graph_failure: GraphFailure | None = None

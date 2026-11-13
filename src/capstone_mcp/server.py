@@ -23,7 +23,7 @@ from pydantic import Field, JsonValue, TypeAdapter
 
 from capstone_mcp.agent_instructions import INSTRUCTIONS, guide
 from capstone_mcp.automation_models import NativeRequest
-from capstone_mcp.automation_worker import AutomationWorker
+from capstone_mcp.automation_worker import AutomationWorker, NativeSessionError
 from capstone_mcp.models import (
     Action,
     Button,
@@ -73,7 +73,21 @@ async def _native(
     with JOBS.interaction() if mutates else nullcontext():
         if request.operation == "attach" and WORKER.retired:
             await anyio.to_thread.run_sync(WORKER.reset)
-        return await anyio.to_thread.run_sync(WORKER.call, request)
+        try:
+            return await anyio.to_thread.run_sync(WORKER.call, request)
+        except NativeSessionError as exc:
+            if exc.error_code:
+                payload = ToolErrorPayload(
+                    error_code=exc.error_code,
+                    message=exc.message,
+                    remediation=(
+                        exc.remediation
+                        or "Check Capstone application state using "
+                        "capstone_windows and retry."
+                    ),
+                )
+                raise ToolError(payload.model_dump_json(indent=2)) from exc
+            raise
 
 
 MCP: Final = FastMCP(
@@ -887,10 +901,100 @@ def hardware_setup_workflow(
 # Structured MCP Protocol Error Envelopes
 # ---------------------------------------------------------------------------
 
+_FALLBACK_ERROR_RULES: Final[tuple[tuple[tuple[str, ...], str, str], ...]] = (
+    (
+        ("attach", "session"),
+        "SESSION_NOT_ATTACHED",
+        "Call capstone_attach(launch=True) to attach to or launch PASCO Capstone.",
+    ),
+    (
+        ("graph",),
+        "GRAPH_OPERATION_ERROR",
+        (
+            "Verify graph display exists using capstone_manage_graph(action='read') "
+            "or snapshot."
+        ),
+    ),
+    (
+        (
+            "display",
+            "digits",
+            "table",
+            "scope",
+            "fft",
+            "page",
+            "layout",
+            "workbook",
+        ),
+        "DISPLAY_ERROR",
+        (
+            "Verify display widget container and workbook layout via "
+            "capstone://displays/active or reconfigure using capstone_manage_display."
+        ),
+    ),
+    (
+        ("sensor", "instrument", "generator", "calibration", "hardware"),
+        "INSTRUMENT_ERROR",
+        (
+            "Verify hardware connection via capstone://hardware/inventory or "
+            "check sensor configuration using capstone_manage_instrument."
+        ),
+    ),
+    (
+        ("file", "path"),
+        "FILE_NOT_FOUND",
+        "Verify the target file path exists and is accessible.",
+    ),
+    (
+        ("invalid", "validation", "unsupported"),
+        "INVALID_ARGUMENT",
+        (
+            "Check tool argument types, values, and schema constraints before "
+            "retrying."
+        ),
+    ),
+    (
+        ("time",),
+        "TIMEOUT_ERROR",
+        (
+            "Operation timed out; inspect Capstone responsiveness and reattach "
+            "if needed."
+        ),
+    ),
+)
 
-def format_tool_error(error_message: str) -> ToolErrorPayload:
+
+def _classify_error_text(cleaned: str) -> tuple[str, str]:
+    lower = cleaned.lower()
+    if "control" in lower and ("not found" in lower or "missing" in lower):
+        return (
+            "CONTROL_NOT_FOUND",
+            (
+                "Inspect active window controls using capstone_snapshot to find "
+                "valid references."
+            ),
+        )
+
+    for keywords, code, remediation in _FALLBACK_ERROR_RULES:
+        if any(kw in lower for kw in keywords):
+            return code, remediation
+    return (
+        "AUTOMATION_ERROR",
+        "Check Capstone application state using capstone_windows and retry.",
+    )
+
+
+def format_tool_error(error_message: Exception | str) -> ToolErrorPayload:
     """Classify and format an error string into a structured ToolErrorPayload."""
-    cleaned = re.sub(r"^Error executing tool \w+:\s*", "", error_message).strip()
+    if isinstance(error_message, NativeSessionError) and error_message.error_code:
+        return ToolErrorPayload(
+            error_code=error_message.error_code,
+            message=error_message.message,
+            remediation=error_message.remediation
+            or "Check Capstone application state using capstone_windows and retry.",
+        )
+    msg_str = str(error_message)
+    cleaned = re.sub(r"^Error executing tool \w+:\s*", "", msg_str).strip()
     with suppress(json.JSONDecodeError, KeyError, TypeError):
         data = json.loads(cleaned)
         if (
@@ -905,72 +1009,7 @@ def format_tool_error(error_message: str) -> ToolErrorPayload:
                 remediation=str(data["remediation"]),
             )
 
-    lower = cleaned.lower()
-    if "attach" in lower or "session" in lower:
-        code = "SESSION_NOT_ATTACHED"
-        remediation = (
-            "Call capstone_attach(launch=True) to attach to or launch PASCO Capstone."
-        )
-    elif "control" in lower and ("not found" in lower or "missing" in lower):
-        code = "CONTROL_NOT_FOUND"
-        remediation = (
-            "Inspect active window controls using capstone_snapshot to find "
-            "valid references."
-        )
-    elif "graph" in lower:
-        code = "GRAPH_OPERATION_ERROR"
-        remediation = (
-            "Verify graph display exists using capstone_manage_graph(action='read') "
-            "or snapshot."
-        )
-    elif (
-        "display" in lower
-        or "digits" in lower
-        or "table" in lower
-        or "scope" in lower
-        or "fft" in lower
-        or "page" in lower
-        or "layout" in lower
-        or "workbook" in lower
-    ):
-        code = "DISPLAY_ERROR"
-        remediation = (
-            "Verify display widget container and workbook layout via "
-            "capstone://displays/active or reconfigure using capstone_manage_display."
-        )
-    elif (
-        "sensor" in lower
-        or "instrument" in lower
-        or "generator" in lower
-        or "calibration" in lower
-        or "hardware" in lower
-    ):
-        code = "INSTRUMENT_ERROR"
-        remediation = (
-            "Verify hardware connection via capstone://hardware/inventory or "
-            "check sensor configuration using capstone_manage_instrument."
-        )
-    elif "file" in lower or "path" in lower:
-        code = "FILE_NOT_FOUND"
-        remediation = "Verify the target file path exists and is accessible."
-    elif "invalid" in lower or "validation" in lower or "unsupported" in lower:
-        code = "INVALID_ARGUMENT"
-        remediation = (
-            "Check tool argument types, values, and schema constraints before "
-            "retrying."
-        )
-    elif "time" in lower and "out" in lower:
-        code = "TIMEOUT_ERROR"
-        remediation = (
-            "Operation timed out; inspect Capstone responsiveness and reattach "
-            "if needed."
-        )
-    else:
-        code = "AUTOMATION_ERROR"
-        remediation = (
-            "Check Capstone application state using capstone_windows and retry."
-        )
-
+    code, remediation = _classify_error_text(cleaned)
     return ToolErrorPayload(
         error_code=code,
         message=cleaned,
@@ -1016,7 +1055,7 @@ async def _safe_fastmcp_call_tool(
     try:
         return await _orig_fastmcp_call_tool(name, arguments)
     except Exception as exc:
-        payload = format_tool_error(str(exc))
+        payload = format_tool_error(exc)
         raise ToolError(payload.model_dump_json(indent=2)) from exc
 
 
