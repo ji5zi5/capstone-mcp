@@ -65,10 +65,12 @@ from capstone_mcp.oscilloscope_fft import (
     set_scope_trigger,
 )
 from capstone_mcp.repetition import NativeRecordingBackend, RepeatPlan
-from capstone_mcp.run_delete import DeleteRunRequest, delete_run
-from capstone_mcp.run_rename import RenameRunRequest, rename_run
-from capstone_mcp.run_visibility import (
+from capstone_mcp.runs import (
+    DeleteRunRequest,
+    RenameRunRequest,
     SetRunVisibilityRequest,
+    delete_run,
+    rename_run,
     set_run_visibility,
 )
 from capstone_mcp.sensor_settings import (

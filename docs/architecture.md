@@ -102,9 +102,58 @@ The redundant 579-line pass-through layer `src/capstone_mcp/native_dispatch.py` 
 
 ---
 
-## 5. Quality & Verification Guardrails
+## 5. Core Domain & Automation Deepening (Phase 5)
 
-1. **Automated Test Coverage**: 425 unit and integration tests across 51 test suites, executed with `uv run --no-sync pytest`.
+Phase 5 collapsed fragmented shallow utilities across run management, binary archive decoding, and display palette interactions into deep, cohesive modules with minimal external surface areas and high internal depth:
+
+```mermaid
+flowchart TD
+    subgraph UIAutomation ["UI Automation & Displays"]
+        Harness["DisplayHarness (displays/harness.py)"]
+        Digits["Digits Display (digits_display.py)"]
+        Table["Table Display (table_display.py)"]
+        Scope["Oscilloscope & FFT (oscilloscope_fft.py)"]
+        Workbook["Workbook Layout (workbook_layout.py)"]
+        Digits --> Harness
+        Table --> Harness
+        Scope --> Harness
+        Workbook --> Harness
+    end
+
+    subgraph RunManagement ["Deep Run Management"]
+        RunMgr["RunManager (runs/manager.py)"]
+        RunModels["RunRequest / RunResult (runs/models.py)"]
+        RunMgr --> RunModels
+        RunMgr --> Harness
+    end
+
+    subgraph BinaryDecoder ["Binary CapFile Subsystem"]
+        Archive["Archive Parser (capfiles/archive.py)"]
+        Records["Binary Decoder (capfiles/records.py)"]
+        Archive --> Records
+    end
+```
+
+### Key Subsystems:
+1. **Deep Run Management Module (`src/capstone_mcp/runs/`)**:
+   - Collapsed 4 shallow modules (`run_rename.py`, `run_delete.py`, `run_visibility.py`, `run_capture.py`) into a unified `RunManager` engine.
+   - Provides a single `manage_run(app, RunRequest)` seam supporting `RENAME`, `DELETE`, `SET_VISIBILITY`, and `CAPTURE`.
+   - Incorporates inline F2 keyboard renaming fallbacks, automated modal confirmation dialog dismissal, multi-display visibility toggling, and multi-cycle dataset acquisition snapshots with trendline comparisons.
+
+2. **Decoupled Binary Record Decoder (`src/capstone_mcp/capfiles/records.py`)**:
+   - Decoupled low-level little-endian 12-byte attribute/double scalar unpacking and 8-byte header UTF-16 text decoding from ZIP archive and XML traversal.
+   - Provides pure byte-buffer decoding seams (`decode_numeric_payload`, `decode_text_records`, `decode_interval_coordinates`), enabling microsecond in-memory unit testing (`tests/test_capfile_records.py`) without synthetic zip file generation.
+   - Preserves 100% backward compatibility for archive traversal in `src/capstone_mcp/capfiles/archive.py`.
+
+3. **Consolidated Display Automation Harness (`src/capstone_mcp/displays/`)**:
+   - Consolidates palette drag-and-drop operations, double-click insertion, container resolution, and click/invoke fallbacks into `DisplayHarness`.
+   - Eliminated 6 duplicated `_click()` fallback definitions and repetitive `_find_*` control loops across `digits_display.py`, `table_display.py`, `workbook_layout.py`, `oscilloscope_fft.py`, and `runs/manager.py`.
+
+---
+
+## 6. Quality & Verification Guardrails
+
+1. **Automated Test Coverage**: 457 unit and integration tests across 54 test suites, executed with `uv run --no-sync pytest` (100% pass rate).
 2. **Deterministic Offline CI**: Hardware-dependent and live GUI tests include fallback guards (`pytest.mark.skipif`), allowing CI pipelines to pass deterministically in headless environments.
 3. **Windows Process Lock Guard**: Tool and test runner commands strictly enforce `--no-sync` to avoid `os error 32` file locking when background MCP processes hold `capstone-mcp.exe`.
-4. **Strict Type Safety & Linting**: Ruff compliance across all rulesets (`ruff check src tests`) with 0 errors.
+4. **Strict Type Safety & Linting**: Ruff compliance across all rulesets (`ruff check src tests`) with 0 errors, and Basedpyright type validation (`basedpyright src`) with 0 errors, 0 warnings.

@@ -7,7 +7,7 @@ import pytest
 
 from capstone_mcp.desktop import AutomationError, Capstone
 from capstone_mcp.models import Bounds, Control, Snapshot, Window
-from capstone_mcp.run_visibility import (
+from capstone_mcp.runs import (
     SetRunVisibilityRequest,
     SetRunVisibilityResult,
     set_run_visibility,

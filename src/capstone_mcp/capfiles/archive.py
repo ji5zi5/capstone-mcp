@@ -27,38 +27,38 @@ from capstone_mcp.capfile_models import (
     CapValueKind,
     CapXmlNode,
 )
-from capstone_mcp.numeric_storage import (
-    NumericStorageError,
-    decode_numeric_records,
-    interval_values,
+from capstone_mcp.capfiles.records import (
+    DEPENDENT_STORAGE_TYPE,
+    INDEPENDENT_STORAGE_TYPE,
+    INTERVAL_STORAGE_TYPE,
+    MAX_PAYLOAD_BYTES,
+    MAX_RECORDS,
+    NUMERIC_STORAGE_TYPE,
+    CapFileError,
+    decode_interval_coordinates,
+    decode_numeric_payload,
+    decode_text_records,
 )
 
 if TYPE_CHECKING:
     from collections.abc import Collection
 
 CAP_SECTIONS: Final[tuple[CapSection, ...]] = (
-    "header", "hardware", "hardware_interfaces", "unconnected_sensors",
-    "experiment_settings", "data_sources", "workspace", "calculations",
+    "header",
+    "hardware",
+    "hardware_interfaces",
+    "unconnected_sensors",
+    "experiment_settings",
+    "data_sources",
+    "workspace",
+    "calculations",
 )
 MAX_ARCHIVE_BYTES: Final = 64 * 1024 * 1024
 MAX_ARCHIVE_ENTRIES: Final = 4096
 MAX_TOTAL_UNCOMPRESSED_BYTES: Final = 64 * 1024 * 1024
 MAX_XML_BYTES: Final = 8 * 1024 * 1024
-MAX_PAYLOAD_BYTES: Final = 16 * 1024 * 1024
 MAX_XML_NODES: Final = 100_000
 MAX_XML_DEPTH: Final = 128
-MAX_RECORDS: Final = 1_000_000
-MAX_VALUE_BYTES: Final = 1024 * 1024
-RECORD_HEADER_SIZE: Final = 8
-TEXT_RECORD_TYPE: Final = 2
-DEPENDENT_STORAGE_TYPE: Final = 7
-INDEPENDENT_STORAGE_TYPE: Final = 4
-NUMERIC_STORAGE_TYPE: Final = 0
-INTERVAL_STORAGE_TYPE: Final = 1
-
-
-class CapFileError(ValueError):
-    """Raised when a `.cap` archive is invalid, ambiguous, or unsupported."""
 
 
 def _normalize_member_name(name: str) -> str:
@@ -322,7 +322,9 @@ def _ancestor(
 
 
 def _hardware_sensor(
-    sensor: Element, *, interface_euid: str | None,
+    sensor: Element,
+    *,
+    interface_euid: str | None,
     channel: Element | None,
 ) -> CapHardwareSensor:
     return CapHardwareSensor(
@@ -376,7 +378,8 @@ def _hardware_interfaces(
             channel = _ancestor(sensor, parent_by_child, "Channel")
             sensors.append(
                 _hardware_sensor(
-                    sensor, interface_euid=interface.attrib.get("EUID"),
+                    sensor,
+                    interface_euid=interface.attrib.get("EUID"),
                     channel=channel,
                 ),
             )
@@ -390,51 +393,6 @@ def _hardware_interfaces(
             ),
         )
     return interfaces
-
-
-def _records(payload: bytes, count: int, *, member_name: str) -> list[str]:
-    values: list[str] = []
-    offset = 0
-    for record_index in range(count):
-        if len(payload) - offset < RECORD_HEADER_SIZE:
-            msg = (
-                f"Truncated record header {record_index} in "
-                f"{member_name!r}."
-            )
-            raise CapFileError(msg)
-        record_type = int.from_bytes(payload[offset : offset + 4], "little")
-        value_size = int.from_bytes(payload[offset + 4 : offset + 8], "little")
-        offset += RECORD_HEADER_SIZE
-        if record_type == 0:
-            if value_size != 0:
-                msg = (
-                    f"Unsupported non-zero size {value_size} for empty record "
-                    f"type 0 in {member_name!r}."
-                )
-                raise CapFileError(msg)
-            values.append("")
-            continue
-        if record_type != TEXT_RECORD_TYPE:
-            msg = (
-                f"Unsupported record type {record_type} in "
-                f"{member_name!r}."
-            )
-            raise CapFileError(msg)
-        if value_size > MAX_VALUE_BYTES or value_size % 2:
-            msg = f"Invalid UTF-16 value size in {member_name!r}."
-            raise CapFileError(msg)
-        end = offset + value_size
-        if end > len(payload):
-            msg = f"Truncated UTF-16 value {record_index} in {member_name!r}."
-            raise CapFileError(msg)
-        try:
-            value = payload[offset:end].decode("utf-16-le")
-        except UnicodeDecodeError as exc:
-            msg = f"Invalid UTF-16 value {record_index} in {member_name!r}."
-            raise CapFileError(msg) from exc
-        values.append(value)
-        offset = end
-    return values
 
 
 def _dataset_storage(element: Element) -> tuple[int, int, int, str]:
@@ -457,7 +415,9 @@ def _dataset_storage(element: Element) -> tuple[int, int, int, str]:
         msg = f"Unsupported dependent storage type: {dependent_type!r}."
         raise CapFileError(msg)
     if independent_type not in (
-        INDEPENDENT_STORAGE_TYPE, NUMERIC_STORAGE_TYPE, INTERVAL_STORAGE_TYPE,
+        INDEPENDENT_STORAGE_TYPE,
+        NUMERIC_STORAGE_TYPE,
+        INTERVAL_STORAGE_TYPE,
     ):
         msg = f"Unsupported independent storage type: {independent_type!r}."
         raise CapFileError(msg)
@@ -467,7 +427,8 @@ def _dataset_storage(element: Element) -> tuple[int, int, int, str]:
     )
     independent_count = _integer(
         independent.attrib.get(
-            "DataCacheDataSize" if independent_type == NUMERIC_STORAGE_TYPE
+            "DataCacheDataSize"
+            if independent_type == NUMERIC_STORAGE_TYPE
             else "CacheDataCount",
         ),
         context="IndependentStorageElement.CacheDataCount",
@@ -487,7 +448,10 @@ def _dataset_storage(element: Element) -> tuple[int, int, int, str]:
 
 
 def _numeric_payload(
-    element: Element, count: int, archive: ZipFile, members: dict[str, ZipInfo],
+    element: Element,
+    count: int,
+    archive: ZipFile,
+    members: dict[str, ZipInfo],
 ) -> tuple[list[str], list[Decimal | None], list[int]]:
     if element.get("DataCacheStorageType") == "-1":
         msg = "Legacy string caches marked StorageType=0 are not numeric caches."
@@ -503,16 +467,17 @@ def _numeric_payload(
             msg = f"Dataset payload is missing: {name!r}."
             raise CapFileError(msg)
         payload = _read_member(archive, members[name], maximum_size=MAX_PAYLOAD_BYTES)
-    try:
-        decoded = decode_numeric_records(payload, count, offset)
-    except NumericStorageError as exc:
-        raise CapFileError(str(exc)) from exc
+
+    decoded = decode_numeric_payload(payload, count, offset)
     return decoded.text, decoded.values, decoded.attributes
 
 
 def _independent_coordinates(
-    element: Element, count: int, storage_type: int,
-    archive: ZipFile, members: dict[str, ZipInfo],
+    element: Element,
+    count: int,
+    storage_type: int,
+    archive: ZipFile,
+    members: dict[str, ZipInfo],
 ) -> tuple[list[Decimal | None], Literal["index", "interval", "stored"]]:
     if storage_type == NUMERIC_STORAGE_TYPE:
         _, values, _ = _numeric_payload(element, count, archive, members)
@@ -523,20 +488,19 @@ def _independent_coordinates(
             msg = "Interval attribute exceptions require an unsupported decoder."
             raise CapFileError(msg)
         start = _decimal(
-            element.get("IntervalCacheStartValue"), context="IntervalCacheStartValue",
+            element.get("IntervalCacheStartValue"),
+            context="IntervalCacheStartValue",
         )
         interval = _decimal(
-            element.get("IntervalCacheInterval"), context="IntervalCacheInterval",
+            element.get("IntervalCacheInterval"),
+            context="IntervalCacheInterval",
         )
         if start is None or interval is None:
             msg = "Interval cache requires explicit start and interval."
             raise CapFileError(msg)
-        try:
-            coordinates: list[Decimal | None] = list(
-                interval_values(start, interval, count),
-            )
-        except NumericStorageError as exc:
-            raise CapFileError(str(exc)) from exc
+        coordinates: list[Decimal | None] = list(
+            decode_interval_coordinates(start, interval, count),
+        )
         return coordinates, "interval"
     return [Decimal(index) for index in range(count)], "index"
 
@@ -589,7 +553,7 @@ def _dataset(
         if info is None:
             msg = f"Dataset payload is missing: {member_name!r}."
             raise CapFileError(msg)
-        values = _records(
+        values = decode_text_records(
             _read_member(archive, info, maximum_size=MAX_PAYLOAD_BYTES),
             count,
             member_name=member_name,
@@ -733,18 +697,22 @@ def read_cap_configuration(path: str | Path) -> CapConfiguration:
     """Inspect saved settings without requiring a supported dataset encoding."""
     parsed = read_cap_file(path, include_data=False)
     return CapConfiguration(
-        file_name=parsed.file_name, root_tag=parsed.root_tag,
-        header=parsed.header, hardware=parsed.hardware,
+        file_name=parsed.file_name,
+        root_tag=parsed.root_tag,
+        header=parsed.header,
+        hardware=parsed.hardware,
         hardware_interfaces=parsed.hardware_interfaces,
         unconnected_sensors=parsed.unconnected_sensors,
         experiment_settings=parsed.experiment_settings,
         data_sources=parsed.data_sources,
-        workspace=parsed.workspace, calculations=parsed.calculations,
+        workspace=parsed.workspace,
+        calculations=parsed.calculations,
     )
 
 
 def select_configuration(
-    configuration: CapConfiguration, sections: Collection[CapSection] | None,
+    configuration: CapConfiguration,
+    sections: Collection[CapSection] | None,
 ) -> CapConfigurationView:
     """Keep only the requested sections; None keeps the complete configuration."""
     wanted = set(CAP_SECTIONS if sections is None else sections)
@@ -753,7 +721,8 @@ def select_configuration(
         return value if name in wanted else None
 
     return CapConfigurationView(
-        file_name=configuration.file_name, root_tag=configuration.root_tag,
+        file_name=configuration.file_name,
+        root_tag=configuration.root_tag,
         header=pick("header", configuration.header),
         hardware=pick("hardware", configuration.hardware),
         hardware_interfaces=pick(

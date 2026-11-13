@@ -7,7 +7,7 @@ import pytest
 
 from capstone_mcp.desktop import AutomationError, Capstone
 from capstone_mcp.models import Bounds, Control, Snapshot, Window
-from capstone_mcp.run_rename import RenameRunRequest, rename_run
+from capstone_mcp.runs import RenameRunRequest, rename_run
 
 
 def test_rename_run_rejects_empty_name() -> None:

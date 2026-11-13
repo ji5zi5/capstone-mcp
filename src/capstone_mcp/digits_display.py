@@ -6,7 +6,13 @@ import re
 from typing import Final
 
 from capstone_mcp.desktop import AutomationError, Capstone
-from capstone_mcp.models import Action, Control, Model
+from capstone_mcp.displays import (
+    click_control,
+    find_display_container,
+    find_palette_item,
+    is_within_bounds,
+)
+from capstone_mcp.models import Control, Model
 
 DIGITS_PALETTE_NAME: Final = "Digits"
 FLOAT_PATTERN: Final = re.compile(r"^[+-]?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?$")
@@ -43,41 +49,18 @@ def _click(
     allow_foreground: bool = True,
 ) -> None:
     """Deliver a click or double-click compatible with real app and mocks."""
-    if hasattr(app, "click"):
-        app.click(handle, ctrl.ref, allow_foreground=allow_foreground)
-        return
-    with contextlib.suppress(Exception):
-        node = app.control(ctrl.ref)
-        if double:
-            b = ctrl.bounds
-            coords = ((b.left + b.right) // 2, (b.top + b.bottom) // 2)
-            node.click_input(button="left", double=True, coords=coords, absolute=True)
-            return
-        if hasattr(node, "invoke") and callable(node.invoke):
-            node.invoke()
-            return
-    app.act(handle, Action.INVOKE, ref=ctrl.ref, allow_foreground=allow_foreground)
+    click_control(
+        app,
+        handle,
+        ctrl,
+        double=double,
+        allow_foreground=allow_foreground,
+    )
 
 
 def _find_digits_palette_item(controls: list[Control]) -> Control:
     """Find Digits display item in the Displays palette."""
-    matches = [
-        c
-        for c in controls
-        if c.visible
-        and c.enabled
-        and (
-            c.name.strip() == DIGITS_PALETTE_NAME
-            or c.name.strip().lower() == "digits"
-            or c.automation_id.endswith(".ObjNameDigits")
-            or "digits" in c.automation_id.lower()
-        )
-        and c.control_type in ("Text", "Button", "ListItem", "TreeItem", "Custom")
-    ]
-    if not matches:
-        msg = "Digits display palette item not found in window snapshot."
-        raise AutomationError(msg)
-    return matches[0]
+    return find_palette_item(controls, DIGITS_PALETTE_NAME, ".ObjNameDigits")
 
 
 def _find_digits_control(
@@ -85,40 +68,7 @@ def _find_digits_control(
     digits_name: str | None = None,
 ) -> Control:
     """Locate the target Digits widget container in the active window."""
-    if digits_name:
-        d_lower = digits_name.strip().lower()
-        for ctrl in controls:
-            if ctrl.visible and (
-                d_lower == ctrl.name.strip().lower()
-                or d_lower in ctrl.automation_id.lower()
-            ):
-                return ctrl
-        msg = f"Digits control matching '{digits_name}' not found."
-        raise AutomationError(msg)
-
-    # Search for Digits widget container
-    for ctrl in controls:
-        if (
-            ctrl.visible
-            and ctrl.control_type in ("Custom", "Pane", "Group")
-            and (
-                "digits" in ctrl.name.lower()
-                or "digits" in ctrl.automation_id.lower()
-            )
-        ):
-            return ctrl
-
-    # Fallback to the largest Custom/Pane that isn't the root window
-    candidates = [
-        c
-        for c in controls
-        if c.visible and c.control_type in ("Custom", "Pane") and c.parent is not None
-    ]
-    if candidates:
-        return candidates[0]
-
-    msg = "No Digits display found in the active window."
-    raise AutomationError(msg)
+    return find_display_container(controls, "digits", digits_name)
 
 
 def _find_measurement_selector(
@@ -126,16 +76,10 @@ def _find_measurement_selector(
     digits_ctrl: Control,
 ) -> Control | None:
     """Find the measurement selector button inside the Digits widget."""
-    b = digits_ctrl.bounds
     for c in controls:
         if not c.visible or c.ref == digits_ctrl.ref:
             continue
-        if not (
-            c.bounds.top >= b.top
-            and c.bounds.bottom <= b.bottom
-            and c.bounds.left >= b.left
-            and c.bounds.right <= b.right
-        ):
+        if not is_within_bounds(c, digits_ctrl):
             continue
         name_lower = c.name.strip().lower()
         aid_lower = c.automation_id.lower()

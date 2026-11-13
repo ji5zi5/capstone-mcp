@@ -25,9 +25,7 @@ from capstone_mcp.graph_toolbox import (
     ToggleGraphStatisticsResult,
 )
 from capstone_mcp.models import Point, Result
-from capstone_mcp.run_delete import DeleteRunResult
-from capstone_mcp.run_rename import RenameRunResult
-from capstone_mcp.run_visibility import SetRunVisibilityResult
+from capstone_mcp.runs import DeleteRunResult, RenameRunResult, SetRunVisibilityResult
 from capstone_mcp.table_display import (
     CreateTableResult,
     ReadTableResult,

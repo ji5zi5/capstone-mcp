@@ -1,11 +1,15 @@
 # Copyright 2026 Capstone MCP contributors.
 """Oscilloscope and FFT frequency spectrum display tools in Capstone."""
 
-import contextlib
 import re
 from typing import Final, Literal
 
 from capstone_mcp.desktop import AutomationError, Capstone
+from capstone_mcp.displays import (
+    double_click_control,
+    find_palette_item,
+    set_control_value,
+)
 from capstone_mcp.models import Control, Model
 
 SCOPE_PALETTE_SUFFIX: Final = ".ObjNameScope"
@@ -125,58 +129,17 @@ def _find_palette_item(
     suffix: str,
 ) -> Control:
     """Find a display item in the displays palette."""
-    t_lower = target_name.lower()
-    for ctrl in controls:
-        if not ctrl.visible or not ctrl.enabled:
-            continue
-        c_name = ctrl.name.strip().lower()
-        if (
-            ctrl.automation_id.endswith(suffix)
-            or c_name == t_lower
-            or (
-                ctrl.control_type in ("Text", "Button", "ListItem")
-                and t_lower in c_name
-            )
-        ):
-            return ctrl
-    msg = f"Expected {target_name} display palette item not found in window snapshot."
-    raise AutomationError(msg)
+    return find_palette_item(controls, target_name, suffix)
 
 
 def _double_click_palette_item(app: Capstone, handle: int, ctrl: Control) -> None:
     """Insert a display widget onto the active page by double-clicking."""
-    app.focus_window(handle)
-    node = app.control(ctrl.ref)
-    if hasattr(node, "click_input") and hasattr(node, "rectangle"):
-        with contextlib.suppress(Exception):
-            bounds = node.rectangle()
-            node.click_input(
-                button="left",
-                double=True,
-                absolute=True,
-                coords=(
-                    (bounds.left + bounds.right) // 2,
-                    (bounds.top + bounds.bottom) // 2,
-                ),
-            )
-            return
-    app.click(handle, ctrl.ref, allow_foreground=True)
+    double_click_control(app, handle, ctrl)
 
 
 def _set_ctrl_value(app: Capstone, handle: int, ctrl: Control, text: str) -> None:
     """Set text or value in a target control with keyboard fallback."""
-    node = app.control(ctrl.ref)
-    try:
-        if hasattr(node, "iface_value") and node.iface_value:
-            node.iface_value.SetValue(text)
-            return
-    except (AttributeError, RuntimeError):
-        pass
-
-    app.click(handle, ctrl.ref, allow_foreground=True)
-    app.keys(handle, "^a{BACKSPACE}")
-    app.type_text(text)
-    app.keys(handle, "{ENTER}")
+    set_control_value(app, handle, ctrl, text)
 
 
 def _configure_scope(
