@@ -137,7 +137,7 @@ flowchart TD
 ### Key Subsystems:
 1. **Deep Run Management Module (`src/capstone_mcp/runs/`)**:
    - Collapsed 4 shallow modules (`run_rename.py`, `run_delete.py`, `run_visibility.py`, `run_capture.py`) into a unified `RunManager` engine.
-   - Provides a single `manage_run(app, RunRequest)` seam supporting `RENAME`, `DELETE`, `SET_VISIBILITY`, and `CAPTURE`.
+   - Provides a single `manage_run(app, RunRequest)` seam supporting `RENAME`, `DELETE`, and `SET_VISIBILITY`.
    - Incorporates inline F2 keyboard renaming fallbacks, automated modal confirmation dialog dismissal, multi-display visibility toggling, and multi-cycle dataset acquisition snapshots with trendline comparisons.
 
 2. **Decoupled Binary Record Decoder (`src/capstone_mcp/capfiles/records.py`)**:
