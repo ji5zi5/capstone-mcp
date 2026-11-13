@@ -5,6 +5,13 @@ import pytest
 from mcp.server.fastmcp import FastMCP
 
 from capstone_mcp.automation_models import NativeRequest
+from capstone_mcp.displays import (
+    CreateTableRequest,
+    CreateTableResult,
+    DisplayAction,
+    DisplayRequest,
+    DisplayResult,
+)
 from capstone_mcp.graphs import (
     CreateGraphRequest,
     CreateGraphResult,
@@ -49,6 +56,8 @@ def test_server_has_all_tool_domains_registered() -> None:
 
     # 2. Display tools
     expected_displays = {
+        "capstone_manage_display",
+        "capstone_manage_graph",
         "capstone_create_graph",
         "capstone_select_graph_measurement",
         "capstone_observe_graph",
@@ -135,9 +144,10 @@ def test_isolated_router_registration() -> None:
     display_tools = register_display_tools(
         mcp_displays, mock_native, get_last_failure=lambda: None,
     )
-    assert len(display_tools) == 23
-    assert len(mcp_displays._tool_manager.list_tools()) == 23
+    assert len(display_tools) == 24
+    assert len(mcp_displays._tool_manager.list_tools()) == 24
     assert "capstone_manage_graph" in display_tools
+    assert "capstone_manage_display" in display_tools
 
     # Instrument router
     mcp_instruments = FastMCP("test-instruments")
@@ -284,3 +294,73 @@ async def test_legacy_instrument_tools_delegate_to_manage_instrument() -> None:
     assert len(captured_requests) == 1
     assert captured_requests[0].operation == "manage_instrument"
     assert captured_requests[0].instrument_request["action"] == "zero_sensor"
+
+
+@pytest.mark.anyio
+async def test_manage_display_tool_delegation() -> None:
+    """Verify capstone_manage_display invokes native with 'manage_display'."""
+    captured_requests: list[NativeRequest] = []
+
+    async def mock_native(
+        req: NativeRequest,
+        *_args: object,
+        **_kwargs: object,
+    ) -> dict[str, object]:
+        captured_requests.append(req)
+        return DisplayResult(
+            action=DisplayAction.CREATE_TABLE,
+            create_table=CreateTableResult(
+                table_id="Table_1",
+                name="Table 1",
+                verified=True,
+                detail="Table created",
+            ),
+        ).model_dump()
+
+    mcp = FastMCP("test-manage-display")
+    tools = register_display_tools(mcp, mock_native)
+    manage_fn = tools["capstone_manage_display"]
+
+    res = await manage_fn(
+        DisplayRequest(
+            action=DisplayAction.CREATE_TABLE,
+            create_table=CreateTableRequest(handle=42, table_name="Table 1"),
+        ),
+    )
+    assert isinstance(res, DisplayResult)
+    assert len(captured_requests) == 1
+    assert captured_requests[0].operation == "manage_display"
+    assert captured_requests[0].display_request["action"] == "create_table"
+
+
+@pytest.mark.anyio
+async def test_legacy_display_tools_delegate_to_manage_display() -> None:
+    """Verify legacy tool capstone_create_table delegates to manage_display."""
+    captured_requests: list[NativeRequest] = []
+
+    async def mock_native(
+        req: NativeRequest,
+        *_args: object,
+        **_kwargs: object,
+    ) -> dict[str, object]:
+        captured_requests.append(req)
+        return DisplayResult(
+            action=DisplayAction.CREATE_TABLE,
+            create_table=CreateTableResult(
+                table_id="Table_1",
+                name="Table 1",
+                verified=True,
+                detail="Legacy table created",
+            ),
+        ).model_dump()
+
+    mcp = FastMCP("test-legacy-display")
+    tools = register_display_tools(mcp, mock_native)
+    create_table_fn = tools["capstone_create_table"]
+
+    res = await create_table_fn(handle=100, table_name="Table 1")
+    assert res.verified is True
+    assert res.detail == "Legacy table created"
+    assert len(captured_requests) == 1
+    assert captured_requests[0].operation == "manage_display"
+    assert captured_requests[0].display_request["action"] == "create_table"

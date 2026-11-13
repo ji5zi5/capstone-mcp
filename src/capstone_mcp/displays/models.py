@@ -135,11 +135,14 @@ class ReadTableRequest(Model):
 class ReadTableResult(Model):
     """Tabular data extracted from Table display."""
 
-    table_name: str
-    columns: list[str]
-    rows: list[list[str]]
-    row_count: int
-    total_rows: int
+    table_name: str = "Table"
+    columns: list[str] = Field(default_factory=list)
+    rows: list[list[str]] = Field(default_factory=list)
+    row_count: int = 0
+    total_rows: int = 0
+    page: int = 1
+    page_size: int = 50
+    total_pages: int = 1
     statistics: dict[str, dict[str, str]] = Field(default_factory=dict)
     has_more: bool = False
     verified: bool = True

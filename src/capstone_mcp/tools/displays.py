@@ -9,7 +9,24 @@ from mcp.types import CallToolResult, ImageContent, TextContent, ToolAnnotations
 from pydantic import JsonValue, TypeAdapter
 
 from capstone_mcp.automation_models import NativeRequest
-from capstone_mcp.digits_display import CreateDigitsResult
+from capstone_mcp.displays import (
+    AddPageRequest,
+    AddPageResult,
+    CreateDigitsRequest,
+    CreateDigitsResult,
+    CreateTableRequest,
+    CreateTableResult,
+    DisplayAction,
+    DisplayRequest,
+    DisplayResult,
+    PageLayoutTemplate,
+    ReadTableRequest,
+    ReadTableResult,
+    SetPageLayoutRequest,
+    SetPageLayoutResult,
+    SetTableColumnsRequest,
+    SetTableColumnsResult,
+)
 from capstone_mcp.graphs import (
     AnalyzeGraphRequest,
     CreateGraphRequest,
@@ -36,16 +53,6 @@ from capstone_mcp.graphs import (
 )
 from capstone_mcp.models import Point, Result
 from capstone_mcp.runs import DeleteRunResult, RenameRunResult, SetRunVisibilityResult
-from capstone_mcp.table_display import (
-    CreateTableResult,
-    ReadTableResult,
-    SetTableColumnsResult,
-)
-from capstone_mcp.workbook_layout import (
-    AddPageResult,
-    PageLayoutTemplate,
-    SetPageLayoutResult,
-)
 
 type NativeCaller = Callable[..., Awaitable[Any]]
 DEFAULT_FIT_OFFSET: Final = Point(x=20, y=20)
@@ -97,6 +104,47 @@ def register_display_tools(  # noqa: PLR0915
                     ),
                 ),
                 mutates=request.action != GraphAction.READ,
+            ),
+        )
+
+    @mcp.tool(
+        annotations=ToolAnnotations(
+            title="Unified display and workbook management seam",
+            readOnlyHint=False,
+            destructiveHint=False,
+            idempotentHint=False,
+            openWorldHint=False,
+        ),
+    )
+    async def capstone_manage_display(
+        request: DisplayRequest,
+    ) -> DisplayResult:
+        """Unified entry point for all Capstone display and workbook operations.
+
+        Supported actions (request.action):
+        - create_digits: Insert Digits display and monitor numeric readout
+        - create_table: Insert Table display widget on active page
+        - set_table_columns: Configure measurement columns for Table display
+        - read_table: Extract tabular rows, pagination, and statistics
+        - create_scope: Insert Oscilloscope display widget
+        - set_scope_trigger: Configure scope hardware trigger level/slope/mode
+        - create_fft: Insert FFT frequency spectrum display
+        - read_fft_peaks: Read detected spectral peak frequencies and amplitudes
+        - add_page: Add a new workbook page tab
+        - set_page_layout: Apply multi-display split grid layout template
+        """
+        return DisplayResult.model_validate(
+            await native(
+                NativeRequest(
+                    operation="manage_display",
+                    display_request=JSON_VALUE.validate_json(
+                        request.model_dump_json(),
+                    ),
+                ),
+                mutates=request.action not in (
+                    DisplayAction.READ_TABLE,
+                    DisplayAction.READ_FFT_PEAKS,
+                ),
             ),
         )
 
@@ -537,17 +585,20 @@ def register_display_tools(  # noqa: PLR0915
         Returns:
             CreateTableResult with table_id, name, columns, and status.
         """
-        return CreateTableResult.model_validate(
-            await native(
-                NativeRequest(
-                    operation="create_table",
+        res = await capstone_manage_display(
+            DisplayRequest(
+                action=DisplayAction.CREATE_TABLE,
+                create_table=CreateTableRequest(
                     handle=handle,
                     table_name=table_name,
                     allow_foreground=allow_foreground,
                 ),
-                mutates=True,
             ),
         )
+        if res.create_table is None:
+            msg = "Expected create_table result from manage_display"
+            raise RuntimeError(msg)
+        return res.create_table
 
     @mcp.tool(
         annotations=ToolAnnotations(
@@ -576,18 +627,21 @@ def register_display_tools(  # noqa: PLR0915
         Returns:
             SetTableColumnsResult with updated columns list and binding status.
         """
-        return SetTableColumnsResult.model_validate(
-            await native(
-                NativeRequest(
-                    operation="set_table_columns",
+        res = await capstone_manage_display(
+            DisplayRequest(
+                action=DisplayAction.SET_TABLE_COLUMNS,
+                set_table_columns=SetTableColumnsRequest(
                     handle=handle,
                     columns=columns,
                     table_name=table_name,
                     allow_foreground=allow_foreground,
                 ),
-                mutates=True,
             ),
         )
+        if res.set_table_columns is None:
+            msg = "Expected set_table_columns result from manage_display"
+            raise RuntimeError(msg)
+        return res.set_table_columns
 
     @mcp.tool(
         annotations=ToolAnnotations(
@@ -620,10 +674,10 @@ def register_display_tools(  # noqa: PLR0915
         Returns:
             ReadTableResult containing headers, rows, total_rows, and statistics.
         """
-        return ReadTableResult.model_validate(
-            await native(
-                NativeRequest(
-                    operation="read_table",
+        res = await capstone_manage_display(
+            DisplayRequest(
+                action=DisplayAction.READ_TABLE,
+                read_table=ReadTableRequest(
                     handle=handle,
                     table_name=table_name,
                     page=page,
@@ -631,9 +685,12 @@ def register_display_tools(  # noqa: PLR0915
                     include_statistics=include_statistics,
                     allow_foreground=allow_foreground,
                 ),
-                mutates=False,
             ),
         )
+        if res.read_table is None:
+            msg = "Expected read_table result from manage_display"
+            raise RuntimeError(msg)
+        return res.read_table
 
     @mcp.tool(
         annotations=ToolAnnotations(
@@ -662,18 +719,21 @@ def register_display_tools(  # noqa: PLR0915
         Returns:
             CreateDigitsResult with digits_id, name, bound measurement, and unit.
         """
-        return CreateDigitsResult.model_validate(
-            await native(
-                NativeRequest(
-                    operation="create_digits",
+        res = await capstone_manage_display(
+            DisplayRequest(
+                action=DisplayAction.CREATE_DIGITS,
+                create_digits=CreateDigitsRequest(
                     handle=handle,
                     measurement=measurement,
                     digits_name=digits_name,
                     allow_foreground=allow_foreground,
                 ),
-                mutates=True,
             ),
         )
+        if res.create_digits is None:
+            msg = "Expected create_digits result from manage_display"
+            raise RuntimeError(msg)
+        return res.create_digits
 
     @mcp.tool(
         annotations=ToolAnnotations(
@@ -820,17 +880,20 @@ def register_display_tools(  # noqa: PLR0915
         Returns:
             AddPageResult with page_index, title, and total pages count.
         """
-        return AddPageResult.model_validate(
-            await native(
-                NativeRequest(
-                    operation="add_page",
+        res = await capstone_manage_display(
+            DisplayRequest(
+                action=DisplayAction.ADD_PAGE,
+                add_page=AddPageRequest(
                     handle=handle,
                     title=title,
                     allow_foreground=allow_foreground,
                 ),
-                mutates=True,
             ),
         )
+        if res.add_page is None:
+            msg = "Expected add_page result from manage_display"
+            raise RuntimeError(msg)
+        return res.add_page
 
     @mcp.tool(
         annotations=ToolAnnotations(
@@ -860,20 +923,24 @@ def register_display_tools(  # noqa: PLR0915
         Returns:
             SetPageLayoutResult with layout template and display placeholders.
         """
-        return SetPageLayoutResult.model_validate(
-            await native(
-                NativeRequest(
-                    operation="set_page_layout",
+        res = await capstone_manage_display(
+            DisplayRequest(
+                action=DisplayAction.SET_PAGE_LAYOUT,
+                set_page_layout=SetPageLayoutRequest(
                     handle=handle,
                     layout=layout,
                     page_name=page_name,
                     allow_foreground=allow_foreground,
                 ),
-                mutates=True,
             ),
         )
+        if res.set_page_layout is None:
+            msg = "Expected set_page_layout result from manage_display"
+            raise RuntimeError(msg)
+        return res.set_page_layout
 
     return {
+        "capstone_manage_display": capstone_manage_display,
         "capstone_manage_graph": capstone_manage_graph,
         "capstone_create_graph": capstone_create_graph,
         "capstone_select_graph_measurement": capstone_select_graph_measurement,

@@ -22,7 +22,21 @@ from capstone_mcp.automation_models import NativeReply, RequestPacket
 from capstone_mcp.automation_worker import MAX_MESSAGE_BYTES
 from capstone_mcp.calculator import CreateCalculationRequest, create_calculation
 from capstone_mcp.desktop import AutomationError, Capstone
-from capstone_mcp.digits_display import CreateDigitsRequest, create_digits
+from capstone_mcp.displays import (
+    AddPageRequest,
+    CreateDigitsRequest,
+    CreateFftRequest,
+    CreateScopeRequest,
+    CreateTableRequest,
+    DisplayAction,
+    DisplayRequest,
+    ReadFftPeaksRequest,
+    ReadTableRequest,
+    SetPageLayoutRequest,
+    SetScopeTriggerRequest,
+    SetTableColumnsRequest,
+    manage_display,
+)
 from capstone_mcp.file_workflows import (
     export_data,
     open_experiment,
@@ -73,16 +87,6 @@ from capstone_mcp.instruments import (
     target_sampling_rate,
 )
 from capstone_mcp.models import Point, Result
-from capstone_mcp.oscilloscope_fft import (
-    CreateFftRequest,
-    CreateScopeRequest,
-    ReadFftPeaksRequest,
-    SetScopeTriggerRequest,
-    create_fft,
-    create_scope,
-    read_fft_peaks,
-    set_scope_trigger,
-)
 from capstone_mcp.repetition import NativeRecordingBackend, RepeatPlan
 from capstone_mcp.runs import (
     DeleteRunRequest,
@@ -91,20 +95,6 @@ from capstone_mcp.runs import (
     delete_run,
     rename_run,
     set_run_visibility,
-)
-from capstone_mcp.table_display import (
-    CreateTableRequest,
-    ReadTableRequest,
-    SetTableColumnsRequest,
-    create_table,
-    read_table,
-    set_table_columns,
-)
-from capstone_mcp.workbook_layout import (
-    AddPageRequest,
-    SetPageLayoutRequest,
-    add_page,
-    set_page_layout,
 )
 
 if TYPE_CHECKING:
@@ -253,6 +243,12 @@ class NativeDesktop:
                     InstrumentRequest.model_validate(r.instrument_request),
                 ),
             ),
+            "manage_display": lambda r: _json(
+                manage_display(
+                    self.app,
+                    DisplayRequest.model_validate(r.display_request),
+                ),
+            ),
             "create_graph": lambda r: _json(
                 create_graph(
                     self.app,
@@ -349,49 +345,61 @@ class NativeDesktop:
                 ).zero_sensor,  # type: ignore[arg-type]
             ),
             "create_table": lambda r: _json(
-                create_table(
+                manage_display(
                     self.app,
-                    CreateTableRequest(
-                        handle=r.handle,
-                        table_name=r.table_name,
-                        allow_foreground=r.allow_foreground,
+                    DisplayRequest(
+                        action=DisplayAction.CREATE_TABLE,
+                        create_table=CreateTableRequest(
+                            handle=r.handle,
+                            table_name=r.table_name,
+                            allow_foreground=r.allow_foreground,
+                        ),
                     ),
-                ),
+                ).create_table,  # type: ignore[arg-type]
             ),
             "set_table_columns": lambda r: _json(
-                set_table_columns(
+                manage_display(
                     self.app,
-                    SetTableColumnsRequest(
-                        handle=r.handle,
-                        columns=r.columns,
-                        table_name=r.table_name,
-                        allow_foreground=r.allow_foreground,
+                    DisplayRequest(
+                        action=DisplayAction.SET_TABLE_COLUMNS,
+                        set_table_columns=SetTableColumnsRequest(
+                            handle=r.handle,
+                            columns=r.columns,
+                            table_name=r.table_name,
+                            allow_foreground=r.allow_foreground,
+                        ),
                     ),
-                ),
+                ).set_table_columns,  # type: ignore[arg-type]
             ),
             "read_table": lambda r: _json(
-                read_table(
+                manage_display(
                     self.app,
-                    ReadTableRequest(
-                        handle=r.handle,
-                        table_name=r.table_name,
-                        page=r.page,
-                        page_size=r.page_size,
-                        include_statistics=r.include_statistics,
-                        allow_foreground=r.allow_foreground,
+                    DisplayRequest(
+                        action=DisplayAction.READ_TABLE,
+                        read_table=ReadTableRequest(
+                            handle=r.handle,
+                            table_name=r.table_name,
+                            page=r.page,
+                            page_size=r.page_size,
+                            include_statistics=r.include_statistics,
+                            allow_foreground=r.allow_foreground,
+                        ),
                     ),
-                ),
+                ).read_table,  # type: ignore[arg-type]
             ),
             "create_digits": lambda r: _json(
-                create_digits(
+                manage_display(
                     self.app,
-                    CreateDigitsRequest(
-                        handle=r.handle,
-                        measurement=r.measurement,
-                        digits_name=r.digits_name,
-                        allow_foreground=r.allow_foreground,
+                    DisplayRequest(
+                        action=DisplayAction.CREATE_DIGITS,
+                        create_digits=CreateDigitsRequest(
+                            handle=r.handle,
+                            measurement=r.measurement,
+                            digits_name=r.digits_name,
+                            allow_foreground=r.allow_foreground,
+                        ),
                     ),
-                ),
+                ).create_digits,  # type: ignore[arg-type]
             ),
             "toggle_graph_statistics": lambda r: _json(
                 toggle_graph_statistics(
@@ -475,51 +483,63 @@ class NativeDesktop:
                 )
             ),
             "create_scope": lambda r: _json(
-                create_scope(
+                manage_display(
                     self.app,
-                    CreateScopeRequest(
-                        handle=r.handle,
-                        timebase=r.timebase,
-                        channel=r.channel,
-                        allow_foreground=r.allow_foreground,
+                    DisplayRequest(
+                        action=DisplayAction.CREATE_SCOPE,
+                        create_scope=CreateScopeRequest(
+                            handle=r.handle,
+                            timebase=r.timebase,
+                            channel=r.channel,
+                            allow_foreground=r.allow_foreground,
+                        ),
                     ),
-                ),
+                ).create_scope,  # type: ignore[arg-type]
             ),
             "set_scope_trigger": lambda r: _json(
-                set_scope_trigger(
+                manage_display(
                     self.app,
-                    SetScopeTriggerRequest(
-                        handle=r.handle,
-                        scope_id=r.scope_id,
-                        trigger_level=r.trigger_level,
-                        trigger_slope=r.trigger_slope,
-                        trigger_mode=r.trigger_mode,
-                        trigger_source=r.trigger_source,
-                        allow_foreground=r.allow_foreground,
+                    DisplayRequest(
+                        action=DisplayAction.SET_SCOPE_TRIGGER,
+                        set_scope_trigger=SetScopeTriggerRequest(
+                            handle=r.handle,
+                            scope_id=r.scope_id,
+                            trigger_level=r.trigger_level,
+                            trigger_slope=r.trigger_slope,
+                            trigger_mode=r.trigger_mode,
+                            trigger_source=r.trigger_source,
+                            allow_foreground=r.allow_foreground,
+                        ),
                     ),
-                ),
+                ).set_scope_trigger,  # type: ignore[arg-type]
             ),
             "create_fft": lambda r: _json(
-                create_fft(
+                manage_display(
                     self.app,
-                    CreateFftRequest(
-                        handle=r.handle,
-                        measurement=r.measurement,
-                        frequency_range=r.frequency_range,
-                        allow_foreground=r.allow_foreground,
+                    DisplayRequest(
+                        action=DisplayAction.CREATE_FFT,
+                        create_fft=CreateFftRequest(
+                            handle=r.handle,
+                            measurement=r.measurement,
+                            frequency_range=r.frequency_range,
+                            allow_foreground=r.allow_foreground,
+                        ),
                     ),
-                ),
+                ).create_fft,  # type: ignore[arg-type]
             ),
             "read_fft_peaks": lambda r: _json(
-                read_fft_peaks(
+                manage_display(
                     self.app,
-                    ReadFftPeaksRequest(
-                        handle=r.handle,
-                        fft_id=r.fft_id,
-                        top_k=r.top_k,
-                        allow_foreground=r.allow_foreground,
+                    DisplayRequest(
+                        action=DisplayAction.READ_FFT_PEAKS,
+                        read_fft_peaks=ReadFftPeaksRequest(
+                            handle=r.handle,
+                            fft_id=r.fft_id,
+                            top_k=r.top_k,
+                            allow_foreground=r.allow_foreground,
+                        ),
                     ),
-                ),
+                ).read_fft_peaks,  # type: ignore[arg-type]
             ),
             "set_recording_condition": lambda r: _json(
                 manage_instrument(
@@ -618,25 +638,31 @@ class NativeDesktop:
                 ).calibrate_sensor,  # type: ignore[arg-type]
             ),
             "add_page": lambda r: _json(
-                add_page(
+                manage_display(
                     self.app,
-                    AddPageRequest(
-                        handle=r.handle,
-                        title=r.title,
-                        allow_foreground=r.allow_foreground,
+                    DisplayRequest(
+                        action=DisplayAction.ADD_PAGE,
+                        add_page=AddPageRequest(
+                            handle=r.handle,
+                            title=r.title,
+                            allow_foreground=r.allow_foreground,
+                        ),
                     ),
-                ),
+                ).add_page,  # type: ignore[arg-type]
             ),
             "set_page_layout": lambda r: _json(
-                set_page_layout(
+                manage_display(
                     self.app,
-                    SetPageLayoutRequest(
-                        handle=r.handle,
-                        layout=r.layout,  # type: ignore[arg-type]
-                        page_name=r.page_name,
-                        allow_foreground=r.allow_foreground,
+                    DisplayRequest(
+                        action=DisplayAction.SET_PAGE_LAYOUT,
+                        set_page_layout=SetPageLayoutRequest(
+                            handle=r.handle,
+                            layout=r.layout,  # type: ignore[arg-type]
+                            page_name=r.page_name,
+                            allow_foreground=r.allow_foreground,
+                        ),
                     ),
-                ),
+                ).set_page_layout,  # type: ignore[arg-type]
             ),
         }
 

@@ -21,6 +21,19 @@ from capstone_mcp.bridge import (
     read_inventory,
     read_measurement,
 )
+from capstone_mcp.displays import (
+    CreateFftRequest,
+    CreateFftResult,
+    CreateScopeRequest,
+    CreateScopeResult,
+    DisplayAction,
+    DisplayRequest,
+    DisplayResult,
+    ReadFftPeaksRequest,
+    ReadFftPeaksResult,
+    ScopeTriggerResult,
+    SetScopeTriggerRequest,
+)
 from capstone_mcp.instruments import (
     CalibrateSensorRequest,
     CalibrateSensorResult,
@@ -48,12 +61,6 @@ from capstone_mcp.instruments import (
     SignalGeneratorStatusResult,
     ZeroSensorRequest,
     ZeroSensorResult,
-)
-from capstone_mcp.oscilloscope_fft import (
-    CreateFftResult,
-    CreateScopeResult,
-    ReadFftPeaksResult,
-    ScopeTriggerResult,
 )
 from capstone_mcp.repetition import AcquisitionJobs, JobStatus, RepeatPlan
 
@@ -502,18 +509,29 @@ def register_instrument_tools(  # noqa: PLR0915
         Returns:
             CreateScopeResult with scope_id, channel, and timebase.
         """
-        return CreateScopeResult.model_validate(
+        res = DisplayResult.model_validate(
             await native(
                 NativeRequest(
-                    operation="create_scope",
-                    handle=handle,
-                    timebase=str(timebase) if timebase is not None else None,
-                    channel=channel,
-                    allow_foreground=allow_foreground,
+                    operation="manage_display",
+                    display_request=_json_dict(
+                        DisplayRequest(
+                            action=DisplayAction.CREATE_SCOPE,
+                            create_scope=CreateScopeRequest(
+                                handle=handle,
+                                timebase=str(timebase) if timebase is not None else None,
+                                channel=channel,
+                                allow_foreground=allow_foreground,
+                            ),
+                        ),
+                    ),
                 ),
                 mutates=True,
             ),
         )
+        if res.create_scope is None:
+            msg = "Expected create_scope result from manage_display"
+            raise RuntimeError(msg)
+        return res.create_scope
 
     @mcp.tool(
         annotations=ToolAnnotations(
@@ -548,21 +566,32 @@ def register_instrument_tools(  # noqa: PLR0915
         Returns:
             ScopeTriggerResult with applied trigger configuration.
         """
-        return ScopeTriggerResult.model_validate(
+        res = DisplayResult.model_validate(
             await native(
                 NativeRequest(
-                    operation="set_scope_trigger",
-                    handle=handle,
-                    scope_id=scope_id,
-                    trigger_level=trigger_level,
-                    trigger_slope=trigger_slope,
-                    trigger_mode=trigger_mode,
-                    trigger_source=trigger_source,
-                    allow_foreground=allow_foreground,
+                    operation="manage_display",
+                    display_request=_json_dict(
+                        DisplayRequest(
+                            action=DisplayAction.SET_SCOPE_TRIGGER,
+                            set_scope_trigger=SetScopeTriggerRequest(
+                                handle=handle,
+                                scope_id=scope_id,
+                                trigger_level=trigger_level,
+                                trigger_slope=trigger_slope,
+                                trigger_mode=trigger_mode,
+                                trigger_source=trigger_source,
+                                allow_foreground=allow_foreground,
+                            ),
+                        ),
+                    ),
                 ),
                 mutates=True,
             ),
         )
+        if res.set_scope_trigger is None:
+            msg = "Expected set_scope_trigger result from manage_display"
+            raise RuntimeError(msg)
+        return res.set_scope_trigger
 
     @mcp.tool(
         annotations=ToolAnnotations(
@@ -591,18 +620,29 @@ def register_instrument_tools(  # noqa: PLR0915
         Returns:
             CreateFftResult with fft_id, measurement, and frequency_range.
         """
-        return CreateFftResult.model_validate(
+        res = DisplayResult.model_validate(
             await native(
                 NativeRequest(
-                    operation="create_fft",
-                    handle=handle,
-                    measurement=measurement,
-                    frequency_range=frequency_range,
-                    allow_foreground=allow_foreground,
+                    operation="manage_display",
+                    display_request=_json_dict(
+                        DisplayRequest(
+                            action=DisplayAction.CREATE_FFT,
+                            create_fft=CreateFftRequest(
+                                handle=handle,
+                                measurement=measurement,
+                                frequency_range=frequency_range,
+                                allow_foreground=allow_foreground,
+                            ),
+                        ),
+                    ),
                 ),
                 mutates=True,
             ),
         )
+        if res.create_fft is None:
+            msg = "Expected create_fft result from manage_display"
+            raise RuntimeError(msg)
+        return res.create_fft
 
     @mcp.tool(
         annotations=ToolAnnotations(
@@ -631,18 +671,29 @@ def register_instrument_tools(  # noqa: PLR0915
         Returns:
             ReadFftPeaksResult with list of detected frequency peaks and amplitudes.
         """
-        return ReadFftPeaksResult.model_validate(
+        res = DisplayResult.model_validate(
             await native(
                 NativeRequest(
-                    operation="read_fft_peaks",
-                    handle=handle,
-                    fft_id=fft_id,
-                    top_k=top_k,
-                    allow_foreground=allow_foreground,
+                    operation="manage_display",
+                    display_request=_json_dict(
+                        DisplayRequest(
+                            action=DisplayAction.READ_FFT_PEAKS,
+                            read_fft_peaks=ReadFftPeaksRequest(
+                                handle=handle,
+                                fft_id=fft_id,
+                                top_k=top_k,
+                                allow_foreground=allow_foreground,
+                            ),
+                        ),
+                    ),
                 ),
                 mutates=False,
             ),
         )
+        if res.read_fft_peaks is None:
+            msg = "Expected read_fft_peaks result from manage_display"
+            raise RuntimeError(msg)
+        return res.read_fft_peaks
 
     @mcp.tool(
         annotations=ToolAnnotations(
