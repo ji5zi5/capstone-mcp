@@ -517,6 +517,47 @@ async def capstone_active_runs_resource() -> str:
     return json.dumps(runs_info, indent=2)
 
 
+@MCP.resource("capstone://hardware/inventory")
+async def capstone_hardware_inventory_resource() -> str:
+    """Return real-time hardware status for interfaces, sensors, and devices."""
+    inventory_doc: dict[str, JsonValue] = {
+        "attached": not WORKER.retired and bool(WORKER.process_id),
+        "process_id": WORKER.process_id,
+        "interfaces": [],
+        "sensors": [],
+        "wireless_devices": [],
+        "recording": None,
+        "sampling_rate": None,
+    }
+    if not WORKER.retired and WORKER.process_id:
+        with suppress(Exception):
+            rec_status = await _native(
+                NativeRequest(operation="recording_status"),
+                mutates=False,
+            )
+            inventory_doc["recording"] = rec_status
+            if isinstance(rec_status, dict):
+                inventory_doc["sampling_rate"] = rec_status.get(
+                    "sampling_rate_display",
+                )
+        with suppress(Exception):
+            scan_res = await _native(
+                NativeRequest(
+                    operation="manage_instrument",
+                    instrument_request={
+                        "action": "scan_wireless",
+                        "scan_wireless": {"timeout_seconds": 1.0},
+                    },
+                ),
+                mutates=False,
+            )
+            if isinstance(scan_res, dict) and "scan_wireless" in scan_res:
+                sw = scan_res["scan_wireless"]
+                if isinstance(sw, dict) and "sensors" in sw:
+                    inventory_doc["wireless_devices"] = sw["sensors"]
+    return JSON_VALUE.dump_json(inventory_doc, indent=2).decode("utf-8")
+
+
 @MCP.resource("capstone://guide")
 def capstone_guide_resource() -> str:
     """Return the complete workflow guidance manual for PASCO Capstone."""
@@ -838,6 +879,7 @@ __all__ = [
     "capstone_acquisition_job",
     "capstone_cancel_acquisition",
     "capstone_generate_lab_report",
+    "capstone_hardware_inventory_resource",
     "capstone_run_experiment_macro",
     "capstone_tutor_get_lesson",
     "capstone_tutor_guide_step",
