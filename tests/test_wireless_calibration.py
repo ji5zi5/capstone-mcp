@@ -6,8 +6,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from capstone_mcp.desktop import AutomationError, Capstone
-from capstone_mcp.models import Bounds, Control, Snapshot, Window
-from capstone_mcp.wireless_calibration import (
+from capstone_mcp.instruments import (
     CalibrateSensorRequest,
     ConnectWirelessSensorRequest,
     ScanWirelessSensorsRequest,
@@ -15,6 +14,7 @@ from capstone_mcp.wireless_calibration import (
     connect_wireless_sensor,
     scan_wireless_sensors,
 )
+from capstone_mcp.models import Bounds, Control, Snapshot, Window
 
 
 def _create_mock_window(handle: int = 100) -> Window:

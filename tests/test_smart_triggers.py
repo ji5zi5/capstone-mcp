@@ -6,8 +6,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from capstone_mcp.desktop import AutomationError, Capstone
-from capstone_mcp.models import Bounds, Control, Snapshot, Window
-from capstone_mcp.smart_triggers import (
+from capstone_mcp.instruments import (
     ConditionSpec,
     KeepSampleRequest,
     KeepSampleResult,
@@ -19,6 +18,7 @@ from capstone_mcp.smart_triggers import (
     set_recording_condition,
     set_sampling_mode,
 )
+from capstone_mcp.models import Bounds, Control, Snapshot, Window
 
 
 def _make_window() -> Window:

@@ -6,8 +6,9 @@ from typing import override
 
 import pytest
 
-from capstone_mcp import acquisition, sensor_settings
+from capstone_mcp import acquisition
 from capstone_mcp.desktop import AutomationError, Capstone
+from capstone_mcp.instruments import sensors as sensor_settings
 from capstone_mcp.models import Action, Bounds, Control, Result, Snapshot, Window
 
 
