@@ -1,5 +1,5 @@
 # Copyright 2026 Capstone MCP contributors.
-"""Tool router for physical calculations, numerical fitting, lab reports, and tutoring."""
+"""Tool router for physical calculations, numerical fitting, and lab reports."""
 
 from collections.abc import Awaitable, Callable
 from pathlib import Path
@@ -31,12 +31,6 @@ from capstone_mcp.reports import (
     generate_report,
     render_report,
 )
-from capstone_mcp.tutor import (
-    LessonPlan,
-    StepGuidance,
-    get_lesson_plan,
-    guide_lesson_step,
-)
 
 type NativeCaller = Callable[..., Awaitable[Any]]
 
@@ -61,7 +55,7 @@ def _write_report_file(
 
 
 def register_physics_tools(mcp: FastMCP, native: NativeCaller) -> dict[str, Any]:
-    """Register all math analysis, plotting, recipe macros, and tutor tools."""
+    """Register all math analysis, plotting, and recipe macro tools."""
 
     @mcp.tool(
         annotations=ToolAnnotations(
@@ -240,52 +234,6 @@ def register_physics_tools(mcp: FastMCP, native: NativeCaller) -> dict[str, Any]
 
     @mcp.tool(
         annotations=ToolAnnotations(
-            title="Get Physics Lab Lesson",
-            readOnlyHint=True,
-            destructiveHint=False,
-            idempotentHint=True,
-            openWorldHint=False,
-        ),
-    )
-    def capstone_tutor_get_lesson(experiment_id: str) -> LessonPlan:
-        """Return full syllabus, equipment list, theory, equations, steps, and quiz.
-
-        Args:
-            experiment_id: Canonical experiment identifier (e.g. 'photoelectric_effect',
-                'rlc_resonance', 'forced_harmonic_oscillation', 'adiabatic_gas',
-                'slit_diffraction') or lesson alias.
-
-        Returns:
-            LessonPlan with syllabus, equipment, theory, equations, steps, and quiz.
-        """
-        return get_lesson_plan(experiment_id)
-
-    @mcp.tool(
-        annotations=ToolAnnotations(
-            title="Guide Physics Lab Step",
-            readOnlyHint=True,
-            destructiveHint=False,
-            idempotentHint=True,
-            openWorldHint=False,
-        ),
-    )
-    def capstone_tutor_guide_step(
-        experiment_id: str,
-        step_index: int,
-    ) -> StepGuidance:
-        """Return targeted instructions, safety warnings, action, and validation checks.
-
-        Args:
-            experiment_id: Canonical experiment identifier (e.g. 'photoelectric_effect').
-            step_index: 1-based index of the procedural step to guide.
-
-        Returns:
-            StepGuidance with targeted instructions, safety warnings, action, and checks.
-        """
-        return guide_lesson_step(experiment_id, step_index)
-
-    @mcp.tool(
-        annotations=ToolAnnotations(
             title="Run experiment macro",
             readOnlyHint=False,
             destructiveHint=False,
@@ -333,8 +281,6 @@ def register_physics_tools(mcp: FastMCP, native: NativeCaller) -> dict[str, Any]
         "capstone_compare_runs": capstone_compare_runs,
         "capstone_create_calculation": capstone_create_calculation,
         "capstone_generate_lab_report": capstone_generate_lab_report,
-        "capstone_tutor_get_lesson": capstone_tutor_get_lesson,
-        "capstone_tutor_guide_step": capstone_tutor_guide_step,
         "capstone_run_experiment_macro": capstone_run_experiment_macro,
     }
 

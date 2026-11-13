@@ -41,11 +41,6 @@ from capstone_mcp.tools import (
     register_physics_tools,
 )
 from capstone_mcp.tools.files import ExportedData
-from capstone_mcp.tutor import (
-    get_curriculum,
-    list_experiments,
-    normalize_experiment_id,
-)
 
 WORKER: Final = AutomationWorker()
 JOBS: Final = AcquisitionJobs()
@@ -477,8 +472,6 @@ def capstone_cancel_acquisition(job_id: str) -> JobStatus:
 
 capstone_run_experiment_macro = _physics_tools["capstone_run_experiment_macro"]
 capstone_generate_lab_report = _physics_tools["capstone_generate_lab_report"]
-capstone_tutor_get_lesson = _physics_tools["capstone_tutor_get_lesson"]
-capstone_tutor_guide_step = _physics_tools["capstone_tutor_guide_step"]
 
 # ---------------------------------------------------------------------------
 # MCP Resources
@@ -662,27 +655,6 @@ def capstone_guide_resource() -> str:
     return guide()
 
 
-@MCP.resource("capstone://tutor/lessons")
-def capstone_tutor_lessons_resource() -> str:
-    """Return JSON catalog of all available pedagogical physics experiment lessons."""
-    catalog = [
-        {
-            "experiment_id": exp.experiment_id,
-            "title": exp.title,
-            "domain": exp.domain,
-            "theory_summary": exp.theory_summary,
-            "governing_equations": exp.governing_equations,
-            "equipment": exp.equipment,
-            "total_steps": len(exp.steps),
-            "total_quiz_questions": len(exp.quiz_questions),
-            "reference_file": exp.reference_file,
-            "lesson_file": f"./lessons/{exp.reference_file}",
-        }
-        for exp in list_experiments()
-    ]
-    return json.dumps(catalog, indent=2)
-
-
 # ---------------------------------------------------------------------------
 # MCP Prompts
 # ---------------------------------------------------------------------------
@@ -759,44 +731,6 @@ def sensor_calibration_workflow(
         "(known calibration weight or buffer).\n"
         "3. Confirm calibration completion and verify sensor reading matches "
         "the reference value."
-    )
-
-
-@MCP.prompt()
-def physics_lab_tutor(
-    experiment_id: str = "photoelectric_effect",
-    step_index: int = 1,
-) -> str:
-    """Pedagogical tutor prompt to guide students through physics lab experiments."""
-    curr = get_curriculum(normalize_experiment_id(experiment_id))
-    step = next(
-        (s for s in curr.steps if s.step_index == step_index),
-        curr.steps[0] if curr.steps else None,
-    )
-    step_text = ""
-    if step:
-        step_text = (
-            f"\n\nCurrent Target Step ({step.step_index}/{len(curr.steps)}): "
-            f"{step.title}\n"
-            f"- Targeted Instructions: {step.instructions}\n"
-            f"- Safety Warnings: {step.safety_notes}\n"
-            f"- Capstone Action: {step.capstone_action}\n"
-            f"- Validation Check: {step.validation_check}"
-        )
-    return (
-        f"You are the PASCO Capstone Physics Lab Tutor for '{curr.title}' "
-        f"({curr.domain}).\n"
-        f"Theory Summary:\n{curr.theory_summary}\n\n"
-        "Governing Equations:\n"
-        + "\n".join(f"- {eq}" for eq in curr.governing_equations)
-        + "\n\n"
-        "Required Equipment:\n"
-        + "\n".join(f"- {eq}" for eq in curr.equipment)
-        + step_text
-        + "\n\n"
-        "Guide the student interactively: explain the physical intuition, ensure "
-        "laboratory safety, verify Capstone sensor/display configurations, and test "
-        "conceptual understanding with quiz questions."
     )
 
 
@@ -1086,16 +1020,12 @@ __all__ = [
     "capstone_generate_lab_report",
     "capstone_hardware_inventory_resource",
     "capstone_run_experiment_macro",
-    "capstone_tutor_get_lesson",
-    "capstone_tutor_guide_step",
-    "capstone_tutor_lessons_resource",
     "data_analysis_workflow",
     "display_layout_workflow",
     "format_tool_error",
     "hardware_setup_workflow",
     "http_main",
     "main",
-    "physics_lab_tutor",
     "run_comparison_workflow",
 ]
 
