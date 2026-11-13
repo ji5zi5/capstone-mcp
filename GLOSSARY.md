@@ -28,3 +28,22 @@ Mathematical model fitting (Linear, Quadratic, Polynomial, Sine, etc.) applied t
 
 ### Toolbox
 The Qt-based floating smart toolbar (`ZSmartToolBox`) positioned over a graph display, housing tools for delta coordinates, statistics, area integration, and auto-scaling.
+
+### CDP (Chrome DevTools Protocol)
+The WebSocket debugging protocol exposed by Capstone's internal QtWebEngine / Chromium instance on port 9222, providing high-speed telemetry and direct JavaScript/C++ RPC inspection.
+
+### QWebChannel
+Qt's IPC bridge bridging native C++ objects (`javascriptBridge`) with the embedded webview, hosting 53 native RPC methods under `window.app.mSenseAndControlView.mServices`.
+
+### UnifiedSessionManager
+Central coordinator in `capstone_mcp.session` managing desktop UIA interactions and high-speed CDP WebSocket telemetry (< 15 ms).
+
+### Fast-Path Telemetry
+Direct WebSocket polling for sensor inventories and instantaneous values without UI automation overhead.
+
+### Stop Condition Trigger
+Automated threshold monitor halting data recording when sensor values exceed or cross specified mathematical boundaries (`StopCondition`).
+
+### UI Escape Hatch (`capstone_interact_ui`)
+Consolidated fallback tool providing raw mouse and keyboard UIA activations across invoke, click, drag, scroll, and key typing without polluting the top-level tool catalog.
+

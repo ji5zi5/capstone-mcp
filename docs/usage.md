@@ -345,13 +345,12 @@ PASCO 850 Universal Interface 또는 550 Interface의 내장 신호발생기 출
 }
 ```
 
-### 3. 대화형 랩 어시스턴트 & 튜터 (`capstone_tutor_*`)
+### 3. 실시간 센서 텔레메트리 & 임계치 트리거 (`capstone://measurements/live`)
 
-한국어 정규 실험 매뉴얼(`.hwp`, `.docx`, `.pdf`)을 기반으로 한 학습 가이드와 안전 지침을 제공합니다:
-- `capstone_tutor_get_lesson(experiment_id)`: 전체 실습 커리큘럼, 지배 방정식, 필수 장비 목록 및 사전 퀴즈 조회
-- `capstone_tutor_guide_step(experiment_id, step_index)`: 단계별 세부 절차, 주의사항, Capstone 조작법 및 검증 기준 지도
-- FastMCP 리소스: `capstone://tutor/lessons`
-- FastMCP 프롬프트: `physics_lab_tutor`
+Capstone 내부의 QtWebEngine CDP WebSocket 디버깅 포트(9222)를 통해 UI 자동화보다 20배 이상 빠른 초고속(10~15ms) 센서 인벤토리 및 실시간 계측값 조회를 제공합니다:
+- FastMCP 동적 리소스: `capstone://measurements/live` (연결된 모든 센서와 실시간 측정값의 JSON 스냅샷 스트림)
+- 임계치 자동 감시 및 정지: `monitor_until_stop`을 통해 힘, 전압, 가속도 등의 센서 값이 특정 기준(예: `force > 5.0 N`)에 도달했을 때 데이터 녹화를 자동으로 중단
+- 원격 디버그 포트 자동 연결: `capstone_attach(launch=True)` 시 `--remote-debugging-port=9222`가 자동 주입되어 별도 설정 없이 가동
 
 
 ## HTTP 연결
