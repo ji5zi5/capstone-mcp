@@ -151,9 +151,73 @@ flowchart TD
 
 ---
 
-## 6. Quality & Verification Guardrails
+## 6. Deep Graph Subsystem & MCP Protocol Maturity (Phase 6)
 
-1. **Automated Test Coverage**: 457 unit and integration tests across 54 test suites, executed with `uv run --no-sync pytest` (100% pass rate).
+Phase 6 deepened the fragmented graph automation infrastructure into a unified domain package (`src/capstone_mcp/graphs/`), eliminated 7 shallow root modules, and upgraded the MCP protocol integration to full maturity with compound tools, systematic tool annotations, dynamic state resources, structured error envelopes, and guided workflow prompts.
+
+```mermaid
+flowchart TD
+    subgraph ClientLayer ["Client / AI Agent Context"]
+        Prompt["Universal Workflow Prompts\n(data_analysis_workflow, run_comparison_workflow)"]
+        Resources["Dynamic MCP Resources\n(capstone://status, capstone://runs/active)"]
+        CompoundTool["Compound Tool\n(capstone_manage_graph)"]
+    end
+
+    subgraph ServerLayer ["MCP Protocol Boundary (server.py)"]
+        Annotations["Systematic ToolAnnotations\n(readOnlyHint / destructiveHint)"]
+        Envelope["Structured Error Protocol\n(CallToolResult(isError=True) -> JSON)"]
+    end
+
+    subgraph DeepGraphs ["Deep Graph Package (capstone_mcp.graphs)"]
+        Manager["GraphManager & manage_graph(app, request)"]
+        Toolbox["Smart Toolbox Controller (toolbox.py)"]
+        Inspection["Inspection & Native XML (inspection.py)"]
+        Models["Unified Enums & Models (models.py)"]
+        Manager --> Toolbox
+        Manager --> Inspection
+        Manager --> Models
+    end
+
+    CompoundTool --> Manager
+    CompoundTool --> Annotations
+    Envelope --> ClientLayer
+```
+
+### Key Architectural Enhancements:
+
+1. **Deep Graph Domain Seam (`src/capstone_mcp/graphs/`)**:
+   - Consolidated 7 fragmented shallow modules (`graph_control.py`, `graph_execution.py`, `graph_report.py`, `graph_requests.py`, `graph_state.py`, `graph_toolbox.py`, `graph_workflows.py`) into a deep, cohesive package.
+   - Anchored by a single unified seam: `manage_graph(app: Capstone, request: GraphRequest) -> GraphResult` and `GraphManager` engine.
+   - Encapsulates Qt floating smart toolbox (`ZSmartToolBox`) coordinates arithmetic, delta measurements, curve area integration, and summary statistics table extraction.
+   - Decodes native clipboard XML state and renders pure analytical reports without cross-binding leakage.
+
+2. **Compound FastMCP Tool (`capstone_manage_graph`)**:
+   - Registers a single compound tool on FastMCP dispatching across 8 graph actions (`CREATE`, `READ`, `FIT`, `SELECT_MEASUREMENT`, `TOOLBOX_DELTA`, `TOOLBOX_AREA`, `TOOLBOX_STATISTICS`, `ANALYZE`).
+   - Mitigates AI agent context bloat by reducing required tool schemas while preserving thin backward-compatible forwarding adapters for legacy tool callers.
+
+3. **Systematic MCP Tool Annotations**:
+   - Every domain tool is annotated with explicit `ToolAnnotations`:
+     - `readOnlyHint=True` on non-mutating inspection tools (`capstone_windows`, `capstone_snapshot`, `capstone_screenshot`, `capstone_read_graph`, `capstone_read_table`, `capstone_inspect_file`, `capstone_file_datasets`, `capstone_linear_fit`, etc.).
+     - `destructiveHint=True` on state-destroying operations (`capstone_delete_run`, `capstone_open_experiment` with discard, `capstone_set_graph_fits`, `capstone_analyze_graph`).
+
+4. **Dynamic Real-Time State Resources**:
+   - `capstone://status`: Live JSON snapshot of Capstone process attachment, window count, active background jobs, and worker health.
+   - `capstone://runs/active`: Real-time active job and recording run state for immediate agent inspection without heavy round-trip RPC calls.
+
+5. **Standardized Error Protocol**:
+   - Replaced raw unhandled Python tracebacks with structured `CallToolResult(isError=True)` containing structured JSON envelopes (`error_code`, `message`, `remediation`).
+   - Provides clear, actionable self-correction instructions across AI agent interactions for unattached sessions, missing controls, graph errors, and argument validation issues.
+
+6. **Universal Workflow Prompts**:
+   - `data_analysis_workflow`: End-to-end guided prompt for display inspection, graph reading, curve fitting, residual analysis, and formal lab report generation.
+   - `run_comparison_workflow`: Multi-run comparative prompt for verifying recorded trials, extracting summary statistics, and computing percentage differences.
+
+---
+
+## 7. Quality & Verification Guardrails
+
+1. **Automated Test Coverage**: 476 unit and integration tests across 57 test suites, executed with `uv run --no-sync pytest` (100% pass rate).
 2. **Deterministic Offline CI**: Hardware-dependent and live GUI tests include fallback guards (`pytest.mark.skipif`), allowing CI pipelines to pass deterministically in headless environments.
 3. **Windows Process Lock Guard**: Tool and test runner commands strictly enforce `--no-sync` to avoid `os error 32` file locking when background MCP processes hold `capstone-mcp.exe`.
 4. **Strict Type Safety & Linting**: Ruff compliance across all rulesets (`ruff check src tests`) with 0 errors, and Basedpyright type validation (`basedpyright src`) with 0 errors, 0 warnings.
+

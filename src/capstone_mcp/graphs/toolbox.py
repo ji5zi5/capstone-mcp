@@ -96,7 +96,7 @@ def _find_graph_control(
                 or g_lower in ctrl.automation_id.lower()
             ):
                 return ctrl
-        msg = f"Graph control matching '{graph_name}' not found."
+        msg = f"Target graph control not found: matching '{graph_name}'."
         raise AutomationError(msg)
 
     # Search for Graph widget

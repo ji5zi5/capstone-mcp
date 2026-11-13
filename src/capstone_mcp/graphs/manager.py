@@ -9,7 +9,11 @@ from typing import TYPE_CHECKING, Final
 from capstone_mcp.desktop import AutomationError, Capstone
 from capstone_mcp.displays import click_control
 from capstone_mcp.graphs.inspection import (
+    MENU_RELEASE_ATTEMPTS,
+    close_menus,
+    menu_item_disabled,
     read_graph,
+    release_menu_bar,
     summarize_graph,
     verify_graph_binding,
 )
@@ -228,11 +232,26 @@ def _enable_fitting(
 
 def create_graph(
     app: Capstone,
-    request: CreateGraphRequest | None = None,
+    handle_or_request: int | CreateGraphRequest | None = None,
+    *,
+    allow_foreground: bool = True,
 ) -> CreateGraphResult:
     """Insert a graph into the active page through its display palette item."""
-    if request is None:
-        request = CreateGraphRequest()
+    if isinstance(handle_or_request, CreateGraphRequest):
+        request = handle_or_request
+    elif isinstance(handle_or_request, int):
+        request = CreateGraphRequest(
+            handle=handle_or_request,
+            allow_foreground=allow_foreground,
+        )
+    elif handle_or_request is None:
+        request = CreateGraphRequest(allow_foreground=allow_foreground)
+    else:
+        request = CreateGraphRequest(
+            handle=int(handle_or_request),
+            allow_foreground=allow_foreground,
+        )
+
     if not request.allow_foreground:
         msg = "Graph creation requires foreground input."
         raise AutomationError(msg)
@@ -644,3 +663,23 @@ class GraphManager:
 def manage_graph(app: Capstone, request: GraphRequest) -> GraphResult:
     """Functional convenience wrapper for the unified graph management seam."""
     return GraphManager(app).manage(request)
+
+
+__all__ = [
+    "MENU_RELEASE_ATTEMPTS",
+    "GraphManager",
+    "_toggle_fit",
+    "analyze_graph",
+    "close_menus",
+    "create_graph",
+    "fit_graph",
+    "invoke_graph_menu",
+    "manage_graph",
+    "menu_item_disabled",
+    "read_graph",
+    "ready_graph_menu",
+    "release_menu_bar",
+    "select_graph_measurement",
+    "set_graph_fits",
+]
+

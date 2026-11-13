@@ -14,7 +14,7 @@ from mcp.types import ImageContent
 from pydantic import BaseModel
 
 from capstone_mcp.agent_instructions import INSTRUCTIONS
-from capstone_mcp.graph_execution import GraphFrame
+from capstone_mcp.graphs import GraphFrame
 from capstone_mcp.models import Snapshot, Window
 
 ROOT: Final = str(Path(__file__).resolve().parents[1])

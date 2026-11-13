@@ -9,7 +9,7 @@ from PIL import Image
 
 from capstone_mcp.automation_models import NativeRequest
 from capstone_mcp.desktop import AutomationError, Capstone
-from capstone_mcp.graph_execution import GraphCapture, GraphOperationError
+from capstone_mcp.graphs import GraphCapture, GraphOperationError
 from capstone_mcp.models import Bounds, Window
 from capstone_mcp.native_loop import NativeDesktop
 

@@ -305,6 +305,18 @@ class GraphAnalysisReport(Model):
     renderers: list[RendererAnalysisGroup]
     overall_limitations: list[LimitationCode]
 
+    @computed_field
+    @property
+    def groups(self) -> list[RendererAnalysisGroup]:
+        """Backward-compatible alias for renderers."""
+        return self.renderers
+
+    @computed_field
+    @property
+    def limitations(self) -> list[LimitationCode]:
+        """Backward-compatible alias for overall_limitations."""
+        return self.overall_limitations
+
 
 # ---------------------------------------------------------------------------
 # 6. Execution Tracking & Failure Envelopes
@@ -485,9 +497,13 @@ class GraphFitOutcome(Model):
 
     @computed_field
     @property
-    def next_action(self) -> Literal["read_graph", "capstone_summarize_graph"]:
-        """Compute recommended follow-up action based on fitting success."""
-        return "capstone_summarize_graph" if self.fits_successful else "read_graph"
+    def next_action(self) -> Literal[
+        "inspect_graph", "inspect_fit_status", "no_fits_requested",
+    ]:
+        """Keep configured selection distinct from successful numerical analysis."""
+        if not self.requested_models:
+            return "no_fits_requested"
+        return "inspect_graph" if self.fits_successful else "inspect_fit_status"
 
 
 class AxisSelection(Model):

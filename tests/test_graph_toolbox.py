@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from capstone_mcp.desktop import AutomationError, Capstone
-from capstone_mcp.graph_toolbox import (
+from capstone_mcp.graphs import (
     GraphDeltaRequest,
     GraphDeltaResult,
     MeasureGraphAreaRequest,

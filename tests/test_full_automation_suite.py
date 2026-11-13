@@ -7,7 +7,7 @@ import pytest
 
 from capstone_mcp.automation_models import NativeRequest
 from capstone_mcp.digits_display import CreateDigitsResult
-from capstone_mcp.graph_toolbox import (
+from capstone_mcp.graphs import (
     GraphDeltaResult,
     MeasureGraphAreaResult,
     ToggleGraphStatisticsResult,

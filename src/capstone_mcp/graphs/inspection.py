@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import logging
+from _ctypes import COMError
 from contextlib import suppress
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
@@ -16,6 +17,7 @@ from defusedxml.ElementTree import fromstring
 from capstone_mcp.desktop import AutomationError, Capstone
 from capstone_mcp.graphs.models import (
     FIT_ROWS,
+    FIT_SUCCESS_STATUSES,
     FIT_TYPES,
     USER_DEFINED_FIT,
     FitMetric,
@@ -80,20 +82,26 @@ def _required(element: Element, attribute: str) -> str:
 
 def _required_integer(element: Element, attribute: str) -> int:
     raw = _required(element, attribute)
+    return _integer(raw, context=attribute)
+
+
+def _integer(raw: str, *, context: str) -> int:
     try:
         return int(raw)
     except ValueError as exc:
-        msg = f"Graph clipboard XML attribute {attribute!r} is not an integer: {raw!r}."
+        msg = f"Graph clipboard XML field {context!r} is not an integer: {raw!r}."
         raise GraphStateError(msg) from exc
 
 
-def _flag(value: str, *, context: str) -> bool:
-    if value == "1":
-        return True
-    if value == "0":
-        return False
-    msg = f"Graph clipboard XML flag {context!r} is not boolean: {value!r}."
-    raise GraphStateError(msg)
+def _flag(raw: str, *, context: str) -> bool:
+    match raw:
+        case "1" | "TRUE" | "true":
+            return True
+        case "0" | "FALSE" | "false":
+            return False
+        case _:
+            msg = f"Unknown status {raw!r} in {context}."
+            raise GraphStateError(msg)
 
 
 def _single_descendant(element: Element, tag: str) -> Element:
@@ -105,13 +113,23 @@ def _single_descendant(element: Element, tag: str) -> Element:
 
 
 def _graph_input(element: Element) -> GraphInput:
-    index = _required_integer(element, "ZBundleInputIndex")
-    unit_raw = element.get("ZTDDRUnitCode")
-    unit_id = None if unit_raw is None else int(unit_raw)
+    adapters = list(element.iter("DataAdapter"))
+    if len(adapters) > 1:
+        msg = "BundleInput contains multiple DataAdapter elements."
+        raise GraphStateError(msg)
+    unit_id = None
+    if adapters:
+        raw_unit = adapters[0].attrib.get("ConverterConverterUnit")
+        if raw_unit is not None:
+            unit_id = _integer(raw_unit, context="DataAdapter.ConverterConverterUnit")
+    index = _required_integer(element, "BundleIndex")
+    if index < 0:
+        msg = "BundleInput.BundleIndex must be nonnegative."
+        raise GraphStateError(msg)
     return GraphInput(
         index=index,
-        source_id=_required(element, "ZTDDRSourceID"),
-        dataset_id=_required(element, "ZTDDRUniqueId"),
+        source_id=_required(element, "BundleMeasID"),
+        dataset_id=_required(element, "BundleDataSetID"),
         unit_id=unit_id,
     )
 
@@ -122,60 +140,73 @@ def _fit_parameter(
     *,
     error_status: int,
 ) -> FitParameter:
-    actual_index = _required_integer(
+    index = _required_integer(
         description, "ZCFDICurveFitParameterDescriptionIndexToActual",
     )
-    matches = [
-        d for d in definitions
-        if _required_integer(d, "ZCFDICurveFitActualParameterIndex") == actual_index
-    ]
-    if len(matches) != 1:
-        msg = f"Missing actual parameter descriptor for index {actual_index}."
+    if not 0 <= index < len(definitions):
+        msg = f"Fit parameter descriptor index {index} is outside its definitions."
         raise GraphStateError(msg)
-    actual = matches[0]
+    definition = definitions[index]
+    value = _required(definition, "ZCFDICurveFitParameterResultValue")
+    uncertainty = _required(definition, "ZCFDICurveFitParameterFitGoodness")
     return FitParameter(
-        name=_required(description, "ZCFDICurveFitParameterDescriptionName"),
-        value=(
-            actual.get("ZCFDICurveFitParameterString")
-            if error_status != FIT_ERROR_STATUS_FAILED
-            else None
-        ),
-        uncertainty=(
-            actual.get("ZCFDICurveFitParameterUncertaintyString")
-            if error_status != FIT_ERROR_STATUS_FAILED
-            else None
-        ),
+        name=_required(description, "ZCFDICurveFitParameterAbbreviation"),
+        value=value if error_status in FIT_SUCCESS_STATUSES else None,
+        uncertainty=uncertainty if error_status in FIT_SUCCESS_STATUSES else None,
         locked=_flag(
-            _required(description, "ZCFDICurveFitParameterDescriptionIsLocked"),
-            context="ZCFDICurveFitParameterDescriptionIsLocked",
+            _required(definition, "ZCFDICurveParameterIsLocked"),
+            context="ZCFDICurveFitParameterDefinition.ZCFDICurveParameterIsLocked",
         ),
     )
 
 
-def _fit_metric(result: Element, *, error_status: int) -> FitMetric:
+def _fit_metric(element: Element, *, error_status: int) -> FitMetric:
+    validity = _flag(
+        _required(element, "ZCFDICurveFitResultsValidity"),
+        context="ZCFDICurveFitResultsDefinition.ZCFDICurveFitResultsValidity",
+    )
+    valid = error_status in FIT_SUCCESS_STATUSES and validity
+    value = _required(element, "ZCFDICurveFitResultsValue")
     return FitMetric(
-        name=_required(result, "ZCFDICurveFitResultName"),
-        abbreviation=_required(result, "ZCFDICurveFitResultAbbreviation"),
-        value=(
-            result.get("ZCFDICurveFitResultString")
-            if error_status != FIT_ERROR_STATUS_FAILED
-            else None
-        ),
-        valid=_flag(
-            _required(result, "ZCFDICurveFitResultValid"),
-            context="ZCFDICurveFitResultValid",
-        ),
+        name=_required(element, "ZCFDICurveFitResultsName"),
+        abbreviation=_required(element, "ZCFDICurveFitResultsAbbreviation"),
+        value=value if valid else None,
+        valid=valid,
     )
 
 
 def _native_fit(element: Element) -> NativeFit:
-    definitions = list(element.iter("ActualParameter"))
-    parameter_count = len(definitions)
-    descriptions = list(element.iter("ParameterDescription"))
-    if len(descriptions) != parameter_count:
-        msg = "Native fit parameter descriptors do not match actual parameters."
+    parameter_count = _required_integer(element, "ZCFDICurveFitCountOfParameters")
+    description_count = _required_integer(
+        element, "ZCFDICurveFitCountOfParameterDescriptions",
+    )
+    result_count = _required_integer(element, "ZCFDICurveFitCountOfResults")
+    if min(parameter_count, description_count, result_count) < 0:
+        msg = "Native fit counts must be nonnegative."
         raise GraphStateError(msg)
-    results = list(element.iter("Result"))
+    descriptions = [
+        child
+        for child in element
+        if child.tag == "ZCFDICurveFitParameterDescriptionDefinition"
+    ]
+    definitions = [
+        child
+        for child in element
+        if child.tag == "ZCFDICurveFitParameterDefinition"
+    ]
+    results = [
+        child
+        for child in element
+        if child.tag == "ZCFDICurveFitResultsDefinition"
+    ]
+    if (
+        len(definitions) != parameter_count
+        or len(descriptions) != description_count
+        or len(results) != result_count
+        or description_count != parameter_count
+    ):
+        msg = "Native fit child counts do not match their declared counts."
+        raise GraphStateError(msg)
     indices = [
         _required_integer(
             description, "ZCFDICurveFitParameterDescriptionIndexToActual",
@@ -416,6 +447,23 @@ def close_menus(app: Capstone, handle: int) -> None:
     """Dismiss a menu this workflow opened so its failure does not block the next."""
     with suppress(Exception):
         release_menu_bar(app, handle)
+
+
+def menu_item_disabled(app: Capstone, before: set[int], name: str) -> bool:
+    """Report whether an open menu shows the named item but keeps it disabled."""
+    for window in app.windows():
+        if window.handle in before:
+            continue
+        try:
+            snapshot = app.snapshot(window.handle, 5, 500)
+        except (COMError, AutomationError):
+            continue
+        if any(
+            c.name == name and c.control_type == "MenuItem" and not c.enabled
+            for c in snapshot.controls
+        ):
+            return True
+    return False
 
 
 def verify_graph_binding(state: GraphState, expected: str | None) -> None:

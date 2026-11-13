@@ -3,7 +3,7 @@
 
 import pytest
 
-from capstone_mcp.graph_state import (
+from capstone_mcp.graphs import (
     FIT_ROWS,
     FIT_TYPES,
     FitModel,

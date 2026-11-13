@@ -3,18 +3,16 @@
 
 import pytest
 
-from capstone_mcp.graph_report import (
+from capstone_mcp.graphs import (
     DuplicateNativeModelError,
-    LimitationCode,
-    summarize_graph,
-)
-from capstone_mcp.graph_state import (
     FitMetric,
     FitParameter,
     GraphInput,
     GraphSeries,
     GraphState,
+    LimitationCode,
     NativeFit,
+    summarize_graph,
 )
 
 
