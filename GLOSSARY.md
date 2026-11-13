@@ -19,3 +19,12 @@ A column or array of numeric data points (such as Time, Voltage, Current, Positi
 
 ### Scale to Fit
 The graph tool in Capstone that automatically adjusts the X and Y axis bounds to fully display all visible data points.
+
+### Graph
+The primary 2D data visualization display in Capstone displaying continuous or discrete measurements along horizontal and vertical axes, supporting curve fitting and toolbox tools.
+
+### Curve Fit
+Mathematical model fitting (Linear, Quadratic, Polynomial, Sine, etc.) applied to experimental data points in a graph to extract physical parameters.
+
+### Toolbox
+The Qt-based floating smart toolbar (`ZSmartToolBox`) positioned over a graph display, housing tools for delta coordinates, statistics, area integration, and auto-scaling.
