@@ -32,25 +32,6 @@ if TYPE_CHECKING:
     from capstone_mcp.models import Control
 
 
-def _find_palette_item(
-    controls: list[Control],
-    target_name: str,
-    suffix: str,
-) -> Control:
-    """Find a display item in the displays palette."""
-    return find_palette_item(controls, target_name, suffix)
-
-
-def _double_click_palette_item(app: Capstone, handle: int, ctrl: Control) -> None:
-    """Insert a display widget onto the active page by double-clicking."""
-    double_click_control(app, handle, ctrl)
-
-
-def _set_ctrl_value(app: Capstone, handle: int, ctrl: Control, text: str) -> None:
-    """Set text or value in a target control with keyboard fallback."""
-    set_control_value(app, handle, ctrl, text)
-
-
 def _configure_scope(
     app: Capstone,
     handle: int,
@@ -64,9 +45,9 @@ def _configure_scope(
         aid = ctrl.automation_id.lower()
         name = ctrl.name.lower()
         if timebase_str and ("timebase" in aid or "sec/div" in name or "time" in aid):
-            _set_ctrl_value(app, handle, ctrl, timebase_str)
+            set_control_value(app, handle, ctrl, timebase_str)
         elif channel and ("channel" in aid or "y-axis" in name or "measurement" in aid):
-            _set_ctrl_value(app, handle, ctrl, channel)
+            set_control_value(app, handle, ctrl, channel)
 
 
 def create_scope(
@@ -82,8 +63,8 @@ def create_scope(
         raise AutomationError(msg)
 
     snapshot = app.snapshot(request.handle, depth=12, limit=10_000)
-    palette_item = _find_palette_item(snapshot.controls, "Scope", SCOPE_PALETTE_SUFFIX)
-    _double_click_palette_item(app, request.handle, palette_item)
+    palette_item = find_palette_item(snapshot.controls, "Scope", SCOPE_PALETTE_SUFFIX)
+    double_click_control(app, request.handle, palette_item)
 
     display_id = "Scope 1"
     timebase_str = str(request.timebase) if request.timebase is not None else None
@@ -159,11 +140,11 @@ def set_scope_trigger(
     level_ctrl, slope_ctrl, mode_ctrl = _find_trigger_controls(snapshot.controls)
 
     if level_ctrl:
-        _set_ctrl_value(app, request.handle, level_ctrl, f"{request.trigger_level} V")
+        set_control_value(app, request.handle, level_ctrl, f"{request.trigger_level} V")
     if slope_ctrl:
-        _set_ctrl_value(app, request.handle, slope_ctrl, normalized_slope)
+        set_control_value(app, request.handle, slope_ctrl, normalized_slope)
     if mode_ctrl:
-        _set_ctrl_value(app, request.handle, mode_ctrl, normalized_mode)
+        set_control_value(app, request.handle, mode_ctrl, normalized_mode)
 
     detail = (
         f"Scope '{scope_id}' trigger configured: Level={request.trigger_level}V, "
@@ -195,11 +176,11 @@ def _configure_fft(
         if measurement and (
             "measurement" in aid or "channel" in aid or "y-axis" in name
         ):
-            _set_ctrl_value(app, handle, ctrl, measurement)
+            set_control_value(app, handle, ctrl, measurement)
         elif frequency_range and (
             "range" in aid or "freq_range" in aid or "span" in name
         ):
-            _set_ctrl_value(app, handle, ctrl, frequency_range)
+            set_control_value(app, handle, ctrl, frequency_range)
 
 
 def create_fft(
@@ -215,8 +196,8 @@ def create_fft(
         raise AutomationError(msg)
 
     snapshot = app.snapshot(request.handle, depth=12, limit=10_000)
-    palette_item = _find_palette_item(snapshot.controls, "FFT", FFT_PALETTE_SUFFIX)
-    _double_click_palette_item(app, request.handle, palette_item)
+    palette_item = find_palette_item(snapshot.controls, "FFT", FFT_PALETTE_SUFFIX)
+    double_click_control(app, request.handle, palette_item)
 
     display_id = "FFT 1"
 

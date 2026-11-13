@@ -573,6 +573,7 @@ def _tally_display_controls(
     displays_doc: dict[str, JsonValue],
 ) -> None:
     pages_list = displays_doc["pages"]
+    displays_list = displays_doc.get("displays")
     if not isinstance(pages_list, list):
         return
     for c in controls:
@@ -588,6 +589,15 @@ def _tally_display_controls(
             if keyword in aid or keyword in name_lower:
                 val = displays_doc.get(count_field, 0)
                 displays_doc[count_field] = (val if isinstance(val, int) else 0) + 1
+                if isinstance(displays_list, list):
+                    norm_kind = "scope" if keyword == "oscilloscope" else keyword
+                    displays_list.append(
+                        {
+                            "kind": norm_kind,
+                            "name": name or aid,
+                            "automation_id": str(c.get("automation_id", "")),
+                        },
+                    )
                 break
 
 
@@ -816,7 +826,7 @@ def display_layout_workflow(
         f"capstone_manage_display(action='set_page_layout', layout='{layout}').\n"
         "4. Insert appropriate display widgets into layout placeholders: "
         "use capstone_manage_display with 'create_digits', 'create_table', "
-        "'create_graph', 'create_scope', or 'create_fft'.\n"
+        "'create_scope', or 'create_fft' (or capstone_manage_graph for graphs).\n"
         f"5. Bind target measurements ({target_measurements}) to display axes, "
         "columns, or readout channels.\n"
         "6. Verify the active display layout visually or via capstone_snapshot."
