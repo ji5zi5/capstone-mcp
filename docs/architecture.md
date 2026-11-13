@@ -110,10 +110,10 @@ Phase 5 collapsed fragmented shallow utilities across run management, binary arc
 flowchart TD
     subgraph UIAutomation ["UI Automation & Displays"]
         Harness["DisplayHarness (displays/harness.py)"]
-        Digits["Digits Display (digits_display.py)"]
-        Table["Table Display (table_display.py)"]
-        Scope["Oscilloscope & FFT (oscilloscope_fft.py)"]
-        Workbook["Workbook Layout (workbook_layout.py)"]
+        Digits["Digits Display (displays/digits.py)"]
+        Table["Table Display (displays/table.py)"]
+        Scope["Oscilloscope & FFT (displays/scope.py)"]
+        Workbook["Workbook Layout (displays/workbook.py)"]
         Digits --> Harness
         Table --> Harness
         Scope --> Harness
@@ -276,9 +276,71 @@ flowchart TD
 
 ---
 
-## 8. Quality & Verification Guardrails
+## 8. Deep Displays Subsystem & Compound Display Tooling (Phase 8)
 
-1. **Automated Test Coverage**: 476 unit and integration tests across 57 test suites, executed with `uv run --no-sync pytest` (100% pass rate).
+Phase 8 deepened and consolidated the remaining 4 shallow root display modules (`digits_display.py`, `table_display.py`, `oscilloscope_fft.py`, `workbook_layout.py`) into a unified domain package (`src/capstone_mcp/displays/`). It introduced a single compound FastMCP tool, dynamic displays resource, structured error handling, and guided display workflow prompts, completing the domain seam architecture across the entire repository.
+
+```mermaid
+flowchart TD
+    subgraph ClientContext ["Client / AI Agent Context"]
+        DisplayPrompt["Universal Display Layout Prompt\n(display_layout_workflow)"]
+        DisplayResource["Dynamic State Resource\n(capstone://displays/active)"]
+        CompoundDisplay["Compound Tool\n(capstone_manage_display)"]
+    end
+
+    subgraph ServerBoundary ["MCP Protocol Boundary (server.py)"]
+        ToolAnnotations["Systematic ToolAnnotations\n(readOnlyHint / destructiveHint)"]
+        ErrorProtocol["Structured Error Protocol\n(DISPLAY_ERROR -> JSON)"]
+    end
+
+    subgraph DeepDisplays ["Deep Displays Package (capstone_mcp.displays)"]
+        Manager["DisplayManager & manage_display(app, request)"]
+        Digits["Digits Readout (digits.py)"]
+        Table["Table Columns & Data (table.py)"]
+        Scope["Oscilloscope & FFT (scope.py)"]
+        Workbook["Workbook Pages & Grid (workbook.py)"]
+        Harness["Automation Primitives (harness.py)"]
+        Models["Unified Enums & Schemas (models.py)"]
+        Manager --> Digits
+        Manager --> Table
+        Manager --> Scope
+        Manager --> Workbook
+        Manager --> Models
+        Digits --> Harness
+        Table --> Harness
+        Scope --> Harness
+        Workbook --> Harness
+    end
+
+    CompoundDisplay --> Manager
+    CompoundDisplay --> ToolAnnotations
+    ErrorProtocol --> ClientContext
+```
+
+### Key Architectural Enhancements:
+
+1. **Deep Displays Domain Seam (`src/capstone_mcp/displays/`)**:
+   - Consolidated 4 shallow root modules into a deep, cohesive package with minimal surface area and high internal depth.
+   - Anchored by a single unified functional seam: `manage_display(app: Capstone, request: DisplayRequest) -> DisplayResult` and `DisplayManager` engine.
+   - Dispatches across 10 discrete display operations: `CREATE_DIGITS`, `CREATE_TABLE`, `SET_TABLE_COLUMNS`, `READ_TABLE`, `CREATE_SCOPE`, `SET_SCOPE_TRIGGER`, `CREATE_FFT`, `READ_FFT_PEAKS`, `ADD_PAGE`, and `SET_PAGE_LAYOUT`.
+   - Incorporates ergonomic flat argument normalization (`_FLAT_FIELD_MAPPINGS`), allowing callers to invoke actions with flat keyword dictionaries or structured sub-models.
+
+2. **Compound FastMCP Tool (`capstone_manage_display`) & Thin Forwarding Adapters**:
+   - Registers a single compound tool on FastMCP dispatching across all 10 display actions via `request: DisplayRequest`.
+   - Minimizes tool schema overhead while preserving 100% backward compatibility through thin forwarding adapters for all legacy display tools (`capstone_create_table`, `capstone_create_digits`, `capstone_create_scope`, `capstone_add_page`, etc.).
+
+3. **Dynamic Real-Time State Resource**:
+   - `capstone://displays/active`: Live JSON resource reporting workbook pages, active page, and container counts (table, graph, digits, scope, fft) with deterministic offline fallbacks.
+
+4. **Structured Display Error Envelope & Guided Workflow Prompt**:
+   - Classifies display and workbook layout failures into `DISPLAY_ERROR` with structured JSON envelopes (`error_code`, `message`, `remediation`).
+   - `display_layout_workflow`: 6-step prompt guiding agents through workbook page tab creation, grid split template selection, widget insertion, and axis/measurement mapping.
+
+---
+
+## 9. Quality & Verification Guardrails
+
+1. **Automated Test Coverage**: 524 unit and integration tests across 59 test suites, executed with `uv run --no-sync pytest` (100% pass rate).
 2. **Deterministic Offline CI**: Hardware-dependent and live GUI tests include fallback guards (`pytest.mark.skipif`), allowing CI pipelines to pass deterministically in headless environments.
 3. **Windows Process Lock Guard**: Tool and test runner commands strictly enforce `--no-sync` to avoid `os error 32` file locking when background MCP processes hold `capstone-mcp.exe`.
 4. **Strict Type Safety & Linting**: Ruff compliance across all rulesets (`ruff check src tests`) with 0 errors, and Basedpyright type validation (`basedpyright src`) with 0 errors, 0 warnings.

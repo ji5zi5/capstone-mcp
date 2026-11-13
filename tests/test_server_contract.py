@@ -66,6 +66,7 @@ def test_fastmcp_tool_count_contract() -> None:
     assert "capstone_create_calculation" in tool_names
     assert "capstone_linear_fit" in tool_names
     assert "capstone_manage_graph" in tool_names
+    assert "capstone_manage_display" in tool_names
 
 
 def test_systematic_tool_annotations() -> None:
@@ -132,6 +133,21 @@ def test_systematic_tool_annotations() -> None:
         assert tool.annotations is not None, f"Tool {name} missing annotations"
         assert tool.annotations.destructiveHint is False, f"Tool {name} expected destructiveHint=False"
 
+    # 4. Display tool annotations systematic completeness
+    display_tools = [
+        "capstone_manage_display",
+        "capstone_create_table",
+        "capstone_set_table_columns",
+        "capstone_read_table",
+        "capstone_create_digits",
+        "capstone_add_page",
+        "capstone_set_page_layout",
+    ]
+    for name in display_tools:
+        tool = tools[name]
+        assert tool.annotations is not None, f"Tool {name} missing annotations"
+        assert tool.annotations.destructiveHint is False, f"Tool {name} expected destructiveHint=False"
+
 
 @pytest.mark.anyio
 async def test_dynamic_resources_contract() -> None:
@@ -140,6 +156,7 @@ async def test_dynamic_resources_contract() -> None:
     assert "capstone://status" in resources
     assert "capstone://runs/active" in resources
     assert "capstone://hardware/inventory" in resources
+    assert "capstone://displays/active" in resources
 
     # Status resource read
     status_raw = await server.capstone_status_resource()
@@ -165,3 +182,17 @@ async def test_dynamic_resources_contract() -> None:
     assert "wireless_devices" in hw
     assert "recording" in hw
     assert "sampling_rate" in hw
+
+    # Displays active resource read
+    disp_raw = await server.capstone_active_displays_resource()
+    disp = json.loads(disp_raw)
+    assert "attached" in disp
+    assert "process_id" in disp
+    assert "active_page" in disp
+    assert "pages" in disp
+    assert "displays" in disp
+    assert "table_count" in disp
+    assert "graph_count" in disp
+    assert "digits_count" in disp
+    assert "scope_count" in disp
+    assert "fft_count" in disp

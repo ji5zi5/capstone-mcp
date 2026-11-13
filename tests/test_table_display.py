@@ -6,8 +6,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from capstone_mcp.desktop import AutomationError, Capstone
-from capstone_mcp.models import Bounds, Control, Snapshot, Window
-from capstone_mcp.table_display import (
+from capstone_mcp.displays import (
     CreateTableRequest,
     CreateTableResult,
     ReadTableRequest,
@@ -18,6 +17,7 @@ from capstone_mcp.table_display import (
     read_table,
     set_table_columns,
 )
+from capstone_mcp.models import Bounds, Control, Snapshot, Window
 
 
 def _mock_window(handle: int = 100) -> Window:

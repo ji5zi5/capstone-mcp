@@ -1,92 +1,27 @@
 # Copyright 2026 Capstone MCP contributors.
 """Workbook page creation and multi-display layout templates in Capstone."""
 
+from __future__ import annotations
+
 import contextlib
-from typing import Final, Literal
+from typing import TYPE_CHECKING
 
 from capstone_mcp.desktop import AutomationError, Capstone
-from capstone_mcp.displays import click_control
-from capstone_mcp.models import Control, Model
+from capstone_mcp.displays.harness import click_control
+from capstone_mcp.displays.models import (
+    ADD_PAGE_NAMES,
+    ADD_PAGE_SUFFIX,
+    LAYOUT_AREAS,
+    LAYOUT_KEYWORDS,
+    AddPageRequest,
+    AddPageResult,
+    PageLayoutTemplate,
+    SetPageLayoutRequest,
+    SetPageLayoutResult,
+)
 
-ADD_PAGE_SUFFIX: Final = ".AddPageButton"
-ADD_PAGE_NAMES: Final = ("Add Page", "New Page", "Create Page", "+")
-
-type PageLayoutTemplate = Literal[
-    "single",
-    "two_vertical",
-    "two_horizontal",
-    "three_vertical",
-    "three_horizontal",
-    "four_grid",
-]
-
-LAYOUT_AREAS: Final[dict[PageLayoutTemplate, int]] = {
-    "single": 1,
-    "two_vertical": 2,
-    "two_horizontal": 2,
-    "three_vertical": 3,
-    "three_horizontal": 3,
-    "four_grid": 4,
-}
-
-LAYOUT_KEYWORDS: Final[dict[PageLayoutTemplate, tuple[str, ...]]] = {
-    "single": ("single", "1 display", "template1", "templatesingle"),
-    "two_vertical": (
-        "two vertical", "two columns", "2 vertical", "2 columns",
-        "template2v", "templatetwovertical", "vertical split",
-    ),
-    "two_horizontal": (
-        "two horizontal", "two rows", "2 horizontal", "2 rows",
-        "template2h", "templatetwohorizontal", "horizontal split",
-    ),
-    "three_vertical": (
-        "three vertical", "3 displays", "three columns", "3 columns",
-        "template3v", "templatethreevertical", "template3",
-    ),
-    "three_horizontal": (
-        "three horizontal", "3 rows", "templatethreehorizontal", "template3h",
-    ),
-    "four_grid": (
-        "four displays", "4 displays", "2x2", "grid", "template4",
-        "templatefourdisplays", "four quadrants",
-    ),
-}
-
-
-class AddPageRequest(Model):
-    """Specification for adding a new workbook page."""
-
-    title: str = "New Page"
-    handle: int = 0
-    allow_foreground: bool = True
-
-
-class AddPageResult(Model):
-    """Result of adding a new workbook page."""
-
-    page_index: int
-    title: str
-    verified: bool = True
-    detail: str = ""
-
-
-class SetPageLayoutRequest(Model):
-    """Specification for applying a multi-display layout template."""
-
-    layout: PageLayoutTemplate = "two_vertical"
-    page_name: str | None = None
-    handle: int = 0
-    allow_foreground: bool = True
-
-
-class SetPageLayoutResult(Model):
-    """Result of setting page layout template."""
-
-    layout: PageLayoutTemplate
-    page_name: str | None = None
-    areas_created: int
-    verified: bool = True
-    detail: str = ""
+if TYPE_CHECKING:
+    from capstone_mcp.models import Control
 
 
 def _find_add_page_button(controls: list[Control]) -> Control:
@@ -128,9 +63,12 @@ def _rename_page_tab(
 
 def add_page(
     app: Capstone,
-    request: AddPageRequest,
+    request: AddPageRequest | None = None,
 ) -> AddPageResult:
     """Create a new workbook page tab and set its title."""
+    if request is None:
+        request = AddPageRequest()
+
     clean_title = request.title.strip()
     if not clean_title:
         msg = "title must not be empty."

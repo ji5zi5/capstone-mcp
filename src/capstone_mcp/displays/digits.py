@@ -1,43 +1,30 @@
 # Copyright 2026 Capstone MCP contributors.
-"""High-level Digits display creation and live numerical monitoring."""
+"""Digits display creation and live numerical monitoring."""
+
+from __future__ import annotations
 
 import contextlib
 import re
-from typing import Final
+from typing import TYPE_CHECKING
 
 from capstone_mcp.desktop import AutomationError, Capstone
-from capstone_mcp.displays import (
+from capstone_mcp.displays.harness import (
     click_control,
     find_display_container,
     find_palette_item,
     is_within_bounds,
 )
-from capstone_mcp.models import Control, Model
+from capstone_mcp.displays.models import (
+    DIGITS_PALETTE_NAME,
+    FLOAT_PATTERN,
+    CreateDigitsRequest,
+    CreateDigitsResult,
+)
 
-DIGITS_PALETTE_NAME: Final = "Digits"
-FLOAT_PATTERN: Final = re.compile(r"^[+-]?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?$")
-MAX_UNIT_STR_LEN: Final = 10
+if TYPE_CHECKING:
+    from capstone_mcp.models import Control
 
-
-class CreateDigitsRequest(Model):
-    """Specification for inserting a Digits display widget and binding a measurement."""
-
-    measurement: str | None = None
-    handle: int = 0
-    digits_name: str | None = None
-    allow_foreground: bool = True
-
-
-class CreateDigitsResult(Model):
-    """Outcome of Digits display creation, including current value and unit."""
-
-    created: bool = True
-    digits_name: str = "Digits"
-    measurement: str | None = None
-    current_value: float | None = None
-    unit: str | None = None
-    verified: bool = True
-    detail: str = ""
+MAX_UNIT_STR_LEN = 10
 
 
 def _find_digits_palette_item(controls: list[Control]) -> Control:

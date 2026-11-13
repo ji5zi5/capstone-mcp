@@ -1,145 +1,35 @@
 # Copyright 2026 Capstone MCP contributors.
 """Oscilloscope and FFT frequency spectrum display tools in Capstone."""
 
+from __future__ import annotations
+
 import re
-from typing import Final, Literal
+from typing import TYPE_CHECKING
 
 from capstone_mcp.desktop import AutomationError, Capstone
-from capstone_mcp.displays import (
+from capstone_mcp.displays.harness import (
     double_click_control,
     find_palette_item,
     set_control_value,
 )
-from capstone_mcp.models import Control, Model
+from capstone_mcp.displays.models import (
+    FFT_PALETTE_SUFFIX,
+    SCOPE_PALETTE_SUFFIX,
+    VALID_MODES,
+    VALID_SLOPES,
+    CreateFftRequest,
+    CreateFftResult,
+    CreateScopeRequest,
+    CreateScopeResult,
+    FftPeak,
+    ReadFftPeaksRequest,
+    ReadFftPeaksResult,
+    ScopeTriggerResult,
+    SetScopeTriggerRequest,
+)
 
-SCOPE_PALETTE_SUFFIX: Final = ".ObjNameScope"
-FFT_PALETTE_SUFFIX: Final = ".ObjNameFFT"
-
-type TriggerSlope = Literal["rising", "falling", "positive", "negative"]
-type TriggerMode = Literal["auto", "normal", "single"]
-
-VALID_SLOPES: Final = {
-    "rising": "rising",
-    "positive": "rising",
-    "falling": "falling",
-    "negative": "falling",
-}
-
-VALID_MODES: Final = {
-    "auto": "auto",
-    "normal": "normal",
-    "single": "single",
-}
-
-
-class CreateScopeRequest(Model):
-    """Specification for creating an oscilloscope display widget."""
-
-    timebase: str | float | None = None
-    channel: str | None = None
-    handle: int = 0
-    allow_foreground: bool = True
-
-
-class CreateScopeResult(Model):
-    """Outcome of oscilloscope display creation."""
-
-    display_id: str
-    display_type: str = "Scope"
-    timebase: str | None = None
-    channel: str | None = None
-    verified: bool = True
-    detail: str = ""
-
-
-class SetScopeTriggerRequest(Model):
-    """Specification for oscilloscope trigger settings."""
-
-    scope_id: str | None = None
-    trigger_level: float = 0.0
-    trigger_slope: str = "rising"
-    trigger_mode: str = "auto"
-    trigger_source: str | None = None
-    handle: int = 0
-    allow_foreground: bool = True
-
-
-class ScopeTriggerResult(Model):
-    """Outcome of oscilloscope trigger configuration."""
-
-    scope_id: str
-    trigger_level: float
-    trigger_slope: str
-    trigger_mode: str
-    trigger_source: str | None = None
-    verified: bool = True
-    detail: str = ""
-
-
-class CreateFftRequest(Model):
-    """Specification for creating an FFT display widget."""
-
-    measurement: str | None = None
-    frequency_range: str | None = None
-    handle: int = 0
-    allow_foreground: bool = True
-
-
-class CreateFftResult(Model):
-    """Outcome of FFT display creation."""
-
-    display_id: str
-    display_type: str = "FFT"
-    measurement: str | None = None
-    frequency_range: str | None = None
-    verified: bool = True
-    detail: str = ""
-
-
-class FftPeak(Model):
-    """One frequency spectrum peak."""
-
-    frequency_hz: float
-    amplitude: float
-    unit: str = "Hz"
-
-
-class ReadFftPeaksRequest(Model):
-    """Request to read peak frequencies and amplitudes from FFT display."""
-
-    fft_id: str | None = None
-    top_k: int = 5
-    handle: int = 0
-    allow_foreground: bool = True
-
-
-class ReadFftPeaksResult(Model):
-    """Extracted frequency peaks from FFT display."""
-
-    fft_id: str
-    peaks: list[FftPeak]
-    peak_count: int
-    verified: bool = True
-    detail: str = ""
-
-
-def _find_palette_item(
-    controls: list[Control],
-    target_name: str,
-    suffix: str,
-) -> Control:
-    """Find a display item in the displays palette."""
-    return find_palette_item(controls, target_name, suffix)
-
-
-def _double_click_palette_item(app: Capstone, handle: int, ctrl: Control) -> None:
-    """Insert a display widget onto the active page by double-clicking."""
-    double_click_control(app, handle, ctrl)
-
-
-def _set_ctrl_value(app: Capstone, handle: int, ctrl: Control, text: str) -> None:
-    """Set text or value in a target control with keyboard fallback."""
-    set_control_value(app, handle, ctrl, text)
+if TYPE_CHECKING:
+    from capstone_mcp.models import Control
 
 
 def _configure_scope(
@@ -155,20 +45,26 @@ def _configure_scope(
         aid = ctrl.automation_id.lower()
         name = ctrl.name.lower()
         if timebase_str and ("timebase" in aid or "sec/div" in name or "time" in aid):
-            _set_ctrl_value(app, handle, ctrl, timebase_str)
+            set_control_value(app, handle, ctrl, timebase_str)
         elif channel and ("channel" in aid or "y-axis" in name or "measurement" in aid):
-            _set_ctrl_value(app, handle, ctrl, channel)
+            set_control_value(app, handle, ctrl, channel)
 
 
-def create_scope(app: Capstone, request: CreateScopeRequest) -> CreateScopeResult:
+def create_scope(
+    app: Capstone,
+    request: CreateScopeRequest | None = None,
+) -> CreateScopeResult:
     """Insert an oscilloscope display onto the page and optionally configure it."""
+    if request is None:
+        request = CreateScopeRequest()
+
     if not request.allow_foreground:
         msg = "Scope creation requires allow_foreground=true."
         raise AutomationError(msg)
 
     snapshot = app.snapshot(request.handle, depth=12, limit=10_000)
-    palette_item = _find_palette_item(snapshot.controls, "Scope", SCOPE_PALETTE_SUFFIX)
-    _double_click_palette_item(app, request.handle, palette_item)
+    palette_item = find_palette_item(snapshot.controls, "Scope", SCOPE_PALETTE_SUFFIX)
+    double_click_control(app, request.handle, palette_item)
 
     display_id = "Scope 1"
     timebase_str = str(request.timebase) if request.timebase is not None else None
@@ -190,6 +86,7 @@ def create_scope(app: Capstone, request: CreateScopeRequest) -> CreateScopeResul
 def _find_trigger_controls(
     controls: list[Control],
 ) -> tuple[Control | None, Control | None, Control | None]:
+    """Find trigger level, slope, and mode controls in snapshot."""
     level_ctrl: Control | None = None
     slope_ctrl: Control | None = None
     mode_ctrl: Control | None = None
@@ -200,19 +97,11 @@ def _find_trigger_controls(
         aid = ctrl.automation_id.lower()
         name = ctrl.name.lower()
 
-        is_level = (
-            "triggerlevel" in aid
-            or "trigger_level" in aid
-            or ("trigger" in name and "level" in name)
-        )
-        is_slope = "triggerslope" in aid or "slope" in aid or "edge" in name
-        is_mode = "triggermode" in aid or "trigger_mode" in aid or "mode" in aid
-
-        if is_level and not level_ctrl:
+        if "triggerlevel" in aid or "trigger_level" in aid or "trigger level" in name:
             level_ctrl = ctrl
-        elif is_slope and not slope_ctrl:
+        elif "triggerslope" in aid or "trigger_slope" in aid or "trigger slope" in name:
             slope_ctrl = ctrl
-        elif is_mode and not mode_ctrl:
+        elif "triggermode" in aid or "trigger_mode" in aid or "trigger mode" in name:
             mode_ctrl = ctrl
 
     return level_ctrl, slope_ctrl, mode_ctrl
@@ -222,28 +111,28 @@ def set_scope_trigger(
     app: Capstone,
     request: SetScopeTriggerRequest,
 ) -> ScopeTriggerResult:
-    """Configure trigger level, slope, and mode for an oscilloscope display."""
+    """Configure oscilloscope trigger level, slope, and mode."""
     if not request.allow_foreground:
-        msg = "Scope trigger configuration requires allow_foreground=true."
+        msg = "Oscilloscope trigger configuration requires allow_foreground=true."
         raise AutomationError(msg)
 
-    slope_key = request.trigger_slope.strip().lower()
-    if slope_key not in VALID_SLOPES:
+    normalized_slope = VALID_SLOPES.get(request.trigger_slope.lower())
+    if not normalized_slope:
+        valid = list(VALID_SLOPES.keys())
         msg = (
-            f"Unsupported trigger slope '{request.trigger_slope}'. "
-            f"Supported: {', '.join(VALID_SLOPES.keys())}."
+            f"Unsupported trigger slope "
+            f"'{request.trigger_slope}'. Valid: {valid}"
         )
         raise AutomationError(msg)
-    normalized_slope = VALID_SLOPES[slope_key]
 
-    mode_key = request.trigger_mode.strip().lower()
-    if mode_key not in VALID_MODES:
+    normalized_mode = VALID_MODES.get(request.trigger_mode.lower())
+    if not normalized_mode:
+        valid = list(VALID_MODES.keys())
         msg = (
-            f"Unsupported trigger mode '{request.trigger_mode}'. "
-            f"Supported: {', '.join(VALID_MODES.keys())}."
+            f"Unsupported trigger mode "
+            f"'{request.trigger_mode}'. Valid: {valid}"
         )
         raise AutomationError(msg)
-    normalized_mode = VALID_MODES[mode_key]
 
     scope_id = request.scope_id or "Scope 1"
 
@@ -251,11 +140,11 @@ def set_scope_trigger(
     level_ctrl, slope_ctrl, mode_ctrl = _find_trigger_controls(snapshot.controls)
 
     if level_ctrl:
-        _set_ctrl_value(app, request.handle, level_ctrl, f"{request.trigger_level} V")
+        set_control_value(app, request.handle, level_ctrl, f"{request.trigger_level} V")
     if slope_ctrl:
-        _set_ctrl_value(app, request.handle, slope_ctrl, normalized_slope)
+        set_control_value(app, request.handle, slope_ctrl, normalized_slope)
     if mode_ctrl:
-        _set_ctrl_value(app, request.handle, mode_ctrl, normalized_mode)
+        set_control_value(app, request.handle, mode_ctrl, normalized_mode)
 
     detail = (
         f"Scope '{scope_id}' trigger configured: Level={request.trigger_level}V, "
@@ -287,22 +176,28 @@ def _configure_fft(
         if measurement and (
             "measurement" in aid or "channel" in aid or "y-axis" in name
         ):
-            _set_ctrl_value(app, handle, ctrl, measurement)
+            set_control_value(app, handle, ctrl, measurement)
         elif frequency_range and (
             "range" in aid or "freq_range" in aid or "span" in name
         ):
-            _set_ctrl_value(app, handle, ctrl, frequency_range)
+            set_control_value(app, handle, ctrl, frequency_range)
 
 
-def create_fft(app: Capstone, request: CreateFftRequest) -> CreateFftResult:
+def create_fft(
+    app: Capstone,
+    request: CreateFftRequest | None = None,
+) -> CreateFftResult:
     """Insert an FFT frequency spectrum display onto the active page."""
+    if request is None:
+        request = CreateFftRequest()
+
     if not request.allow_foreground:
         msg = "FFT creation requires allow_foreground=true."
         raise AutomationError(msg)
 
     snapshot = app.snapshot(request.handle, depth=12, limit=10_000)
-    palette_item = _find_palette_item(snapshot.controls, "FFT", FFT_PALETTE_SUFFIX)
-    _double_click_palette_item(app, request.handle, palette_item)
+    palette_item = find_palette_item(snapshot.controls, "FFT", FFT_PALETTE_SUFFIX)
+    double_click_control(app, request.handle, palette_item)
 
     display_id = "FFT 1"
 
@@ -362,8 +257,14 @@ def _parse_peak_text(text: str) -> tuple[float, float] | None:
     return None
 
 
-def read_fft_peaks(app: Capstone, request: ReadFftPeaksRequest) -> ReadFftPeaksResult:
+def read_fft_peaks(
+    app: Capstone,
+    request: ReadFftPeaksRequest | None = None,
+) -> ReadFftPeaksResult:
     """Extract top peak frequencies and amplitudes from the FFT display."""
+    if request is None:
+        request = ReadFftPeaksRequest()
+
     if not request.allow_foreground:
         msg = "FFT peak reading requires allow_foreground=true."
         raise AutomationError(msg)

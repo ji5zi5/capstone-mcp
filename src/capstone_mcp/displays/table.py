@@ -1,98 +1,36 @@
 # Copyright 2026 Capstone MCP contributors.
-"""High-level Table display creation, column mapping, and data extraction."""
+"""Table display creation, column mapping, and data extraction."""
+
+from __future__ import annotations
 
 import contextlib
 import math
 import re
-from typing import Any, Final
+from typing import TYPE_CHECKING, Any
 
 from capstone_mcp.desktop import AutomationError, Capstone
-from capstone_mcp.displays import (
+from capstone_mcp.displays.harness import (
     click_control,
     find_display_container,
     find_palette_item,
 )
-from capstone_mcp.models import Control, Model
-
-TABLE_PALETTE_NAME: Final = "Table"
-ROW_Y_TOLERANCE_PX: Final = 5
-MAX_HEADER_HEIGHT_PX: Final = 100
-MARGIN_EXPAND_PX: Final = 50
-EXPAND_RIGHT_PX: Final = 100
-
-STATISTICS_KEYWORDS: Final = (
-    "mean",
-    "std dev",
-    "stddev",
-    "standard deviation",
-    "minimum",
-    "min",
-    "maximum",
-    "max",
-    "count",
-    "sum",
-    "total",
+from capstone_mcp.displays.models import (
+    EXPAND_RIGHT_PX,
+    MARGIN_EXPAND_PX,
+    MAX_HEADER_HEIGHT_PX,
+    ROW_Y_TOLERANCE_PX,
+    STATISTICS_KEYWORDS,
+    TABLE_PALETTE_NAME,
+    CreateTableRequest,
+    CreateTableResult,
+    ReadTableRequest,
+    ReadTableResult,
+    SetTableColumnsRequest,
+    SetTableColumnsResult,
 )
 
-
-class CreateTableRequest(Model):
-    """Specification for inserting a Table display widget."""
-
-    handle: int = 0
-    table_name: str | None = None
-    allow_foreground: bool = True
-
-
-class CreateTableResult(Model):
-    """Outcome of Table display creation."""
-
-    created: bool = True
-    table_name: str = "Table"
-    verified: bool = True
-    detail: str = ""
-
-
-class SetTableColumnsRequest(Model):
-    """Specification of columns/measurements to bind in a Table display."""
-
-    columns: list[str]
-    handle: int = 0
-    table_name: str | None = None
-    allow_foreground: bool = True
-
-
-class SetTableColumnsResult(Model):
-    """Outcome of Table column configuration."""
-
-    table_name: str
-    columns: list[str]
-    column_count: int
-    verified: bool = True
-    detail: str = ""
-
-
-class ReadTableRequest(Model):
-    """Specification for extracting cell data and statistics from a Table."""
-
-    handle: int = 0
-    table_name: str | None = None
-    page: int = 1
-    page_size: int = 50
-    include_statistics: bool = True
-    allow_foreground: bool = True
-
-
-class ReadTableResult(Model):
-    """Extracted Table contents, supporting pagination and summary statistics."""
-
-    columns: list[str]
-    rows: list[dict[str, Any]]
-    total_rows: int
-    page: int
-    page_size: int
-    total_pages: int
-    statistics: dict[str, dict[str, Any]] | None = None
-    detail: str = ""
+if TYPE_CHECKING:
+    from capstone_mcp.models import Control
 
 
 def _find_table_palette_item(controls: list[Control]) -> Control:
@@ -195,7 +133,7 @@ def create_table(
         created=True,
         table_name=t_name,
         verified=True,
-        detail=f"Table display '{t_name}' created on active page.",
+        detail=f"Table display '{t_name}' created.",
     )
 
 
@@ -226,7 +164,6 @@ def set_table_columns(
         header_ctrl = headers[i] if i < len(headers) else None
         if header_ctrl:
             click_control(app, request.handle, header_ctrl, allow_foreground=True)
-
             applied = False
             with contextlib.suppress(Exception):
                 node = app.control(header_ctrl.ref)
@@ -239,18 +176,22 @@ def set_table_columns(
                     app.keys(request.handle, col_name + "{ENTER}")
 
     t_name = request.table_name or table_ctrl.name or "Table"
+    detail = (
+        f"Configured {len(request.columns)} column(s) in Table '{t_name}': "
+        f"{', '.join(request.columns)}."
+    )
     return SetTableColumnsResult(
         table_name=t_name,
         columns=request.columns,
         column_count=len(request.columns),
         verified=True,
-        detail=f"Configured {len(request.columns)} column(s) on table '{t_name}'.",
+        detail=detail,
     )
 
 
-def _parse_cell_value(val_str: str) -> str | float | None:
-    """Parse string representation of a cell value into float or str."""
-    val = val_str.strip()
+def _parse_cell_value(text: str) -> float | str | None:
+    """Parse string into float if numeric, or preserve raw string."""
+    val = text.strip()
     if not val or val == "-":
         return None
     try:
@@ -391,13 +332,19 @@ def read_table(
         f"total {total_rows}) across {len(column_names)} column(s)."
     )
 
+    t_name = request.table_name or table_ctrl.name or "Table"
+
     return ReadTableResult(
+        table_name=t_name,
         columns=column_names,
         rows=paged_rows,
+        row_count=len(paged_rows),
         total_rows=total_rows,
         page=request.page,
         page_size=request.page_size,
         total_pages=total_pages,
         statistics=stat_rows if request.include_statistics else None,
+        has_more=end_idx < total_rows,
+        verified=True,
         detail=detail,
     )

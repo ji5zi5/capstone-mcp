@@ -6,7 +6,20 @@ from unittest.mock import patch
 import pytest
 
 from capstone_mcp.automation_models import NativeRequest
-from capstone_mcp.digits_display import CreateDigitsResult
+from capstone_mcp.displays import (
+    AddPageResult,
+    CreateDigitsResult,
+    CreateFftResult,
+    CreateScopeResult,
+    CreateTableResult,
+    DisplayAction,
+    DisplayResult,
+    ReadFftPeaksResult,
+    ReadTableResult,
+    ScopeTriggerResult,
+    SetPageLayoutResult,
+    SetTableColumnsResult,
+)
 from capstone_mcp.graphs import (
     GraphDeltaResult,
     MeasureGraphAreaResult,
@@ -25,20 +38,8 @@ from capstone_mcp.instruments import (
     SignalGeneratorStatusResult,
 )
 from capstone_mcp.native_loop import NativeDesktop
-from capstone_mcp.oscilloscope_fft import (
-    CreateFftResult,
-    CreateScopeResult,
-    ReadFftPeaksResult,
-    ScopeTriggerResult,
-)
 from capstone_mcp.runs import SetRunVisibilityResult
 from capstone_mcp.server import MCP
-from capstone_mcp.table_display import (
-    CreateTableResult,
-    ReadTableResult,
-    SetTableColumnsResult,
-)
-from capstone_mcp.workbook_layout import AddPageResult, SetPageLayoutResult
 
 NEW_TOOLS = [
     "capstone_create_table",
@@ -79,44 +80,56 @@ async def test_all_22_new_tools_registered_on_server() -> None:
 def test_dispatch_table_and_digits_operations() -> None:
     desktop = NativeDesktop()
 
-    with patch("capstone_mcp.native_loop.create_table") as mock_ct:
-        mock_ct.return_value = CreateTableResult(
-            created=True, table_name="Table 1",
+    with patch("capstone_mcp.native_loop.manage_display") as mock_md:
+        mock_md.return_value = DisplayResult(
+            action=DisplayAction.CREATE_TABLE,
+            create_table=CreateTableResult(
+                created=True, table_name="Table 1",
+            ),
         )
         res = desktop.dispatch(NativeRequest(
             operation="create_table", table_name="Table 1",
         ))
         assert res["created"] is True
-        mock_ct.assert_called_once()
+        mock_md.assert_called_once()
 
-    with patch("capstone_mcp.native_loop.set_table_columns") as mock_stc:
-        mock_stc.return_value = SetTableColumnsResult(
-            table_name="Table", columns=["Time"], column_count=1,
+    with patch("capstone_mcp.native_loop.manage_display") as mock_md:
+        mock_md.return_value = DisplayResult(
+            action=DisplayAction.SET_TABLE_COLUMNS,
+            set_table_columns=SetTableColumnsResult(
+                table_name="Table", columns=["Time"], column_count=1,
+            ),
         )
         res = desktop.dispatch(NativeRequest(
             operation="set_table_columns", columns=["Time"],
         ))
         assert res["column_count"] == 1
-        mock_stc.assert_called_once()
+        mock_md.assert_called_once()
 
-    with patch("capstone_mcp.native_loop.read_table") as mock_rt:
-        mock_rt.return_value = ReadTableResult(
-            columns=["Time"], rows=[], total_rows=0,
-            page=1, page_size=50, total_pages=0,
+    with patch("capstone_mcp.native_loop.manage_display") as mock_md:
+        mock_md.return_value = DisplayResult(
+            action=DisplayAction.READ_TABLE,
+            read_table=ReadTableResult(
+                columns=["Time"], rows=[], total_rows=0,
+                page=1, page_size=50, total_pages=0,
+            ),
         )
         res = desktop.dispatch(NativeRequest(operation="read_table"))
         assert res["columns"] == ["Time"]
-        mock_rt.assert_called_once()
+        mock_md.assert_called_once()
 
-    with patch("capstone_mcp.native_loop.create_digits") as mock_cd:
-        mock_cd.return_value = CreateDigitsResult(
-            created=True, digits_name="Digits 1",
+    with patch("capstone_mcp.native_loop.manage_display") as mock_md:
+        mock_md.return_value = DisplayResult(
+            action=DisplayAction.CREATE_DIGITS,
+            create_digits=CreateDigitsResult(
+                created=True, digits_name="Digits 1",
+            ),
         )
         res = desktop.dispatch(NativeRequest(
             operation="create_digits", digits_name="Digits 1",
         ))
         assert res["created"] is True
-        mock_cd.assert_called_once()
+        mock_md.assert_called_once()
 
 
 def test_dispatch_graph_toolbox_and_visibility() -> None:
@@ -193,10 +206,13 @@ def test_dispatch_signal_generator_and_scope_fft() -> None:
         assert res["enabled"] is True
         mock_mi.assert_called_once()
 
-    with patch("capstone_mcp.native_loop.create_scope") as mock_cs:
-        mock_cs.return_value = CreateScopeResult(
-            display_id="Scope_1",
-            display_type="Scope",
+    with patch("capstone_mcp.native_loop.manage_display") as mock_md:
+        mock_md.return_value = DisplayResult(
+            action=DisplayAction.CREATE_SCOPE,
+            create_scope=CreateScopeResult(
+                display_id="Scope_1",
+                display_type="Scope",
+            ),
         )
         res = desktop.dispatch(
             NativeRequest(
@@ -205,14 +221,17 @@ def test_dispatch_signal_generator_and_scope_fft() -> None:
             ),
         )
         assert res["display_id"] == "Scope_1"
-        mock_cs.assert_called_once()
+        mock_md.assert_called_once()
 
-    with patch("capstone_mcp.native_loop.set_scope_trigger") as mock_sst:
-        mock_sst.return_value = ScopeTriggerResult(
-            scope_id="Scope_1",
-            trigger_level=0.5,
-            trigger_slope="rising",
-            trigger_mode="auto",
+    with patch("capstone_mcp.native_loop.manage_display") as mock_md:
+        mock_md.return_value = DisplayResult(
+            action=DisplayAction.SET_SCOPE_TRIGGER,
+            set_scope_trigger=ScopeTriggerResult(
+                scope_id="Scope_1",
+                trigger_level=0.5,
+                trigger_slope="rising",
+                trigger_mode="auto",
+            ),
         )
         res = desktop.dispatch(
             NativeRequest(
@@ -221,22 +240,28 @@ def test_dispatch_signal_generator_and_scope_fft() -> None:
             ),
         )
         assert res["trigger_level"] == 0.5
-        mock_sst.assert_called_once()
+        mock_md.assert_called_once()
 
-    with patch("capstone_mcp.native_loop.create_fft") as mock_cf:
-        mock_cf.return_value = CreateFftResult(
-            display_id="FFT_1",
-            display_type="FFT",
+    with patch("capstone_mcp.native_loop.manage_display") as mock_md:
+        mock_md.return_value = DisplayResult(
+            action=DisplayAction.CREATE_FFT,
+            create_fft=CreateFftResult(
+                display_id="FFT_1",
+                display_type="FFT",
+            ),
         )
         res = desktop.dispatch(NativeRequest(operation="create_fft"))
         assert res["display_id"] == "FFT_1"
-        mock_cf.assert_called_once()
+        mock_md.assert_called_once()
 
-    with patch("capstone_mcp.native_loop.read_fft_peaks") as mock_rfp:
-        mock_rfp.return_value = ReadFftPeaksResult(
-            fft_id="FFT_1",
-            peaks=[],
-            peak_count=0,
+    with patch("capstone_mcp.native_loop.manage_display") as mock_md:
+        mock_md.return_value = DisplayResult(
+            action=DisplayAction.READ_FFT_PEAKS,
+            read_fft_peaks=ReadFftPeaksResult(
+                fft_id="FFT_1",
+                peaks=[],
+                peak_count=0,
+            ),
         )
         res = desktop.dispatch(
             NativeRequest(
@@ -245,7 +270,7 @@ def test_dispatch_signal_generator_and_scope_fft() -> None:
             ),
         )
         assert res["peak_count"] == 0
-        mock_rfp.assert_called_once()
+        mock_md.assert_called_once()
 
 
 def test_dispatch_triggers_calibration_and_layout() -> None:
@@ -333,21 +358,27 @@ def test_dispatch_triggers_calibration_and_layout() -> None:
         assert res["sensor_name"] == "Force"
         mock_mi.assert_called_once()
 
-    with patch("capstone_mcp.native_loop.add_page") as mock_ap:
-        mock_ap.return_value = AddPageResult(page_index=1, title="Page 2")
+    with patch("capstone_mcp.native_loop.manage_display") as mock_md:
+        mock_md.return_value = DisplayResult(
+            action=DisplayAction.ADD_PAGE,
+            add_page=AddPageResult(page_index=1, title="Page 2"),
+        )
         res = desktop.dispatch(NativeRequest(operation="add_page", title="Page 2"))
         assert res["title"] == "Page 2"
-        mock_ap.assert_called_once()
+        mock_md.assert_called_once()
 
-    with patch("capstone_mcp.native_loop.set_page_layout") as mock_spl:
-        mock_spl.return_value = SetPageLayoutResult(
-            layout="two_vertical", areas_created=2,
+    with patch("capstone_mcp.native_loop.manage_display") as mock_md:
+        mock_md.return_value = DisplayResult(
+            action=DisplayAction.SET_PAGE_LAYOUT,
+            set_page_layout=SetPageLayoutResult(
+                layout="two_vertical", areas_created=2,
+            ),
         )
         res = desktop.dispatch(NativeRequest(
             operation="set_page_layout", layout="two_vertical",
         ))
         assert res["areas_created"] == 2
-        mock_spl.assert_called_once()
+        mock_md.assert_called_once()
 
 
 @pytest.mark.anyio
