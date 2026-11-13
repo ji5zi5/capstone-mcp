@@ -120,8 +120,6 @@ def test_server_has_all_tool_domains_registered() -> None:
         "capstone_compare_runs",
         "capstone_create_calculation",
         "capstone_generate_lab_report",
-        "capstone_tutor_get_lesson",
-        "capstone_tutor_guide_step",
         "capstone_run_experiment_macro",
     }
     assert expected_physics.issubset(tool_names)
@@ -159,8 +157,8 @@ def test_isolated_router_registration() -> None:
     # Physics router
     mcp_physics = FastMCP("test-physics")
     physics_tools = register_physics_tools(mcp_physics, mock_native)
-    assert len(physics_tools) == 9
-    assert len(mcp_physics._tool_manager.list_tools()) == 9
+    assert len(physics_tools) == 7
+    assert len(mcp_physics._tool_manager.list_tools()) == 7
 
 
 def test_exported_data_backward_compatible() -> None:

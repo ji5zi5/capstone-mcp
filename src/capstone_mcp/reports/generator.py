@@ -325,35 +325,125 @@ def _load_data_from_file_or_string(
     return {}, {}
 
 
+_CANONICAL_EXPERIMENT_METADATA: Final[
+    dict[
+        str,
+        tuple[str, str, list[str], str, list[str], dict[str, str], list[str]],
+    ]
+] = {
+    "photoelectric_effect": (
+        "Photoelectric Effect & Planck Constant Measurement",
+        "Quantum Physics & Modern Optics",
+        ["Mercury Lamp", "Photodiode Aperture", "Optical Filters", "Variable DC Bias"],
+        "Verification of the Einstein photoelectric equation: K_max = h*nu - Phi.",
+        ["K_max = e * V_stop = h * nu - Phi"],
+        {"Signal Generator": "Off", "Sensor 1": "Stopping Potential Electrometer"},
+        [
+            "How do experimental uncertainties influence derived physical constants?",
+            "What systematic physical effects cause deviations from ideal theory?",
+        ],
+    ),
+    "rlc_resonance": (
+        "LRC Series Circuit Resonance & Impedance Analysis",
+        "Electromagnetism & AC Circuit Theory",
+        [
+            "PASCO 850 Universal Interface",
+            "RLC Circuit Board",
+            "Voltage Probe",
+            "Current Sensor",
+        ],
+        (
+            "Measurement of resonant frequency, quality factor, and phase shift "
+            "in an LRC circuit."
+        ),
+        ["f_0 = 1 / (2*pi*sqrt(L*C))", "Q = omega_0 * L / R"],
+        {
+            "Signal Generator": "Sine wave 10Hz-1kHz",
+            "Sensor 1": "Output Voltage",
+            "Sensor 2": "Current",
+        },
+        [
+            (
+                "How does the experimentally determined resonant frequency compare to "
+                "the theoretical LC value?"
+            ),
+            "What determines the sharpness (quality factor Q) of the resonance peak?",
+        ],
+    ),
+    "forced_harmonic_oscillation": (
+        "Driven Damped Harmonic Oscillation & Resonance",
+        "Classical Mechanics",
+        ["Mechanical Driver", "Spring & Cart", "Motion Sensor", "Force Sensor"],
+        "Analysis of amplitude response and phase lag across driving frequencies.",
+        ["A(omega) = F_0 / sqrt(m^2*(omega_0^2 - omega^2)^2 + b^2*omega^2)"],
+        {
+            "Signal Generator": "0.1 - 2.0 Hz Sine Wave",
+            "Sensor 1": "Position",
+            "Sensor 2": "Force",
+        },
+        [
+            "How does damping ratio change the resonant peak position?",
+            "What is the phase difference between driver and oscillator at resonance?",
+        ],
+    ),
+    "adiabatic_gas": (
+        "Adiabatic Gas Law & Thermodynamic Cycle Work",
+        "Thermodynamics",
+        [
+            "Adiabatic Gas Apparatus",
+            "Pressure Sensor",
+            "Temperature Sensor",
+            "Volume Encoder",
+        ],
+        "Verification of P*V^gamma = constant for monoatomic and diatomic gases.",
+        ["P * V^gamma = C", "W = delta(U) = n * C_v * delta(T)"],
+        {
+            "Sensor 1": "Pressure",
+            "Sensor 2": "Volume",
+            "Sensor 3": "Temperature",
+        },
+        [
+            "How does the empirical gamma compare to theoretical 7/5 for air?",
+            "Was the compression process strictly reversible and adiabatic?",
+        ],
+    ),
+    "slit_diffraction": (
+        "Fraunhofer Slit Diffraction Measurement",
+        "Wave Optics",
+        [
+            "Red Diode Laser (650 nm)",
+            "Single & Double Slit Disk",
+            "Linear Position Sensor",
+            "Light Sensor",
+        ],
+        "Intensity distribution of single slit and double slit diffraction patterns.",
+        [
+            "I(theta) = I_0 * (sin(beta)/beta)^2",
+            "beta = (pi * a / lambda) * sin(theta)",
+        ],
+        {
+            "Sensor 1": "High Sensitivity Light Sensor",
+            "Sensor 2": "Rotary/Linear Motion",
+        },
+        [
+            "How does slit width affect the central diffraction maximum width?",
+            (
+                "How do single-slit diffraction envelopes modulate double-slit "
+                "interference fringes?"
+            ),
+        ],
+    ),
+}
+
+
 def _get_curriculum_info(
     experiment_id: str,
 ) -> tuple[str, str, list[str], str, list[str], dict[str, str], list[str]]:
     """Retrieve title, domain, apparatus, theory, and discussion questions."""
-    with contextlib.suppress(Exception):
-        from capstone_mcp.tutor.curriculum import CANONICAL_EXPERIMENTS  # noqa: PLC0415
+    if experiment_id in _CANONICAL_EXPERIMENT_METADATA:
+        return _CANONICAL_EXPERIMENT_METADATA[experiment_id]
 
-        if experiment_id in CANONICAL_EXPERIMENTS:
-            cur = CANONICAL_EXPERIMENTS[experiment_id]
-            questions = [q.question for q in cur.quiz_questions]
-            return (
-                cur.title,
-                cur.domain,
-                list(cur.equipment),
-                cur.theory_summary,
-                list(cur.governing_equations),
-                dict(cur.capstone_setup),
-                questions,
-            )
-
-    titles = {
-        "photoelectric_effect": "Photoelectric Effect & Planck Constant Measurement",
-        "rlc_resonance": "LRC Series Circuit Resonance & Impedance Analysis",
-        "forced_harmonic_oscillation": "Driven Damped Harmonic Oscillation & Resonance",
-        "adiabatic_gas": "Adiabatic Gas Law & Thermodynamic Cycle Work",
-        "slit_diffraction": "Fraunhofer Slit Diffraction Measurement",
-        "generic": "Physics Laboratory Experiment",
-    }
-    title = titles.get(experiment_id, f"Physics Experiment: {experiment_id}")
+    title = f"Physics Experiment: {experiment_id}"
     return (
         title,
         "Physics Laboratory",
