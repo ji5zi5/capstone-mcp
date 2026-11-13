@@ -99,6 +99,32 @@ def test_attach_explains_an_unsupported_build_when_installed_capstone_is_absent(
     start.assert_not_called()
 
 
+def test_attach_launch_injects_remote_debugging_port(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Given: Capstone is not running, but launch=True is requested.
+    monkeypatch.setattr(desktop, "capstone_processes", Mock(return_value=([], [])))
+    start = Mock()
+    application = Mock(
+        connect=Mock(side_effect=ProcessNotFoundError("not found")),
+        start=start,
+        process=1234,
+    )
+    monkeypatch.setattr(desktop, "Application", Mock(return_value=application))
+    app = Capstone()
+    monkeypatch.setattr(app, "windows", Mock(return_value=[]))
+
+    # When
+    _ = app.attach(launch=True)
+
+    # Then
+    start.assert_called_once()
+    called_cmd = start.call_args[0][0]
+    assert "--remote-debugging-port=9222" in called_cmd
+    assert "--remote-allow-origins=*" in called_cmd
+
+
+
 def test_attach_requires_a_process_id_when_several_instances_run(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

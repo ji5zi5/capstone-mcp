@@ -25,6 +25,11 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
 EXECUTABLE: Final = Path("C:/Program Files/PASCO scientific/Capstone/Capstone.exe")
+DEFAULT_DEBUG_PORT: Final = 9222
+CHROMIUM_DEBUG_FLAGS: Final = (
+    f"--remote-debugging-port={DEFAULT_DEBUG_PORT}",
+    "--remote-allow-origins=*",
+)
 CROP_COORDINATE_COUNT: Final = 4
 SHADOW_CLASS: Final = "SysShadow"
 GA_ROOT: Final = 2
@@ -131,8 +136,9 @@ class Capstone:
                             "Store edition): "
                         ) + "; ".join(other)
                     raise AutomationError(msg) from error
+                cmd = f'"{EXECUTABLE}" ' + " ".join(CHROMIUM_DEBUG_FLAGS)
                 _ = app.start(
-                    f'"{EXECUTABLE}"', work_dir=str(EXECUTABLE.parent), timeout=30,
+                    cmd, work_dir=str(EXECUTABLE.parent), timeout=30,
                 )
         self.pid = app.process
         self.refs.clear()
