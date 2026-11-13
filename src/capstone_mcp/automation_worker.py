@@ -7,10 +7,12 @@ import logging
 import subprocess
 import sys
 import time
+from collections import deque
 from concurrent.futures import Future
 from concurrent.futures import TimeoutError as FutureTimeout
+from contextlib import suppress
 from threading import Lock, Thread
-from typing import Final
+from typing import IO, Final
 from uuid import uuid4
 
 import win32api
@@ -23,17 +25,35 @@ from capstone_mcp.graphs import GRAPH_INPUT_OPERATIONS, GraphFailure
 TEXT_VALUE: Final = TypeAdapter(str)
 LOGGER: Final = logging.getLogger(__name__)
 MAX_MESSAGE_BYTES: Final = 64 * 1024 * 1024
+MAX_STDERR_LINE_BYTES: Final = 4096
+MAX_STDERR_LINES: Final = 200
 CLEANUP_SECONDS: Final = 2
 PROCESS_ATTACH_TO_JOB: Final = 0x0101
 
 class NativeSessionError(RuntimeError):
     """The native session failed; an input may already have reached Capstone."""
 
-    def __init__(self, message: str, failure: GraphFailure | None = None) -> None:
+    def __init__(
+        self,
+        message: str,
+        failure: GraphFailure | None = None,
+        *,
+        stderr_tail: list[str] | None = None,
+        error_code: str | None = None,
+        remediation: str | None = None,
+    ) -> None:
         """Keep graph recovery metadata without changing ordinary worker errors."""
+        self.message: str = message
         self.failure: GraphFailure | None = failure
+        self.stderr_tail: list[str] = list(stderr_tail or [])
+        self.error_code: str | None = error_code
+        self.remediation: str | None = remediation
         correlation = "" if failure is None else f" [request_id={failure.request_id}]"
-        super().__init__(message + correlation)
+        stderr_info = ""
+        if self.stderr_tail:
+            tail_joined = "".join(self.stderr_tail)
+            stderr_info = f"\n[Worker stderr tail]:\n{tail_joined}"
+        super().__init__(message + correlation + stderr_info)
 
 
 class AutomationWorker:
@@ -50,6 +70,8 @@ class AutomationWorker:
         self.retired: bool = False
         self.uncertain: bool = False
         self.last_graph_failure: GraphFailure | None = None
+        self.stderr_buffer: deque[str] = deque(maxlen=MAX_STDERR_LINES)
+        self._stderr_thread: Thread | None = None
 
     @property
     def process_id(self) -> int | None:
@@ -60,9 +82,25 @@ class AutomationWorker:
         """Launch the fixed native bootstrap; test backends replace this boundary."""
         return subprocess.Popen(
             [sys.executable, "-X", "utf8", "-u", "-m", "capstone_mcp.native_main"],
-            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
             text=True, encoding="utf-8",
         )
+
+    def _start_stderr_reader(self, stream: IO[str] | None) -> None:
+        if stream is None:
+            return
+
+        def reader() -> None:
+            with suppress(OSError, ValueError):
+                while True:
+                    line = stream.readline(MAX_STDERR_LINE_BYTES)
+                    if not line:
+                        break
+                    self.stderr_buffer.append(line)
+
+        thread = Thread(target=reader, daemon=True)
+        thread.start()
+        self._stderr_thread = thread
 
     def _start(self) -> subprocess.Popen[str]:
         if self.retired:
@@ -83,10 +121,11 @@ class AutomationWorker:
         )
         process = self._spawn()
         self.process = process
+        self._start_stderr_reader(process.stderr)
         if self.retired:
             process.kill()
             msg = "Worker startup finished after its session was retired."
-            raise NativeSessionError(msg)
+            raise NativeSessionError(msg, stderr_tail=list(self.stderr_buffer))
         process_handle = win32api.OpenProcess(
             PROCESS_ATTACH_TO_JOB, 0, process.pid,
         )
@@ -96,7 +135,7 @@ class AutomationWorker:
             process_handle.Close()
         if process.stdin is None:
             msg = "Native worker input stream is unavailable."
-            raise NativeSessionError(msg)
+            raise NativeSessionError(msg, stderr_tail=list(self.stderr_buffer))
         _ = process.stdin.write("INITIALIZE\n")
         process.stdin.flush()
         return process
@@ -105,10 +144,10 @@ class AutomationWorker:
         process = self._start()
         if self.retired:
             msg = "Native session was retired before input delivery."
-            raise NativeSessionError(msg)
+            raise NativeSessionError(msg, stderr_tail=list(self.stderr_buffer))
         if process.stdin is None or process.stdout is None:
             msg = "Native worker IPC streams are unavailable."
-            raise NativeSessionError(msg)
+            raise NativeSessionError(msg, stderr_tail=list(self.stderr_buffer))
         packet = RequestPacket(identifier=identifier, command=request)
         _ = process.stdin.write(packet.model_dump_json() + "\n")
         process.stdin.flush()
@@ -116,13 +155,50 @@ class AutomationWorker:
             process.stdout.readline(MAX_MESSAGE_BYTES + 1),
         )
         if not line.endswith("\n") or len(line) > MAX_MESSAGE_BYTES:
+            exit_code = process.poll()
+            time.sleep(0.05)
+            stderr_tail = list(self.stderr_buffer)
             msg = "Native worker returned an incomplete or oversized reply."
-            raise NativeSessionError(msg)
+            if exit_code is not None:
+                msg = f"Native worker terminated unexpectedly with code {exit_code}."
+            raise NativeSessionError(msg, stderr_tail=stderr_tail)
         reply = NativeReply.model_validate_json(line)
         if reply.identifier != identifier:
             msg = "Native worker returned a reply for a different request."
-            raise NativeSessionError(msg)
+            raise NativeSessionError(msg, stderr_tail=list(self.stderr_buffer))
         return reply
+
+    def _handle_call_timeout(
+        self, request: NativeRequest, identifier: str, _error: FutureTimeout,
+    ) -> NativeSessionError:
+        self.uncertain = True
+        stderr_tail = list(self.stderr_buffer)
+        self._retire()
+        msg = (
+            "Native operation timed out; its outcome is unknown. The worker was "
+            "retired without replay. Capstone was not terminated. Reattach and "
+            "inspect the application before further input."
+        )
+        failure = self._graph_transport_failure(
+            request, identifier, "WORKER_TIMEOUT", msg,
+        )
+        return NativeSessionError(msg, failure, stderr_tail=stderr_tail)
+
+    def _handle_call_failure(
+        self, request: NativeRequest, identifier: str, error: Exception,
+    ) -> NativeSessionError:
+        self.uncertain = True
+        stderr_tail = list(self.stderr_buffer)
+        self._retire()
+        if isinstance(error, NativeSessionError):
+            if not error.stderr_tail:
+                error.stderr_tail = stderr_tail
+            return error
+        msg = f"Native transport failed; outcome is unknown: {error}"
+        failure = self._graph_transport_failure(
+            request, identifier, "TRANSPORT_FAILURE", msg,
+        )
+        return NativeSessionError(msg, failure, stderr_tail=stderr_tail)
 
     def call(self, request: NativeRequest) -> JsonValue:
         """Cover startup, write, complete read, and parsing with one absolute budget."""
@@ -150,31 +226,20 @@ class AutomationWorker:
         try:
             reply = future.result(timeout=max(0, deadline - time.monotonic()))
         except FutureTimeout as error:
-            self.uncertain = True
-            self._retire()
-            msg = (
-                "Native operation timed out; its outcome is unknown. The worker was "
-                "retired without replay. Capstone was not terminated. Reattach and "
-                "inspect the application before further input."
-            )
-            failure = self._graph_transport_failure(
-                request, identifier, "WORKER_TIMEOUT", msg,
-            )
-            raise NativeSessionError(msg, failure) from error
+            raise self._handle_call_timeout(request, identifier, error) from error
         except Exception as error:
-            self.uncertain = True
-            self._retire()
-            msg = f"Native transport failed; outcome is unknown: {error}"
-            failure = self._graph_transport_failure(
-                request, identifier, "TRANSPORT_FAILURE", msg,
-            )
-            raise NativeSessionError(msg, failure) from error
+            raise self._handle_call_failure(request, identifier, error) from error
         finally:
             self.lock.release()
         if reply.error is not None:
             if reply.graph_failure is not None:
                 self.last_graph_failure = reply.graph_failure
-            raise NativeSessionError(reply.error, reply.graph_failure)
+            raise NativeSessionError(
+                reply.error,
+                reply.graph_failure,
+                error_code=reply.error_code,
+                remediation=reply.remediation,
+            )
         return reply.result
 
     def _graph_transport_failure(
@@ -205,26 +270,40 @@ class AutomationWorker:
         finally:
             self.cleanup_lock.release()
 
-    def _dispose_resources(self) -> None:
+    def _terminate_process(self) -> None:
         process = self.process
-        if process is not None:
-            if process.poll() is None:
-                process.kill()
-            try:
-                _ = process.wait(timeout=CLEANUP_SECONDS)
-            except subprocess.TimeoutExpired as error:
-                msg = "Worker termination is unconfirmed; replacement is prohibited."
-                raise NativeSessionError(msg) from error
+        if process is None:
+            return
+        if process.poll() is None:
+            process.kill()
+        try:
+            _ = process.wait(timeout=CLEANUP_SECONDS)
+        except subprocess.TimeoutExpired as error:
+            msg = "Worker termination is unconfirmed; replacement is prohibited."
+            raise NativeSessionError(msg) from error
+
+    def _close_streams(self) -> None:
+        process = self.process
+        if process is None:
+            return
+        if process.stdin is not None:
+            process.stdin.close()
+        if process.stdout is not None:
+            process.stdout.close()
+        if process.stderr is not None:
+            process.stderr.close()
+
+    def _dispose_resources(self) -> None:
+        self._terminate_process()
         if self.transport is not None:
             self.transport.join(CLEANUP_SECONDS)
             if self.transport.is_alive():
                 msg = "Worker transport did not retire; no replacement may be started."
                 raise NativeSessionError(msg)
-        if process is not None:
-            if process.stdin is not None:
-                process.stdin.close()
-            if process.stdout is not None:
-                process.stdout.close()
+        if self._stderr_thread is not None:
+            self._stderr_thread.join(timeout=1.0)
+            self._stderr_thread = None
+        self._close_streams()
         if self.job is not None:
             self.job.Close()
             self.job = None
@@ -240,6 +319,7 @@ class AutomationWorker:
             self.transport = None
             self.retired = False
             self.uncertain = False
+            self.stderr_buffer.clear()
         finally:
             self.lock.release()
 
