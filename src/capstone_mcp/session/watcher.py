@@ -1,5 +1,5 @@
 # Copyright 2026 Capstone MCP contributors.
-"""Unified session manager coordinating Desktop UIA and CDP telemetry."""
+"""Threshold condition monitoring and trigger evaluation for Capstone sessions."""
 
 from __future__ import annotations
 
@@ -8,17 +8,12 @@ import operator
 import time
 from typing import TYPE_CHECKING, Any, Final
 
-from capstone_mcp import bridge
 from capstone_mcp.models import Model
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from capstone_mcp.automation_worker import AutomationWorker
-    from capstone_mcp.bridge import NativeInventory
-
 LOGGER: Final = logging.getLogger(__name__)
-DEFAULT_DEBUG_PORT: Final = 9222
 
 COMPARATORS: Final[dict[str, Callable[[float, float], bool]]] = {
     ">": operator.gt,
@@ -56,35 +51,11 @@ class StopConditionTrigger(Model):
     detail: str
 
 
-class UnifiedSessionManager:
-    """Coordinates desktop UI automation worker and CDP WebSocket fast-path."""
+class ConditionWatcher:
+    """Monitors live sensor streams against user-defined threshold conditions."""
 
-    def __init__(
-        self,
-        worker: AutomationWorker | None = None,
-        debug_port: int = DEFAULT_DEBUG_PORT,
-    ) -> None:
-        """Initialize session manager with optional worker and debug port."""
-        self.worker = worker
-        self.debug_port = debug_port
-
-    def read_live_inventory(self, port: int | None = None) -> NativeInventory:
-        """Query connected sensors and measurement channels via CDP fast-path."""
-        target_port = port if port is not None else self.debug_port
-        return bridge.read_inventory(target_port)
-
-    def read_live_measurement(
-        self,
-        measurement_euid: str,
-        unit_type: int = 0,
-        port: int | None = None,
-    ) -> float:
-        """Poll instantaneous measurement value over CDP WebSocket (< 10 ms)."""
-        target_port = port if port is not None else self.debug_port
-        return bridge.read_measurement(target_port, measurement_euid, unit_type)
-
-    def evaluate_stop_condition(
-        self,
+    @staticmethod
+    def evaluate(
         current_value: float,
         operator_str: str,
         threshold: float,
@@ -96,15 +67,14 @@ class UnifiedSessionManager:
             raise ValueError(msg)
         return op_fn(current_value, threshold)
 
-    def monitor_until_stop(
+    def monitor(
         self,
         condition: StopCondition,
+        sampler: Callable[[], float],
         *,
         halt_callback: Callable[[], Any] | None = None,
-        port: int | None = None,
     ) -> StopConditionTrigger:
-        """Continuously poll live measurement until threshold is met or timeout."""
-        target_port = port if port is not None else self.debug_port
+        """Continuously poll sample values until condition is met or timeout."""
         start_time = time.monotonic()
         last_val = 0.0
 
@@ -123,14 +93,10 @@ class UnifiedSessionManager:
                     ),
                 )
 
-            val = bridge.read_measurement(
-                target_port, condition.measurement_euid, condition.unit_type,
-            )
+            val = sampler()
             last_val = val
 
-            if self.evaluate_stop_condition(
-                val, condition.operator, condition.threshold,
-            ):
+            if self.evaluate(val, condition.operator, condition.threshold):
                 if halt_callback is not None:
                     halt_callback()
                 return StopConditionTrigger(
@@ -146,11 +112,3 @@ class UnifiedSessionManager:
                 )
 
             time.sleep(condition.poll_interval)
-
-
-__all__ = [
-    "DEFAULT_DEBUG_PORT",
-    "StopCondition",
-    "StopConditionTrigger",
-    "UnifiedSessionManager",
-]
