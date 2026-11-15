@@ -17,7 +17,7 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = ["pytest>=8", "ruff", "basedpyright", "types-psutil"]
+dev = ["pytest>=8", "pytest-cov>=6", "ruff", "basedpyright", "types-psutil"]
 
 [project.scripts]
 capstone-mcp = "capstone_mcp.server:main"

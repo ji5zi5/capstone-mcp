@@ -53,4 +53,13 @@ A URI scheme (`live://measurements`, `live://table`) enabling callers to query r
 ### Compound Seam
 A high-depth module interface (such as `manage_display` or `manage_instrument`) consolidating multiple domain actions behind a single parameter-driven entry point, eliminating shallow pass-through wrappers.
 
+### ICapstoneBackend & InMemoryFakeBackend
+The decoupled backend protocol interface and in-memory test implementation emulating Capstone's 53 native QWebChannel RPC methods and state transitions deterministically in CI/headless environments without live GUI dependencies.
+
+### NativeDesktop Runtime
+The decomposed STA automation core in `capstone_mcp.native.runtime`, separating process discovery, window focusing, and input dispatch from the outer event loop and IPC layer.
+
+### Tool Annotations (4-Hint Conformance)
+Explicit boolean declarations across all four MCP hints (`readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint`) on every FastMCP tool, strictly conforming to m8ven and OpenAI registry standards.
+
 

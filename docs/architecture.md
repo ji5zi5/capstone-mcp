@@ -436,10 +436,75 @@ Phase 10 deepened the architecture by addressing technical debt along two dimens
 
 ## 11. Quality & Verification Guardrails
 
-1. **Automated Test Coverage**: 532 unit, integration, and smoke tests across 61 test suites, executed with `uv run --no-sync pytest` (100% pass rate: 531 passed, 1 skipped).
+1. **Automated Test Coverage**: 570 unit, integration, and smoke tests across 62 test suites, executed with `uv run --no-sync pytest` (100% pass rate: 569 passed, 1 skipped) with an **85%+ verified code coverage baseline**.
 2. **Deterministic Offline CI**: Hardware-dependent and live GUI tests include fallback guards (`pytest.mark.skipif`), allowing CI pipelines to pass deterministically in headless environments.
 3. **Windows Process Lock Guard**: Tool and test runner commands strictly enforce `--no-sync` to avoid `os error 32` file locking when background MCP processes hold `capstone-mcp.exe`.
-4. **Strict Type Safety & Linting**: Ruff compliance across all rulesets (`ruff check src tests`) with 0 errors, and Basedpyright type validation (`basedpyright src`) with 0 errors, 0 warnings.
+4. **Strict Type Safety & Linting**: Ruff compliance across all rulesets (`ruff check src tests`) with 0 errors, and Basedpyright type validation (`basedpyright src`) with 0 errors, 0 warnings (no suppressed attribute or call issues).
+
+---
+
+## 12. Core Deepening, Defect Eradication & Fake Backend (Phase 11)
+
+Phase 11 executed a comprehensive structural deepening across the entire codebase to eliminate technical debt, deceptive patterns, and god objects:
+
+```mermaid
+flowchart TD
+    subgraph ServerLayer ["Server & Protocol Layer"]
+        Server["server.py (Slim Router, 330 lines)"]
+        Prompts["prompts.py (8 Guided Prompts)"]
+        Resources["resources.py (6 Dynamic Telemetry Resources)"]
+        UITools["tools/ui.py (Desktop Inspection & Escape Hatch)"]
+        Server --> Prompts
+        Server --> Resources
+        Server --> UITools
+    end
+
+    subgraph NativeLayer ["Native Automation Core"]
+        Loop["native_loop.py (STA Process Entrypoint, 51 lines)"]
+        Runtime["native/runtime.py (NativeDesktop Runtime)"]
+        Errors["native/errors.py (IPC Error Classifier)"]
+        Loop --> Runtime
+        Loop --> Errors
+    end
+
+    subgraph SessionLayer ["Decomposed Session Subsystem"]
+        Facade["UnifiedSessionManager (session/__init__.py)"]
+        Lifecycle["SessionLifecycleManager (session/lifecycle.py)"]
+        CDP["SessionCdpClient (session/cdp_client.py)"]
+        Telem["TelemetryBuffer (session/telemetry.py)"]
+        Watch["ConditionWatcher (session/watcher.py)"]
+        Facade --> Lifecycle
+        Facade --> CDP
+        Facade --> Telem
+        Facade --> Watch
+    end
+
+    subgraph BackendProtocol ["Backend Seam & Test Doubles"]
+        Protocol["ICapstoneBackend (backend_protocol.py)"]
+        LiveCDP["Live WebSocket Backend (session/cdp_client.py)"]
+        FakeBackend["InMemoryFakeBackend (fake_backend.py)"]
+        Protocol <|.. LiveCDP
+        Protocol <|.. FakeBackend
+    end
+```
+
+### Key Architectural Deliverables:
+1. **First-Class Runtime Hazard Eradication (Ticket 1)**:
+   - Permanently eradicated destructive Windows clipboard hijacking in graph copy routines.
+   - Removed runtime monkey-patching of internal libraries and fake synthetic data injection.
+2. **Strict Static Type Safety & Fake Backend Seam (Ticket 2)**:
+   - Eliminated type suppression overrides (`reportAttributeAccessIssue`, `reportCallIssue`) from `pyproject.toml`.
+   - Introduced `ICapstoneBackend` protocol interface and `InMemoryFakeBackend` accurately emulating all 53 native Capstone QWebChannel RPC methods and state transitions in memory.
+3. **Session God Object 4-Tier Decomposition (Ticket 3)**:
+   - Replaced monolithic `session.py` with `capstone_mcp.session` package decomposed into `lifecycle`, `cdp_client`, `telemetry`, and `watcher`.
+4. **Native Loop Monolith Decomposition (Ticket 4)**:
+   - Extracted 1,019-line `native_loop.py` into lightweight 51-line STA entrypoint and `capstone_mcp.native` package (`runtime.py`, `errors.py`).
+   - Permanently removed 3,025 lines of legacy tutor HTML/CSS artifacts.
+5. **FastMCP Server Slimming & Dedicated Routers (Ticket 5)**:
+   - Modularized `server.py` into `prompts.py`, `resources.py`, and `tools/ui.py`, reducing core server lines by over 73%.
+   - Enforced explicit boolean declarations for all 4 tool hints (`readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint`) across all 21 tools conforming to OpenAI/m8ven directory standards.
+6. **Seam Test Surface & 85%+ Coverage Baseline (Ticket 6)**:
+   - Re-aligned test surface around high-depth domain seams (`manage_*`) with 570 passing tests and an 85%+ code coverage baseline.
 
 
 

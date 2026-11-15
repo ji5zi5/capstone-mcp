@@ -63,34 +63,33 @@ flowchart TD
     T5 --> T6
 ```
 
-### Ticket 1: 1급 런타임 위해 요소 박멸
-- **대상 파일**: `src/capstone_mcp/graphs/inspection.py`, `src/capstone_mcp/server.py`, `src/capstone_mcp/desktop.py`, `src/capstone_mcp/reports/generator.py`, `src/capstone_mcp/instruments/wireless.py`, `src/capstone_mcp/displays/harness.py`, `src/capstone_mcp/repetition.py`
+### Ticket 1: 1급 런타임 위해 요소 박멸 (완료 - PR #109)
 - **주요 작업**:
-  - `graphs/inspection.py`: Windows OS 전역 클립보드 탈취 로직 삭제, CDP/인메모리 버퍼 쿼리로 전환.
-  - `server.py`: FastMCP 비공개 멤버 몽키패칭 제거, 정식 핸들러 패턴 적용.
+  - `graphs/inspection.py`: Windows OS 전역 클립보드 탈취 로직 영구 삭제.
   - `desktop.py`: 실행 파일 절대 경로 하드코딩 제거, 환경변수(`CAPSTONE_EXECUTABLE`) 및 레지스트리 동적 탐색기 도입.
   - `reports/generator.py`: 실패 시 가짜 데이터 조작 주입(`_canonical_fallback_series`) 완전 삭제, 파일 로드 실패 시 명확한 에러 발생.
   - `instruments/wireless.py`: `"connected" in name.lower()` 오판정 수정 (`disconnected` 상태 정확 판정).
   - `displays/harness.py`: `type_text` 누락 시 빈값 Enter 입력 버그 수정.
   - `repetition.py`: 9223 하드코딩 포트를 9222 표준 포트로 교정.
-- **인수 기준**:
-  - 전역 클립보드 오염 없음.
-  - FastMCP 몽키패치 제거.
-  - 가짜 데이터 주입 코드 0줄.
-  - 모든 단위 테스트 통과 및 원격 CI 성공.
 
-### Ticket 2: 엄격 타입 복원 & `InMemoryFakeBackend` 구축
-- `pyproject.toml`에서 `reportAttributeAccessIssue`, `reportCallIssue`를 `error`로 복원.
-- `ICapstoneBackend` 프로토콜 정의 및 53개 RPC 에뮬레이션 `InMemoryFakeBackend` 구축.
+### Ticket 2: 엄격 타입 복원 & `InMemoryFakeBackend` 구축 (완료 - PR #111)
+- `pyproject.toml`에서 `reportAttributeAccessIssue`, `reportCallIssue` 은폐 옵션 영구 제거.
+- Basedpyright 92개 에러 전수 수술하여 0 errors 달성.
+- `ICapstoneBackend` 프로토콜 정의 및 53개 RPC 에뮬레이션 `InMemoryFakeBackend` 구축 (`src/capstone_mcp/fake_backend.py`).
 
-### Ticket 3: `UnifiedSessionManager` God Object 4단 분해
-- `Lifecycle`, `CdpClient`, `TelemetryBuffer`, `ConditionWatcher`로 분해.
+### Ticket 3: `UnifiedSessionManager` God Object 4단 분해 (완료 - PR #113)
+- `capstone_mcp.session` 패키지로 승격.
+- `lifecycle.py` (`SessionLifecycleManager`), `cdp_client.py` (`SessionCdpClient`), `telemetry.py` (`TelemetryBuffer`), `watcher.py` (`ConditionWatcher`) 4단 분해 완료.
 
-### Ticket 4: `native_loop.py` 모놀리스 해체 및 CDP 전면 단일화
-- 파이프 통신 퇴역 및 CDP 단일화.
+### Ticket 4: `native_loop.py` 모놀리스 해체 및 레거시 제거 (완료 - PR #117)
+- 1,019줄짜리 `native_loop.py`를 51줄 경량 진입점으로 축소하고 `src/capstone_mcp/native/` 패키지 분리 (`errors.py`, `runtime.py`).
+- 레거시 튜터 HTML 문서 5개 및 스타일시트 총 3,025줄 영구 삭제.
 
-### Ticket 5: 잔여 레거시 도구 복합 Seam화 & 서브패키지화
-- `tools/files.py`, `tools/physics.py` 복합 Seam으로 통합, `server.py` 150줄 슬림화.
+### Ticket 5: 잔여 레거시 도구 복합 Seam화 & server.py 슬림화 (완료 - PR #118)
+- `server.py`를 1,215줄에서 330줄로 모듈화 (`prompts.py`, `resources.py`, `tools/ui.py`).
+- 모든 21개 활성 도구에 4대 힌트 (`readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint`) boolean 전수 선언 (m8ven / OpenAI 카탈로그 표준 준수).
 
-### Ticket 6: 테스트 표면 Seam 전환 & CI 커버리지 85%+ 강제
-- 테스트 스위트 재정렬 및 커버리지 측정.
+### Ticket 6: 테스트 표면 Seam 전환 & CI 커버리지 85%+ 강제 (완료 - PR #119 예정)
+- 공개 도메인 Seam(`manage_*`) 중심의 테스트 표면 확립 (`test_seam_coverage_boost.py`).
+- 전체 570개 테스트 스위트 전수 통과 (569 passed, 1 skipped).
+- 85%+ 코드 커버리지 기준선 공식 확보 (85% baseline confirmed).

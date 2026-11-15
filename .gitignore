@@ -16,4 +16,6 @@ dist/
 *.asm
 .agents/
 PROJECT.md
+.coverage
+htmlcov/
 
