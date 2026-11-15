@@ -65,23 +65,28 @@ classDiagram
 
 ## 3. Unified Experiment Data Source Seam (`capstone_mcp.data_sources`)
 
-To eliminate ad-hoc format branching (`.cap` vs `.csv` vs live UI table) across reports and automation recipes, `capstone_mcp.data_sources` provides a single abstraction seam.
+To eliminate ad-hoc format branching (`.cap` vs `.csv` vs live UI table vs live sensor telemetry) across reports and automation recipes, `capstone_mcp.data_sources` provides a single abstraction seam supporting both local files and polymorphic `live://` URIs.
 
 ```mermaid
 flowchart TD
     Caller["Report Generator / Macro Recipes"] -->|"get_experiment_series(source, x, y)"| Seam["Data Source Seam (seam.py)"]
-    Seam --> Cap["CapArchiveAdapter (.cap files)"]
-    Seam --> Csv["CsvTableAdapter (.csv files)"]
-    Seam --> Live["LiveSessionAdapter (active table display)"]
+    Seam -->|".cap path"| Cap["CapArchiveAdapter (.cap files)"]
+    Seam -->|".csv path"| Csv["CsvTableAdapter (.csv files)"]
+    Seam -->|"live://measurements"| Telemetry["LiveMeasurementAdapter (CDP WebSocket)"]
+    Seam -->|"live://table"| Live["LiveSessionAdapter (active table display)"]
     Cap --> ExpSeries["ExperimentSeries (paired x/y DataSeries)"]
     Csv --> ExpSeries
+    Telemetry --> ExpSeries
     Live --> ExpSeries
 ```
 
 ### Models & Protocols:
 - **`DataSeries`**: Immutable container for named, unit-annotated numerical series with `clean_floats()` filtering of missing or sparse values.
 - **`ExperimentSeries`**: Paired independent ($x$) and dependent ($y$) variables, run metadata, and provenance tags.
-- **`DataSourceAdapter` Protocol**: Common interface implemented by `CapArchiveAdapter`, `CsvTableAdapter`, and `LiveSessionAdapter`.
+- **`DataSourceAdapter` Protocol**: Common interface implemented by `CapArchiveAdapter`, `CsvTableAdapter`, `LiveMeasurementAdapter`, and `LiveSessionAdapter`.
+- **Polymorphic `live://` URIs**:
+  - `live://measurements`: High-speed CDP WebSocket queries against live hardware inventory and sensor channels (`LiveMeasurementAdapter`).
+  - `live://table`: Screen-reader extraction of paired series from active table display UI components (`LiveSessionAdapter`).
 
 ---
 
@@ -412,11 +417,29 @@ flowchart TD
 
 ---
 
-## 10. Quality & Verification Guardrails
+## 10. Codebase Deepening & Polymorphic Seam Unification (Phase 10)
 
-1. **Automated Test Coverage**: 527 unit, integration, and smoke tests across 61 test suites, executed with `uv run --no-sync pytest` (100% pass rate: 526 passed, 1 skipped).
+Phase 10 deepened the architecture by addressing technical debt along two dimensions:
+
+1. **Purge of Legacy Pass-Through Adapters (Passing the Deletion Test)**:
+   - Deleted 42 obsolete, non-registered wrapper functions across `src/capstone_mcp/tools/{displays,instruments,files}.py` (-906 lines).
+   - Unified the test surface: migrated ~120 test assertions to directly call compound domain seams (`manage_display`, `manage_instrument`, `manage_graph`, `manage_run`).
+   - Strictly enforced FastMCP tool registration ceiling at exactly 21 tools (`len(tools) <= 22`).
+
+2. **Polymorphic `live://` URIs in Unified Data Source Seam**:
+   - `get_experiment_series` and `list_source_datasets` accept both disk file paths and polymorphic `live://` URIs (`live://measurements`, `live://table`).
+   - High-speed CDP telemetry stream extraction via `LiveMeasurementAdapter` and table UI extraction via `LiveSessionAdapter`.
+   - Decoupled report generation and numerical fitting algorithms from concrete data access mechanisms.
+   - Clean fail-fast error contracts (`ValueError: Capstone is not running for live source: ...`) when Capstone is unattached or unreachable.
+
+---
+
+## 11. Quality & Verification Guardrails
+
+1. **Automated Test Coverage**: 532 unit, integration, and smoke tests across 61 test suites, executed with `uv run --no-sync pytest` (100% pass rate: 531 passed, 1 skipped).
 2. **Deterministic Offline CI**: Hardware-dependent and live GUI tests include fallback guards (`pytest.mark.skipif`), allowing CI pipelines to pass deterministically in headless environments.
 3. **Windows Process Lock Guard**: Tool and test runner commands strictly enforce `--no-sync` to avoid `os error 32` file locking when background MCP processes hold `capstone-mcp.exe`.
 4. **Strict Type Safety & Linting**: Ruff compliance across all rulesets (`ruff check src tests`) with 0 errors, and Basedpyright type validation (`basedpyright src`) with 0 errors, 0 warnings.
+
 
 

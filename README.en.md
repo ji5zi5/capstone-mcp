@@ -32,7 +32,8 @@ Use it to analyze saved `.cap` files or work with an open experiment, from senso
 | **Wireless sensors & calibration** | Bluetooth wireless sensor discovery and pairing, automated 1-point and 2-point calibration wizards, zeroing |
 | **Workbook pages & split layouts** | Add workbook page tabs, apply 2-split (H/V), 3-pane, and 4-grid layout templates automatically |
 | **One-click physics macros** | Automated execution of multi-step physics experiments, constant derivation, and report generation |
-| **Interactive lab tutor** | Interactive curriculum inspection, safety protocols, live Capstone configuration guidance, and quizzes |
+| **Live sensor telemetry** | High-speed sensor inventory and telemetry over CDP WebSocket (< 15ms), dynamic resource (`capstone://measurements/live`) |
+| **Polymorphic data seam** | Query disk archives (`.cap`, `.csv`) and live streams (`live://measurements`, `live://table`) behind a unified seam |
 
 > File analysis, UI operations, sensor settings, saving, exporting, numerical calculations, and physics suite tools have been verified with comprehensive unit and integration test suites. Physical acquisition with connected hardware should be verified in your lab environment.
 

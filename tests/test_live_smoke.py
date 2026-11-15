@@ -13,6 +13,7 @@ import psutil
 import pytest
 
 from capstone_mcp import server
+from capstone_mcp.data_sources import get_experiment_series, list_source_datasets
 from capstone_mcp.desktop import DEFAULT_DEBUG_PORT, EXECUTABLE, Capstone
 from capstone_mcp.session import UnifiedSessionManager
 
@@ -136,3 +137,23 @@ async def test_live_capstone_mcp_resource(
     assert data["debug_port"] == DEFAULT_DEBUG_PORT
     assert isinstance(data["sensors"], list)
     assert isinstance(data["measurements"], list)
+
+
+def test_live_capstone_polymorphic_seam(
+    live_capstone_process: int,
+) -> None:
+    # Given: live Capstone process with exposed CDP port
+    del live_capstone_process
+
+    # When: querying polymorphic data source seam
+    datasets = list_source_datasets("live://measurements")
+
+    # Then: datasets list must be accessible without raising
+    assert isinstance(datasets, list)
+    if datasets:
+        target = datasets[0].name
+        series = get_experiment_series("live://measurements", "time", target)
+        assert series.x.name == "time"
+        assert series.y.name == target
+        assert len(series.y.values) >= 1
+
