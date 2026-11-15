@@ -54,7 +54,8 @@ def test_click_via_app_click() -> None:
     app.click.assert_called_once_with(100, "ref:1", allow_foreground=True)
 
 
-def test_click_fallback_to_node_invoke() -> None:
+def test_click_fallback_to_node_invoke(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delattr(Capstone, "click", raising=False)
     app = Capstone()
     mock_node = MagicMock()
     app.control = MagicMock(return_value=mock_node)
@@ -85,7 +86,8 @@ def test_click_double_fallback_to_click_input() -> None:
     )
 
 
-def test_click_fallback_to_app_act() -> None:
+def test_click_fallback_to_app_act(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delattr(Capstone, "click", raising=False)
     app = Capstone()
     app.control = MagicMock(side_effect=RuntimeError("no control"))
     app.act = MagicMock()

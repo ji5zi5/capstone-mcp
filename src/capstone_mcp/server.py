@@ -1117,6 +1117,10 @@ def format_tool_error(error_message: Exception | str) -> ToolErrorPayload:
     )
 
 
+# FastMCP v1 does not expose a native middleware hook for JSON-RPC
+# CallToolRequest. This protocol wrapper intercepts CallToolRequest responses
+# to ensure error payloads strictly conform to the structured ToolErrorPayload
+# JSON schema without framework prefixes.
 _orig_call_tool_handler = MCP._mcp_server.request_handlers[CallToolRequest]  # noqa: SLF001
 
 

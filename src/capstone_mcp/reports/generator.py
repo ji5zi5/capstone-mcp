@@ -308,12 +308,26 @@ def _load_data_from_file_or_string(
     if not file_path_or_run:
         return {}, {}
 
+    # Strict check for file paths
+    is_path_like = (
+        any(
+            file_path_or_run.lower().endswith(ext)
+            for ext in [".cap", ".csv", ".tsv", ".json"]
+        )
+        or "/" in file_path_or_run
+        or "\\" in file_path_or_run
+    )
+
     path = Path(file_path_or_run)
+    if is_path_like and not path.exists():
+        msg = f"Experiment data file does not exist: {file_path_or_run}"
+        raise FileNotFoundError(msg)
+
     if path.is_file():
         suffix = path.suffix.lower()
         if suffix == ".cap":
             return _load_cap_data(path)
-        if suffix == ".csv":
+        if suffix in [".csv", ".tsv"]:
             with contextlib.suppress(Exception):
                 return _load_csv_data(path), {}
         if suffix == ".json":
@@ -662,7 +676,27 @@ def generate_report(
     final_channels = {**cur_channels, **parsed_channels}
 
     if not active_series:
-        active_series = _canonical_fallback_series(experiment_id)
+        is_sample = (
+            file_path_or_run in ("sample", None)
+            or (file_path_or_run is not None and file_path_or_run.endswith("_sample"))
+        )
+        if is_sample and experiment_id in _CANONICAL_EXPERIMENT_METADATA:
+            active_series = _canonical_fallback_series(experiment_id)
+            final_title = f"{final_title} [Sample / Demonstration]"
+        elif file_path_or_run:
+            msg = (
+                f"No experimental numeric series could be extracted from "
+                f"'{file_path_or_run}'. "
+                "Ensure data file exists and contains valid numeric columns."
+            )
+            raise ValueError(msg)
+        else:
+            msg = (
+                f"No experimental data provided for '{experiment_id}'. "
+                "Provide file_path_or_run, data_series, or pass "
+                "file_path_or_run='sample' for demonstration."
+            )
+            raise ValueError(msg)
 
     units_map = {
         "Frequency": "Hz",

@@ -48,8 +48,9 @@ def click_control(
 ) -> None:
     """Deliver a click or double-click compatible with both real Capstone and mocks."""
     if hasattr(app, "click"):
-        app.click(handle, ctrl.ref, allow_foreground=allow_foreground)
-        return
+        with contextlib.suppress(Exception):
+            app.click(handle, ctrl.ref, allow_foreground=allow_foreground)
+            return
 
     with contextlib.suppress(Exception):
         node = app.control(ctrl.ref)
@@ -139,6 +140,8 @@ def set_control_value(
         app.keys(handle, "^a{BACKSPACE}")
         if hasattr(app, "type_text"):
             app.type_text(text)
+        else:
+            app.keys(handle, text)
         app.keys(handle, "{ENTER}")
 
 

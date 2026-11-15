@@ -8,7 +8,7 @@ from _ctypes import COMError
 from contextlib import suppress
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
-from typing import TYPE_CHECKING, Final, override
+from typing import TYPE_CHECKING, Any, Final, override
 from xml.etree.ElementTree import Element, ParseError
 
 from defusedxml.common import DefusedXmlException
@@ -319,6 +319,41 @@ def release_menu_bar(app: Capstone, handle: int) -> None:
     raise AutomationError(msg)
 
 
+def _backup_clipboard() -> dict[int, Any]:
+    backup: dict[int, Any] = {}
+    if win32clipboard is None:
+        return backup
+    with suppress(Exception):
+        win32clipboard.OpenClipboard()
+        try:
+            fmt = 0
+            while True:
+                fmt = win32clipboard.EnumClipboardFormats(fmt)
+                if fmt == 0:
+                    break
+                with suppress(Exception):
+                    backup[fmt] = win32clipboard.GetClipboardData(fmt)
+        finally:
+            with suppress(Exception):
+                win32clipboard.CloseClipboard()
+    return backup
+
+
+def _restore_clipboard(backup: dict[int, Any]) -> None:
+    if not backup or win32clipboard is None:
+        return
+    with suppress(Exception):
+        win32clipboard.OpenClipboard()
+        try:
+            win32clipboard.EmptyClipboard()
+            for fmt, data in backup.items():
+                with suppress(Exception):
+                    win32clipboard.SetClipboardData(fmt, data)
+        finally:
+            with suppress(Exception):
+                win32clipboard.CloseClipboard()
+
+
 def _copied_graph(sequence: int, process_id: int) -> GraphState | None:
     if win32clipboard is None or win32process is None:
         return None
@@ -349,7 +384,7 @@ def read_graph(
     *,
     allow_foreground: bool = True,
 ) -> GraphState:
-    """Read selected graph state via native Copy Display; replaces the clipboard."""
+    """Read selected graph state via native Copy Display, preserving user clipboard."""
     if not allow_foreground:
         msg = "Graph inspection uses the native Copy Display menu."
         raise AutomationError(msg)
@@ -366,59 +401,64 @@ def read_graph(
     ):
         msg = "Native clipboard events require Windows pywin32 environment."
         raise AutomationError(msg)
-    with WindowEvents(pid, clipboard=True) as events:
-        _ = app.focus_window(handle)
-        release_menu_bar(app, handle)
-        snapshot = app.snapshot(handle, 3, 400)
-        menus = [
-            c
-            for c in snapshot.controls
-            if c.control_type == "MenuItem"
-            and c.name == "Display"
-            and c.visible
-            and c.enabled
-        ]
-        if len(menus) != 1:
-            msg = "Expected one enabled Display menu."
-            raise AutomationError(msg)
-        _ = app.control(menus[0].ref).expand()
-        try:
-            popup = events.changes.until(
-                lambda: _display_popup(app, handle),
+
+    clipboard_backup = _backup_clipboard()
+    try:
+        with WindowEvents(pid, clipboard=True) as events:
+            _ = app.focus_window(handle)
+            release_menu_bar(app, handle)
+            snapshot = app.snapshot(handle, 3, 400)
+            menus = [
+                c
+                for c in snapshot.controls
+                if c.control_type == "MenuItem"
+                and c.name == "Display"
+                and c.visible
+                and c.enabled
+            ]
+            if len(menus) != 1:
+                msg = "Expected one enabled Display menu."
+                raise AutomationError(msg)
+            _ = app.control(menus[0].ref).expand()
+            try:
+                popup = events.changes.until(
+                    lambda: _display_popup(app, handle),
+                    TRANSITION_SECONDS,
+                    description="Display menu popup window",
+                )
+            except AutomationError:
+                close_menus(app, handle)
+                raise
+            copies = [
+                c
+                for c in popup.controls
+                if c.name == "Copy Display"
+                and c.control_type == "MenuItem"
+                and c.enabled
+                and c.visible
+            ]
+            if len(copies) != 1:
+                msg = "Select exactly one graph before inspecting its analysis."
+                raise AutomationError(msg)
+            sequence = win32clipboard.GetClipboardSequenceNumber()
+            _ = app.control(copies[0].ref).invoke()
+            app.refs.clear()
+            state = events.changes.until(
+                lambda: _copied_graph(sequence, pid),
                 TRANSITION_SECONDS,
-                description="Display menu popup window",
+                description="New native graph clipboard data",
             )
-        except AutomationError:
-            close_menus(app, handle)
-            raise
-        copies = [
-            c
-            for c in popup.controls
-            if c.name == "Copy Display"
-            and c.control_type == "MenuItem"
-            and c.enabled
-            and c.visible
-        ]
-        if len(copies) != 1:
-            msg = "Select exactly one graph before inspecting its analysis."
-            raise AutomationError(msg)
-        sequence = win32clipboard.GetClipboardSequenceNumber()
-        _ = app.control(copies[0].ref).invoke()
-        app.refs.clear()
-        state = events.changes.until(
-            lambda: _copied_graph(sequence, pid),
-            TRANSITION_SECONDS,
-            description="New native graph clipboard data",
-        )
-        if any(w.handle == popup.window.handle for w in app.windows()):
-            _ = app.keys(handle, "{ESC}")
-        _ = events.changes.until(
-            lambda: True if {w.handle for w in app.windows()} == {handle} else None,
-            TRANSITION_SECONDS,
-            description="Copy Display menu dismissal",
-        )
-        release_menu_bar(app, handle)
-        return state
+            if any(w.handle == popup.window.handle for w in app.windows()):
+                _ = app.keys(handle, "{ESC}")
+            _ = events.changes.until(
+                lambda: True if {w.handle for w in app.windows()} == {handle} else None,
+                TRANSITION_SECONDS,
+                description="Copy Display menu dismissal",
+            )
+            release_menu_bar(app, handle)
+            return state
+    finally:
+        _restore_clipboard(clipboard_backup)
 
 
 def _display_popup(app: Capstone, main_handle: int) -> Snapshot | None:

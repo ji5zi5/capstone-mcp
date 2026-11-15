@@ -111,9 +111,12 @@ def _extract_sensor_info(ctrl: Control) -> WirelessSensorInfo:
     sensor_id = _parse_sensor_id(ctrl.name)
     battery = _parse_battery(ctrl.name)
     name = ctrl.name.strip()
-    is_conn = (
-        "connected" in name.lower()
-        or "connected" in ctrl.automation_id.lower()
+    lower_name = name.lower()
+    lower_auto = ctrl.automation_id.lower()
+    is_disconn = "disconnected" in lower_name or "disconnected" in lower_auto
+    is_conn = not is_disconn and (
+        bool(re.search(r"\bconnected\b", lower_name))
+        or bool(re.search(r"\bconnected\b", lower_auto))
     )
     return WirelessSensorInfo(
         sensor_id=sensor_id,

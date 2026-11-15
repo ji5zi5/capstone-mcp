@@ -41,7 +41,7 @@ class RepeatPlan(Model):
 
     process_id: Annotated[int, Field(gt=0)]
     window_handle: Annotated[int, Field(gt=0)]
-    debug_port: Annotated[int, Field(ge=1024, le=65535)] = 9223
+    debug_port: Annotated[int, Field(ge=1024, le=65535)] = 9222
     repetitions: Annotated[int, Field(ge=1, le=100)] = 1
     duration_seconds: Annotated[FiniteFloat, Field(gt=0, le=3600)]
     pause_seconds: Annotated[FiniteFloat, Field(ge=0, le=3600)] = 0

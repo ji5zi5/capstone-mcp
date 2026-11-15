@@ -2,6 +2,7 @@
 """Capstone-scoped Windows UI Automation adapter."""
 
 import ctypes
+import os
 from collections.abc import Collection
 from io import BytesIO
 from itertools import islice
@@ -13,7 +14,7 @@ import psutil
 import win32gui
 import win32process
 from PIL import Image, ImageGrab
-from pywinauto import Application, Desktop, mouse
+from pywinauto import Application, Desktop, keyboard, mouse
 from pywinauto.application import ProcessNotFoundError, process_module
 from pywinauto.controls.hwndwrapper import HwndWrapper
 from pywinauto.controls.uiawrapper import UIAWrapper
@@ -24,7 +25,25 @@ from capstone_mcp.models import Action, Bounds, Control, Result, Snapshot, Windo
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-EXECUTABLE: Final = Path("C:/Program Files/PASCO scientific/Capstone/Capstone.exe")
+
+def find_capstone_executable() -> Path:
+    """Resolve Capstone executable from environment, standard paths, or fallback."""
+    if env_path := os.environ.get("CAPSTONE_EXECUTABLE"):
+        p = Path(env_path)
+        if p.exists():
+            return p
+    candidates = [
+        Path("C:/Program Files/PASCO scientific/Capstone/Capstone.exe"),
+        Path("C:/Program Files (x86)/PASCO scientific/Capstone/Capstone.exe"),
+        Path("D:/Program Files/PASCO scientific/Capstone/Capstone.exe"),
+    ]
+    for c in candidates:
+        if c.exists():
+            return c
+    return candidates[0]
+
+
+EXECUTABLE: Final = find_capstone_executable()
 DEFAULT_DEBUG_PORT: Final = 9222
 CHROMIUM_DEBUG_FLAGS: Final = (
     f"--remote-debugging-port={DEFAULT_DEBUG_PORT}",
@@ -373,6 +392,21 @@ class Capstone:
         _ = self.focus_window(handle)
         mouse.click(button=button, coords=(x, y))
         return Result(detail=f"Clicked at ({x}, {y}) with {button} button.")
+
+    def click(
+        self,
+        handle: int,
+        ref: str,
+        *,
+        allow_foreground: bool = True,
+    ) -> Result:
+        """Click a control reference; handle parameter accepted for compatibility."""
+        del handle
+        return self.act(ref, Action.INVOKE, allow_foreground=allow_foreground)
+
+    def type_text(self, text: str) -> None:
+        """Send virtual keyboard text to the active focused control."""
+        keyboard.send_keys(text, with_spaces=True)
 
     def screenshot(
         self, handle: int, *, scale: float = 1.0,
