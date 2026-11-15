@@ -1,7 +1,10 @@
 [project]
 name = "capstone-mcp"
-version = "0.1.0"
+version = "0.1.1"
 description = "Local Windows UI automation MCP for PASCO Capstone"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
 requires-python = ">=3.12"
 dependencies = [
     "defusedxml>=0.7.1,<0.8",

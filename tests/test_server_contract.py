@@ -2,6 +2,7 @@
 """Regression contract test for capstone_mcp.server public exports."""
 
 import json
+from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -134,6 +135,38 @@ def test_systematic_tool_annotations() -> None:
         tool = tools[name]
         assert tool.annotations is not None, f"Tool {name} missing annotations"
         assert tool.annotations.destructiveHint is False, f"Tool {name} expected destructiveHint=False"
+
+
+    # 4. Enforce OpenAI / m8ven directory compliance: all four hints must be explicit booleans
+    for name, tool in tools.items():
+        assert tool.annotations is not None, f"Tool {name} missing annotations"
+        assert isinstance(
+            tool.annotations.readOnlyHint, bool,
+        ), f"Tool {name} missing boolean readOnlyHint"
+        assert isinstance(
+            tool.annotations.destructiveHint, bool,
+        ), f"Tool {name} missing boolean destructiveHint"
+        assert isinstance(
+            tool.annotations.idempotentHint, bool,
+        ), f"Tool {name} missing boolean idempotentHint"
+        assert isinstance(
+            tool.annotations.openWorldHint, bool,
+        ), f"Tool {name} missing boolean openWorldHint"
+
+
+def test_license_file_and_metadata_present() -> None:
+    """Verify LICENSE file and pyproject.toml license metadata exist."""
+    repo_root = Path(__file__).resolve().parent.parent
+    license_file = repo_root / "LICENSE"
+    assert license_file.exists(), "LICENSE file must exist in repository root"
+    content = license_file.read_text(encoding="utf-8")
+    assert "MIT License" in content
+    assert "Capstone MCP contributors" in content
+
+    pyproject_file = repo_root / "pyproject.toml"
+    pyproject_content = pyproject_file.read_text(encoding="utf-8")
+    assert 'license = "MIT"' in pyproject_content
+    assert 'license-files = ["LICENSE"]' in pyproject_content
 
 
 @pytest.mark.anyio
