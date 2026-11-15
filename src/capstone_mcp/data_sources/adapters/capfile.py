@@ -145,7 +145,9 @@ def read_capfile_all_series(
 
     cfg = read_cap_configuration(path)
     for iface in cfg.hardware_interfaces:
-        channels[f"Interface_{iface.euid}"] = iface.name or "PASCO Interface"
+        channels[f"Interface_{iface.euid}"] = (
+            iface.interface_type or iface.subtype or "PASCO Interface"
+        )
 
     return series, channels
 

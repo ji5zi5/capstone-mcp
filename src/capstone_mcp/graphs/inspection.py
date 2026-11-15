@@ -323,35 +323,37 @@ def _backup_clipboard() -> dict[int, Any]:
     backup: dict[int, Any] = {}
     if win32clipboard is None:
         return backup
+    clip: Any = win32clipboard
     with suppress(Exception):
-        win32clipboard.OpenClipboard()
+        clip.OpenClipboard()
         try:
             fmt = 0
             while True:
-                fmt = win32clipboard.EnumClipboardFormats(fmt)
+                fmt = clip.EnumClipboardFormats(fmt)
                 if fmt == 0:
                     break
                 with suppress(Exception):
-                    backup[fmt] = win32clipboard.GetClipboardData(fmt)
+                    backup[fmt] = clip.GetClipboardData(fmt)
         finally:
             with suppress(Exception):
-                win32clipboard.CloseClipboard()
+                clip.CloseClipboard()
     return backup
 
 
 def _restore_clipboard(backup: dict[int, Any]) -> None:
     if not backup or win32clipboard is None:
         return
+    clip: Any = win32clipboard
     with suppress(Exception):
-        win32clipboard.OpenClipboard()
+        clip.OpenClipboard()
         try:
-            win32clipboard.EmptyClipboard()
+            clip.EmptyClipboard()
             for fmt, data in backup.items():
                 with suppress(Exception):
-                    win32clipboard.SetClipboardData(fmt, data)
+                    clip.SetClipboardData(fmt, data)
         finally:
             with suppress(Exception):
-                win32clipboard.CloseClipboard()
+                clip.CloseClipboard()
 
 
 def _copied_graph(sequence: int, process_id: int) -> GraphState | None:

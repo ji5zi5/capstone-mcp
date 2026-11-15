@@ -14,11 +14,13 @@ import psutil
 import win32gui
 import win32process
 from PIL import Image, ImageGrab
-from pywinauto import Application, Desktop, keyboard, mouse
+from pywinauto import Application, Desktop
 from pywinauto.application import ProcessNotFoundError, process_module
 from pywinauto.controls.hwndwrapper import HwndWrapper
 from pywinauto.controls.uiawrapper import UIAWrapper
 from pywinauto.findwindows import find_windows
+from pywinauto.keyboard import send_keys as keyboard_send_keys
+from pywinauto.mouse import click as mouse_click
 
 from capstone_mcp.models import Action, Bounds, Control, Result, Snapshot, Window
 
@@ -390,7 +392,7 @@ class Capstone:
             msg = "Coordinate clicking uses mouse input; set allow_foreground=true."
             raise AutomationError(msg)
         _ = self.focus_window(handle)
-        mouse.click(button=button, coords=(x, y))
+        mouse_click(button=button, coords=(x, y))
         return Result(detail=f"Clicked at ({x}, {y}) with {button} button.")
 
     def click(
@@ -406,7 +408,7 @@ class Capstone:
 
     def type_text(self, text: str) -> None:
         """Send virtual keyboard text to the active focused control."""
-        keyboard.send_keys(text, with_spaces=True)
+        keyboard_send_keys(text, with_spaces=True)
 
     def screenshot(
         self, handle: int, *, scale: float = 1.0,

@@ -6,7 +6,7 @@ import re
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Final, Literal
+from typing import Any, Final, Literal
 
 from pydantic import ValidationError
 
@@ -60,7 +60,7 @@ RUN_NAME_PATTERN: Final = re.compile(r"run\s*#?\s*\d+", re.IGNORECASE)
 def _rename_via_inline_editor(
     app: Capstone,
     handle: int,
-    node: object,
+    node: Any,  # noqa: ANN401
     new_name: str,
 ) -> None:
     """Fallback inline renaming via F2 keystrokes."""
@@ -203,7 +203,8 @@ def delete_run(app: Capstone, request: DeleteRunRequest) -> DeleteRunResult:
     with contextlib.suppress(Exception):
         node = app.control(target_control.ref)
         if hasattr(node, "select"):
-            node.select()
+            select_fn: Any = getattr(node, "select")  # noqa: B009
+            select_fn()
 
     click_control(
         app,
@@ -303,16 +304,28 @@ def _get_control_visibility_state(app: Capstone, ctrl: Control) -> bool:
 
     with contextlib.suppress(AttributeError, RuntimeError):
         if hasattr(node, "iface_toggle") and node.iface_toggle:
-            return bool(node.iface_toggle.ToggleState == 1)
+            toggle = node.iface_toggle
+            v = getattr(toggle, "ToggleState", None)
+            if isinstance(v, int):
+                return bool(v == 1)
+            v_curr = getattr(toggle, "CurrentToggleState", None)
+            if isinstance(v_curr, int):
+                return bool(v_curr == 1)
 
     with contextlib.suppress(AttributeError, RuntimeError):
         if hasattr(node, "iface_selection_item") and node.iface_selection_item:
-            return bool(node.iface_selection_item.IsSelected)
+            sel = node.iface_selection_item
+            v_sel = getattr(sel, "IsSelected", None)
+            if isinstance(v_sel, bool):
+                return v_sel
+            v_curr_sel = getattr(sel, "CurrentIsSelected", None)
+            if isinstance(v_curr_sel, bool):
+                return v_curr_sel
 
     return False
 
 
-def _try_toggle_or_select(node: object, visible: bool) -> bool:  # noqa: FBT001
+def _try_toggle_or_select(node: Any, visible: bool) -> bool:  # noqa: ANN401, FBT001
     """Attempt pattern-based state changes; return True on success."""
     if hasattr(node, "iface_toggle") and node.iface_toggle:
         with contextlib.suppress(AttributeError, RuntimeError):
@@ -531,7 +544,7 @@ def _deltas(
         )
         changes.append(_Delta(provenance=provenance, dataset=dataset))
     removed = [
-        DatasetIdentity(source_euid=source, dataset_id=identifier)
+        DatasetIdentity(euid=source, name=str(identifier))
         for source, identifier in sorted(old.keys() - current.keys())
     ]
     return changes, removed

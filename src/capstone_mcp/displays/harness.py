@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import contextlib
-from typing import Final
+from typing import Any, Final
 
 from capstone_mcp.desktop import AutomationError, Capstone
 from capstone_mcp.models import Action, Bounds, Control
@@ -63,7 +63,8 @@ def click_control(
             return
 
     with contextlib.suppress(Exception):
-        app.act(handle, Action.INVOKE, ref=ctrl.ref, allow_foreground=allow_foreground)
+        app_act: Any = getattr(app, "act")  # noqa: B009
+        app_act(handle, Action.INVOKE, ref=ctrl.ref, allow_foreground=allow_foreground)
         return
 
     app.act(ctrl.ref, Action.INVOKE, allow_foreground=allow_foreground)
@@ -108,14 +109,16 @@ def drag_control(
         app.focus_window(handle)
 
     if hasattr(app, "drag"):
-        app.drag(handle, source.ref, target.ref, allow_foreground=allow_foreground)
+        drag_fn: Any = getattr(app, "drag")  # noqa: B009
+        drag_fn(handle, source.ref, target.ref, allow_foreground=allow_foreground)
         return
 
     with contextlib.suppress(Exception):
         node = app.control(source.ref)
         if hasattr(node, "drag_mouse"):
             dst_coords = center_coords(target.bounds)
-            node.drag_mouse(dst_coords)
+            drag_mouse_fn: Any = getattr(node, "drag_mouse")  # noqa: B009
+            drag_mouse_fn(dst_coords)
             return
 
     # Fallback to double-click placement if drag is unhandled by mock/backend

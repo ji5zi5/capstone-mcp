@@ -45,8 +45,6 @@ convention = "google"
 
 [tool.basedpyright]
 typeCheckingMode = "standard"
-reportAttributeAccessIssue = "none"
-reportCallIssue = "none"
 stubPath = "typings"
 venvPath = "."
 venv = ".venv"

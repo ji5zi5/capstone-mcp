@@ -56,7 +56,13 @@ def _is_drawer_open(app: Capstone, toggle_ctrl: Control) -> bool:
     node = app.control(toggle_ctrl.ref)
     with contextlib.suppress(Exception):
         if hasattr(node, "iface_toggle") and node.iface_toggle:
-            return bool(node.iface_toggle.ToggleState == 1)
+            toggle = node.iface_toggle
+            v = getattr(toggle, "ToggleState", None)
+            if isinstance(v, int):
+                return bool(v == 1)
+            v_curr = getattr(toggle, "CurrentToggleState", None)
+            if isinstance(v_curr, int):
+                return bool(v_curr == 1)
     return False
 
 

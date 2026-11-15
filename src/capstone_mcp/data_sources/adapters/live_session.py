@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 from typing import TYPE_CHECKING
 
 from capstone_mcp.data_sources.models import (
@@ -103,5 +104,5 @@ class LiveSessionAdapter:
             raise ValueError(msg)
         series = read_live_table_series(self.table_result, x_name, y_name)
         if run_id is not None:
-            series.run_id = run_id
+            return dataclasses.replace(series, run_id=run_id)
         return series

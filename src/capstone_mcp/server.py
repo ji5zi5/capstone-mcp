@@ -636,7 +636,14 @@ async def capstone_active_runs_resource() -> str:
     runs_info = {
         "process_id": WORKER.process_id,
         "active_jobs": [
-            {"job_id": jid, "state": job.observe().text}
+            {
+                "job_id": jid,
+                "state": (
+                    job.result.result().state
+                    if job.result.done()
+                    else getattr(job.backend.observe(), "text", "running")
+                ),
+            }
             for jid, job in JOBS.jobs.items()
         ],
     }
@@ -1126,10 +1133,15 @@ _orig_call_tool_handler = MCP._mcp_server.request_handlers[CallToolRequest]  # n
 
 async def _structured_call_tool_handler(req: CallToolRequest) -> ServerResult:
     res = await _orig_call_tool_handler(req)
-    if isinstance(res, ServerResult) and res.root.isError:
+    if (
+        isinstance(res, ServerResult)
+        and isinstance(res.root, CallToolResult)
+        and res.root.isError
+    ):
+        first_content = res.root.content[0] if res.root.content else None
         raw_text = (
-            res.root.content[0].text
-            if res.root.content and hasattr(res.root.content[0], "text")
+            first_content.text
+            if isinstance(first_content, TextContent)
             else ""
         )
         payload = format_tool_error(raw_text)
