@@ -2,14 +2,17 @@
 """Tests for the unified ExperimentDataSource seam and adapters."""
 
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 import pytest
 
+from capstone_mcp.bridge import BridgeError, NativeInventory
 from capstone_mcp.data_sources import (
     CapArchiveAdapter,
     CsvTableAdapter,
     DataSeries,
     ExperimentSeries,
+    LiveMeasurementAdapter,
     LiveSessionAdapter,
     get_experiment_series,
     list_source_datasets,
@@ -122,4 +125,104 @@ def test_cap_file_adapter_real_download_if_present() -> None:
         assert len(datasets) > 0
         series = adapter.get_series("부피", "압력")
         assert series.x is not None
+
+
+def test_live_measurement_adapter_class() -> None:
+    """Verify LiveMeasurementAdapter class interface directly."""
+    mock_inv = NativeInventory(
+        measurements=[{"name": "Voltage", "units": "V", "euid": "euid_v"}],
+        sensors=[],
+    )
+    session = MagicMock()
+    session.read_live_inventory.return_value = mock_inv
+    session.read_live_measurement.return_value = 3.3
+    adapter = LiveMeasurementAdapter(session=session)
+    datasets = adapter.list_datasets()
+    assert len(datasets) == 1
+    assert datasets[0].name == "Voltage"
+    series = adapter.get_series("time", "Voltage")
+    assert series.y.clean_floats() == [3.3]
+
+
+def test_list_source_datasets_live_measurements_mocked() -> None:
+    """Verify list_source_datasets queries live hardware inventory."""
+    mock_inv = NativeInventory(
+        measurements=[
+            {"name": "Force", "units": "N", "euid": "euid_force"},
+            {"name": "Position", "units": "m", "euid": "euid_pos"},
+        ],
+        sensors=[],
+    )
+    with patch(
+        "capstone_mcp.data_sources.adapters.live_telemetry.UnifiedSessionManager",
+    ) as mock_cls:
+        session_inst = MagicMock()
+        session_inst.read_live_inventory.return_value = mock_inv
+        mock_cls.return_value = session_inst
+
+        datasets = list_source_datasets("live://measurements")
+        assert len(datasets) == 2
+        names = [d.name for d in datasets]
+        assert "Force" in names
+        assert "Position" in names
+
+
+def test_get_experiment_series_live_measurements_mocked() -> None:
+    """Verify get_experiment_series reads paired live telemetry."""
+    mock_inv = NativeInventory(
+        measurements=[
+            {"name": "Force", "units": "N", "euid": "euid_force"},
+        ],
+        sensors=[],
+    )
+    with patch(
+        "capstone_mcp.data_sources.adapters.live_telemetry.UnifiedSessionManager",
+    ) as mock_cls:
+        session_inst = MagicMock()
+        session_inst.read_live_inventory.return_value = mock_inv
+        session_inst.read_live_measurement.return_value = 9.81
+        mock_cls.return_value = session_inst
+
+        series = get_experiment_series("live://measurements", "time", "force")
+        assert isinstance(series, ExperimentSeries)
+        assert series.x.name == "time"
+        assert series.x.clean_floats() == [0.0]
+        assert series.y.name == "force"
+        assert series.y.clean_floats() == [9.81]
+        assert series.metadata["uri"] == "live://measurements"
+
+
+def test_live_measurements_unattached_raises_clean_error() -> None:
+    """Verify clean ValueError is raised when live Capstone is unreachable."""
+    with patch(
+        "capstone_mcp.data_sources.adapters.live_telemetry.UnifiedSessionManager",
+    ) as mock_cls:
+        session_inst = MagicMock()
+        session_inst.read_live_inventory.side_effect = BridgeError("Connection refused")
+        mock_cls.return_value = session_inst
+
+        with pytest.raises(ValueError, match="Capstone is not running for live source"):
+            list_source_datasets("live://measurements")
+
+        with pytest.raises(ValueError, match="Capstone is not running for live source"):
+            get_experiment_series("live://measurements", "time", "force")
+
+
+def test_live_table_adapter_unattached_raises_clean_error() -> None:
+    """Verify clean ValueError is raised when live table is unattached."""
+    with pytest.raises(ValueError, match="Capstone is not running for live source: live://table"):
+        list_source_datasets("live://table")
+
+    with pytest.raises(ValueError, match="Capstone is not running for live source: live://table"):
+        get_experiment_series("live://table", "time", "force")
+
+
+def test_unsupported_live_source_raises() -> None:
+    """Verify unsupported live:// URI raises ValueError."""
+    with pytest.raises(ValueError, match="Unsupported live source URI: live://unknown"):
+        list_source_datasets("live://unknown")
+
+    with pytest.raises(ValueError, match="Unsupported live source URI: live://unknown"):
+        get_experiment_series("live://unknown", "time", "force")
+
 

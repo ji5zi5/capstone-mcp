@@ -13,11 +13,14 @@ from capstone_mcp.data_sources.adapters.csv_file import (
     read_csv_series,
 )
 from capstone_mcp.data_sources.adapters.live_session import (
+    LiveSessionAdapter,
     read_live_table_datasets,
     read_live_table_series,
 )
+from capstone_mcp.data_sources.adapters.live_telemetry import (
+    LiveMeasurementAdapter,
+)
 from capstone_mcp.data_sources.models import DatasetMetadata, ExperimentSeries
-from capstone_mcp.displays import ReadTableResult
 
 
 class DataSourceAdapter(Protocol):
@@ -80,31 +83,12 @@ class CsvTableAdapter:
         return read_csv_series(self.path, x_name, y_name)
 
 
-class LiveSessionAdapter:
-    """Adapter wrapping live Capstone desktop table displays."""
-
-    def __init__(self, result: ReadTableResult) -> None:
-        """Initialize adapter with live ReadTableResult."""
-        self.result = result
-
-    def list_datasets(self) -> list[DatasetMetadata]:
-        """List all column datasets in live table display."""
-        return read_live_table_datasets(self.result)
-
-    def get_series(
-        self,
-        x_name: str,
-        y_name: str,
-        run_id: str | None = None,
-    ) -> ExperimentSeries:
-        """Extract paired x and y series from live table display."""
-        del run_id
-        return read_live_table_series(self.result, x_name, y_name)
-
-
 __all__ = [
     "CapArchiveAdapter",
     "CsvTableAdapter",
     "DataSourceAdapter",
+    "LiveMeasurementAdapter",
     "LiveSessionAdapter",
+    "read_live_table_datasets",
+    "read_live_table_series",
 ]

@@ -1,12 +1,18 @@
 # Copyright 2026 Capstone MCP contributors.
 """Adapter for reading data series from live Capstone UI table displays."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from capstone_mcp.data_sources.models import (
     DataSeries,
     DatasetMetadata,
     ExperimentSeries,
 )
-from capstone_mcp.displays import ReadTableResult
+
+if TYPE_CHECKING:
+    from capstone_mcp.displays import ReadTableResult
 
 
 def read_live_table_datasets(result: ReadTableResult) -> list[DatasetMetadata]:
@@ -63,3 +69,39 @@ def read_live_table_series(
         run_id=None,
         metadata={"source": "live_session", "format": "table_display"},
     )
+
+
+class LiveSessionAdapter:
+    """Adapter for querying data from live active Capstone table UI display."""
+
+    def __init__(self, table_result: ReadTableResult | None = None) -> None:
+        """Initialize adapter with optional captured ReadTableResult."""
+        self.table_result = table_result
+
+    def list_datasets(self) -> list[DatasetMetadata]:
+        """Return dataset metadata from active table display."""
+        if self.table_result is None:
+            msg = (
+                "Capstone is not running for live source: "
+                "live://table (no active table display captured)"
+            )
+            raise ValueError(msg)
+        return read_live_table_datasets(self.table_result)
+
+    def get_series(
+        self,
+        x_name: str,
+        y_name: str,
+        run_id: str | None = None,
+    ) -> ExperimentSeries:
+        """Extract paired x and y DataSeries from active table display."""
+        if self.table_result is None:
+            msg = (
+                "Capstone is not running for live source: "
+                "live://table (no active table display captured)"
+            )
+            raise ValueError(msg)
+        series = read_live_table_series(self.table_result, x_name, y_name)
+        if run_id is not None:
+            series.run_id = run_id
+        return series

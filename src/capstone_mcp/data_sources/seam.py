@@ -11,6 +11,8 @@ from capstone_mcp.data_sources.adapters.csv_file import (
     read_csv_datasets,
     read_csv_series,
 )
+from capstone_mcp.data_sources.adapters.live_session import LiveSessionAdapter
+from capstone_mcp.data_sources.adapters.live_telemetry import LiveMeasurementAdapter
 from capstone_mcp.data_sources.models import DatasetMetadata, ExperimentSeries
 
 
@@ -18,15 +20,23 @@ def list_source_datasets(source: str | Path) -> list[DatasetMetadata]:
     """List all available datasets and their metadata from any experiment source.
 
     Args:
-        source: Path to experiment archive (.cap) or table (.csv).
+        source: Path to experiment archive (.cap), table (.csv), or live URI.
 
     Returns:
         List of DatasetMetadata objects.
 
     Raises:
-        FileNotFoundError: If source path does not exist.
-        ValueError: If file format is unsupported.
+        FileNotFoundError: If source file does not exist.
+        ValueError: If file format or live URI is unsupported.
     """
+    if isinstance(source, str) and source.startswith("live://"):
+        if source == "live://measurements":
+            return LiveMeasurementAdapter().list_datasets()
+        if source == "live://table":
+            return LiveSessionAdapter().list_datasets()
+        msg = f"Unsupported live source URI: {source}"
+        raise ValueError(msg)
+
     path = Path(source)
     if not path.exists():
         msg = f"Data source file does not exist: {path}"
@@ -51,7 +61,7 @@ def get_experiment_series(
     """Retrieve paired X and Y series from any supported experiment source.
 
     Args:
-        source: Path to experiment source file (.cap or .csv).
+        source: Path to experiment source file (.cap or .csv) or live URI.
         x_name: Target independent variable column/signal name.
         y_name: Target dependent variable column/signal name.
         run_id: Optional specific Run ID filter (e.g. 'Run #1').
@@ -63,6 +73,14 @@ def get_experiment_series(
         FileNotFoundError: If source does not exist.
         ValueError: If format is unsupported or series cannot be extracted.
     """
+    if isinstance(source, str) and source.startswith("live://"):
+        if source == "live://measurements":
+            return LiveMeasurementAdapter().get_series(x_name, y_name, run_id=run_id)
+        if source == "live://table":
+            return LiveSessionAdapter().get_series(x_name, y_name, run_id=run_id)
+        msg = f"Unsupported live source URI: {source}"
+        raise ValueError(msg)
+
     path = Path(source)
     if not path.exists():
         msg = f"Data source file does not exist: {path}"

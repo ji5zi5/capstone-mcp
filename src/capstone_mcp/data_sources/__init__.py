@@ -5,6 +5,7 @@ from capstone_mcp.data_sources.adapters import (
     CapArchiveAdapter,
     CsvTableAdapter,
     DataSourceAdapter,
+    LiveMeasurementAdapter,
     LiveSessionAdapter,
 )
 from capstone_mcp.data_sources.models import (
@@ -24,6 +25,7 @@ __all__ = [
     "DataSourceAdapter",
     "DatasetMetadata",
     "ExperimentSeries",
+    "LiveMeasurementAdapter",
     "LiveSessionAdapter",
     "get_experiment_series",
     "list_source_datasets",
