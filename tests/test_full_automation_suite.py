@@ -63,7 +63,7 @@ async def test_compound_management_tools_registered_on_server() -> None:
 def test_dispatch_table_and_digits_operations() -> None:
     desktop = NativeDesktop()
 
-    with patch("capstone_mcp.native_loop.manage_display") as mock_md:
+    with patch("capstone_mcp.native.runtime.manage_display") as mock_md:
         mock_md.return_value = DisplayResult(
             action=DisplayAction.CREATE_TABLE,
             create_table=CreateTableResult(
@@ -76,7 +76,7 @@ def test_dispatch_table_and_digits_operations() -> None:
         assert res["created"] is True
         mock_md.assert_called_once()
 
-    with patch("capstone_mcp.native_loop.manage_display") as mock_md:
+    with patch("capstone_mcp.native.runtime.manage_display") as mock_md:
         mock_md.return_value = DisplayResult(
             action=DisplayAction.SET_TABLE_COLUMNS,
             set_table_columns=SetTableColumnsResult(
@@ -89,7 +89,7 @@ def test_dispatch_table_and_digits_operations() -> None:
         assert res["column_count"] == 1
         mock_md.assert_called_once()
 
-    with patch("capstone_mcp.native_loop.manage_display") as mock_md:
+    with patch("capstone_mcp.native.runtime.manage_display") as mock_md:
         mock_md.return_value = DisplayResult(
             action=DisplayAction.READ_TABLE,
             read_table=ReadTableResult(
@@ -101,7 +101,7 @@ def test_dispatch_table_and_digits_operations() -> None:
         assert res["columns"] == ["Time"]
         mock_md.assert_called_once()
 
-    with patch("capstone_mcp.native_loop.manage_display") as mock_md:
+    with patch("capstone_mcp.native.runtime.manage_display") as mock_md:
         mock_md.return_value = DisplayResult(
             action=DisplayAction.CREATE_DIGITS,
             create_digits=CreateDigitsResult(
@@ -118,7 +118,7 @@ def test_dispatch_table_and_digits_operations() -> None:
 def test_dispatch_graph_toolbox_and_visibility() -> None:
     desktop = NativeDesktop()
 
-    with patch("capstone_mcp.native_loop.toggle_graph_statistics") as mock_tgs:
+    with patch("capstone_mcp.native.runtime.toggle_graph_statistics") as mock_tgs:
         mock_tgs.return_value = ToggleGraphStatisticsResult(visible=True)
         res = desktop.dispatch(NativeRequest(
             operation="toggle_graph_statistics", enable=True,
@@ -126,13 +126,13 @@ def test_dispatch_graph_toolbox_and_visibility() -> None:
         assert res["visible"] is True
         mock_tgs.assert_called_once()
 
-    with patch("capstone_mcp.native_loop.measure_graph_area") as mock_mga:
+    with patch("capstone_mcp.native.runtime.measure_graph_area") as mock_mga:
         mock_mga.return_value = MeasureGraphAreaResult(visible=True, area=42.0)
         res = desktop.dispatch(NativeRequest(operation="measure_graph_area"))
         assert res["area"] == 42.0
         mock_mga.assert_called_once()
 
-    with patch("capstone_mcp.native_loop.graph_delta") as mock_gd:
+    with patch("capstone_mcp.native.runtime.graph_delta") as mock_gd:
         mock_gd.return_value = GraphDeltaResult(
             active=True, delta_x=1.0, delta_y=2.0,
         )
@@ -140,7 +140,7 @@ def test_dispatch_graph_toolbox_and_visibility() -> None:
         assert res["delta_x"] == 1.0
         mock_gd.assert_called_once()
 
-    with patch("capstone_mcp.native_loop.set_run_visibility") as mock_srv:
+    with patch("capstone_mcp.native.runtime.set_run_visibility") as mock_srv:
         mock_srv.return_value = SetRunVisibilityResult(
             visible_runs=["Run #1"], target_displays=[], detail="",
         )
@@ -154,7 +154,7 @@ def test_dispatch_graph_toolbox_and_visibility() -> None:
 def test_dispatch_signal_generator_and_scope_fft() -> None:
     desktop = NativeDesktop()
 
-    with patch("capstone_mcp.native_loop.manage_instrument") as mock_mi:
+    with patch("capstone_mcp.native.runtime.manage_instrument") as mock_mi:
         mock_mi.return_value = InstrumentResult(
             action=InstrumentAction.CONFIGURE_SIGNAL_GENERATOR,
             configure_signal_generator=SetSignalGeneratorResult(
@@ -174,7 +174,7 @@ def test_dispatch_signal_generator_and_scope_fft() -> None:
         assert res["waveform"] == "Sine"
         mock_mi.assert_called_once()
 
-    with patch("capstone_mcp.native_loop.manage_instrument") as mock_mi:
+    with patch("capstone_mcp.native.runtime.manage_instrument") as mock_mi:
         mock_mi.return_value = InstrumentResult(
             action=InstrumentAction.CONFIGURE_SIGNAL_GENERATOR,
             configure_signal_generator=SignalGeneratorStatusResult(
@@ -189,7 +189,7 @@ def test_dispatch_signal_generator_and_scope_fft() -> None:
         assert res["enabled"] is True
         mock_mi.assert_called_once()
 
-    with patch("capstone_mcp.native_loop.manage_display") as mock_md:
+    with patch("capstone_mcp.native.runtime.manage_display") as mock_md:
         mock_md.return_value = DisplayResult(
             action=DisplayAction.CREATE_SCOPE,
             create_scope=CreateScopeResult(
@@ -206,7 +206,7 @@ def test_dispatch_signal_generator_and_scope_fft() -> None:
         assert res["display_id"] == "Scope_1"
         mock_md.assert_called_once()
 
-    with patch("capstone_mcp.native_loop.manage_display") as mock_md:
+    with patch("capstone_mcp.native.runtime.manage_display") as mock_md:
         mock_md.return_value = DisplayResult(
             action=DisplayAction.SET_SCOPE_TRIGGER,
             set_scope_trigger=ScopeTriggerResult(
@@ -225,7 +225,7 @@ def test_dispatch_signal_generator_and_scope_fft() -> None:
         assert res["trigger_level"] == 0.5
         mock_md.assert_called_once()
 
-    with patch("capstone_mcp.native_loop.manage_display") as mock_md:
+    with patch("capstone_mcp.native.runtime.manage_display") as mock_md:
         mock_md.return_value = DisplayResult(
             action=DisplayAction.CREATE_FFT,
             create_fft=CreateFftResult(
@@ -237,7 +237,7 @@ def test_dispatch_signal_generator_and_scope_fft() -> None:
         assert res["display_id"] == "FFT_1"
         mock_md.assert_called_once()
 
-    with patch("capstone_mcp.native_loop.manage_display") as mock_md:
+    with patch("capstone_mcp.native.runtime.manage_display") as mock_md:
         mock_md.return_value = DisplayResult(
             action=DisplayAction.READ_FFT_PEAKS,
             read_fft_peaks=ReadFftPeaksResult(
@@ -259,7 +259,7 @@ def test_dispatch_signal_generator_and_scope_fft() -> None:
 def test_dispatch_triggers_calibration_and_layout() -> None:
     desktop = NativeDesktop()
 
-    with patch("capstone_mcp.native_loop.manage_instrument") as mock_mi:
+    with patch("capstone_mcp.native.runtime.manage_instrument") as mock_mi:
         mock_mi.return_value = InstrumentResult(
             action=InstrumentAction.SET_RECORDING_CONDITION,
             set_recording_condition=SetRecordingConditionResult(),
@@ -268,7 +268,7 @@ def test_dispatch_triggers_calibration_and_layout() -> None:
         assert res["verified"] is True
         mock_mi.assert_called_once()
 
-    with patch("capstone_mcp.native_loop.manage_instrument") as mock_mi:
+    with patch("capstone_mcp.native.runtime.manage_instrument") as mock_mi:
         mock_mi.return_value = InstrumentResult(
             action=InstrumentAction.SET_SAMPLING_MODE,
             set_sampling_mode=SetSamplingModeResult(mode="keep_sample"),
@@ -282,7 +282,7 @@ def test_dispatch_triggers_calibration_and_layout() -> None:
         assert res["mode"] == "keep_sample"
         mock_mi.assert_called_once()
 
-    with patch("capstone_mcp.native_loop.manage_instrument") as mock_mi:
+    with patch("capstone_mcp.native.runtime.manage_instrument") as mock_mi:
         mock_mi.return_value = InstrumentResult(
             action=InstrumentAction.KEEP_SAMPLE,
             keep_sample=KeepSampleResult(recorded_value=3.14),
@@ -296,7 +296,7 @@ def test_dispatch_triggers_calibration_and_layout() -> None:
         assert res["recorded_value"] == 3.14
         mock_mi.assert_called_once()
 
-    with patch("capstone_mcp.native_loop.manage_instrument") as mock_mi:
+    with patch("capstone_mcp.native.runtime.manage_instrument") as mock_mi:
         mock_mi.return_value = InstrumentResult(
             action=InstrumentAction.SCAN_WIRELESS,
             scan_wireless=ScanWirelessSensorsResult(sensors=[], count=0),
@@ -305,7 +305,7 @@ def test_dispatch_triggers_calibration_and_layout() -> None:
         assert res["count"] == 0
         mock_mi.assert_called_once()
 
-    with patch("capstone_mcp.native_loop.manage_instrument") as mock_mi:
+    with patch("capstone_mcp.native.runtime.manage_instrument") as mock_mi:
         mock_mi.return_value = InstrumentResult(
             action=InstrumentAction.CONNECT_WIRELESS,
             connect_wireless=ConnectWirelessSensorResult(
@@ -322,7 +322,7 @@ def test_dispatch_triggers_calibration_and_layout() -> None:
         assert res["sensor_id"] == "Sensor_1"
         mock_mi.assert_called_once()
 
-    with patch("capstone_mcp.native_loop.manage_instrument") as mock_mi:
+    with patch("capstone_mcp.native.runtime.manage_instrument") as mock_mi:
         mock_mi.return_value = InstrumentResult(
             action=InstrumentAction.CALIBRATE_SENSOR,
             calibrate_sensor=CalibrateSensorResult(
@@ -341,7 +341,7 @@ def test_dispatch_triggers_calibration_and_layout() -> None:
         assert res["sensor_name"] == "Force"
         mock_mi.assert_called_once()
 
-    with patch("capstone_mcp.native_loop.manage_display") as mock_md:
+    with patch("capstone_mcp.native.runtime.manage_display") as mock_md:
         mock_md.return_value = DisplayResult(
             action=DisplayAction.ADD_PAGE,
             add_page=AddPageResult(page_index=1, title="Page 2"),
@@ -350,7 +350,7 @@ def test_dispatch_triggers_calibration_and_layout() -> None:
         assert res["title"] == "Page 2"
         mock_md.assert_called_once()
 
-    with patch("capstone_mcp.native_loop.manage_display") as mock_md:
+    with patch("capstone_mcp.native.runtime.manage_display") as mock_md:
         mock_md.return_value = DisplayResult(
             action=DisplayAction.SET_PAGE_LAYOUT,
             set_page_layout=SetPageLayoutResult(
