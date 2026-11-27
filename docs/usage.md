@@ -37,137 +37,55 @@ MCP 연결을 마쳤다면 AI 클라이언트의 채팅창에서 작업을 요�
 
 ### 선형 피팅과 회차 비교
 
-파일 피팅(`capstone_fit_file`)과 수치 피팅(`capstone_linear_fit`)은 `diagnostics`에 잔차, 레버리지, Cook의 거리, 영향이 큰 표본의 인덱스와 인접 잔차 상관을 반환합니다. 파일 피팅에서는 `fit.diagnostics`에 들어 있습니다. 이는 MCP가 계산한 OLS 진단이며 Capstone 네이티브 피팅 결과와 구분합니다.
-
-표본별 배열은 입력 순서의 앞 256개까지만 반환하고 `sample_count`·`truncated`로 범위를 표시합니다. 회귀 계산과 영향도 검색은 전체 표본을 사용합니다. `influential_indices`도 최대 256개이며 전체 개수는 `influential_count`입니다. Cook의 거리 `4/n` 기준은 검토할 표본을 표시하는 경험적 기준이지 유의성 검정이나 자동 삭제 규칙이 아닙니다. 인접 잔차 상관 역시 입력 순서에 대한 설명값이며 시간적 독립성을 증명하지 않습니다.
-
-목록에서 x축과 y축 데이터셋을 확인한 뒤 `capstone_fit_file`에 전달합니다. 아래 인덱스는 설명용이며, 실제 파일에서 같은 좌표에 대응하는 두 수치 데이터셋을 골라야 합니다.
+같은 회차의 x·y를 좌표에 맞춰 짝지은 뒤 `capstone_linear_fit`에 전달합니다. 아래 숫자는 호출 형식을 보여 주는 예제입니다.
 
 ```json
-{
-  "path": "C:/Experiments/momentum.cap",
-  "request": {
-    "x": {"index": 0},
-    "y": {"index": 1}
-  }
-}
+{"samples":{"x":[0,1,2,3],"y":[1.1,2.8,5.2,6.9]}}
 ```
 
-- 인덱스 대신 `{"dataset_id": "조회한 데이터셋 ID"}`로 선택할 수도 있습니다. 두 선택 방식을 함께 지정하지 않습니다.
-- `capstone_compare_file`은 `request.datasets`에 선택 목록을 받아 평균, 표본 표준편차, 최솟값·최댓값 등을 비교합니다. 비교 대상의 단위 ID가 같아야 합니다.
-- 파일 분석 결과에는 원본 경로, 데이터셋과 측정 소스의 ID, 단위 정보가 포함됩니다. 자동 단위 변환은 하지 않습니다.
-- `capstone_plot`은 추출한 x·y 값으로 PNG 그래프를 만듭니다. 피팅과 그래프는 별도 분석 결과이며 Capstone 내부 그래프를 편집하지 않습니다.
+결과의 `diagnostics`에 잔차, 레버리지, Cook의 거리, 인접 잔차 상관이 있습니다. 회귀는 입력 표본 전체로 계산합니다. 표본별 진단 배열은 처음 256개까지 반환하고 `sample_count`·`truncated`로 범위를 표시합니다. 영향 표본의 인덱스도 최대 256개이며 전체 개수는 `influential_count`입니다. Cook의 거리 기준은 검토할 표본을 찾는 데 사용합니다.
+
+`capstone_compare_runs`에는 같은 단위로 측정한 회차별 이름과 표본을, `capstone_plot`에는 좌표와 축 라벨을 전달합니다. 원본 파일, 데이터셋 인덱스, 회차와 축 단위를 분석 결과에 함께 기록하세요.
+
+## 그래프 읽기와 피팅
+
+`capstone_manage_graph`의 저장 파일 호출 예제입니다. 여러 그래프가 있으면 워크북 순서대로 0부터 번호를 매깁니다.
+
+```json
+{"request":{"action":"read","read":{"cap_file":"C:/Experiments/momentum.cap","graph_index":0}}}
+```
+
+저장 그래프에서 축의 소스·회차·단위와 네이티브 피팅 상태를 확인합니다. 미저장 그래프는 대상 창의 `read.handle`을 사용합니다. 이 경우 Capstone의 Copy Display가 필요합니다. 서버가 기존 클립보드 형식을 모두 백업하고 복사본 소유자를 확인한 뒤, 세대가 같을 때 복원합니다. 다른 앱의 더 최근 복사 내용은 보존합니다.
+
+1. `capstone_attach`와 `capstone_windows`로 대상 창을 확인합니다. 새 그래프를 만들 때는 `capstone_manage_graph`의 `create`를 사용합니다.
+2. `read`로 축·회차·단위와 `data_signature`를 확인합니다. `observe`에 실제 창 핸들과 `allow_foreground=true`를 넣어 원본 이미지와 일회용 `frame_id`를 받습니다. 축 메뉴는 `select_measurement`로 선택합니다.
+3. 모델 피팅은 `analyze.fitting`에 원하는 전체 `models` 목록과 방금 읽은 `frame_id`, 화면에서 확인한 `menu_point`, 필요한 경우 `master_point`, `expected_data_signature`를 전달합니다. `fit` 동작은 그래프의 축 범위를 화면에 맞춥니다.
+4. `analyze.outcome.fits_successful`과 실제 계수·오차 상태를 확인합니다. 실패하면 `capstone://status`의 `last_graph_failure`에서 요청과 실패 단계를 대조하고 다시 관찰합니다.
 
 ## 실행 중인 Capstone 조작
 
-앱을 실행하고 실험을 연 다음 아래 순서로 연결합니다.
+`capstone_snapshot`에서 창의 컨트롤과 `ref`를 찾습니다. 필요한 경우 `query`나 `control_types`로 범위를 줄입니다. `capstone_interact_ui`에 현재 참조나 화면에서 관측한 위치를 전달합니다. 입력 후에는 새 스냅샷이나 스크린샷으로 결과를 확인하세요. 열린 대화상자는 해당 대화상자의 핸들로 조작합니다.
 
-1. `capstone_attach`로 연결합니다. 여러 인스턴스 중 하나를 선택할 때는 `process_id`를 지정합니다.
-2. `capstone_windows`로 대상 창의 `handle`을 확인합니다.
-3. `capstone_snapshot`으로 컨트롤 이름과 참조값 `ref`를 읽습니다.
-   실험 창 전체는 컨트롤이 수백 개라 결과가 매우 큽니다. `query`(이름 또는 `automation_id`의
-   일부, 대소문자 무시)와 `control_types`(예: `["Button"]`)로 필요한 컨트롤만 받을 수 있습니다.
-4. `capstone_action` 등으로 조작한 뒤 다시 조회해 결과를 확인합니다.
+| 하려는 일 | 도구와 확인할 내용 |
+|---|---|
+| 표, Digits, Scope, FFT, 페이지 | `capstone_manage_display`에 동작과 해당 페이로드를 지정합니다. 표는 열 이름을 확인하고 `read_table`로 페이지를 읽습니다. |
+| 회차 이름·표시 상태 | `capstone_manage_run`으로 대상 회차를 확인합니다. 삭제 동작은 데이터 요약에서 확인되는 마지막 회차에만 적용됩니다. |
+| 센서 선택·샘플링률 | `capstone_manage_instrument`의 `set_sampling_rate`에 실제 `sensor`와 지원되는 `target`을 넣고 반환된 선택과 속도를 확인합니다. |
+| 발생기와 교정 | 발생기 설정 조회에는 `configure_signal_generator.read_only=true`를 사용합니다. 영점·교정은 관측한 센서와 기준값으로 확인합니다. |
+| 기록 조건·수동 표본 | 타이머 조건과 `keep_sample` 요청을 지원합니다. 장치별 센서 역치 설정은 미지원입니다. 표본 보존 여부는 추가된 행 등 독립적인 관측으로 확인합니다. |
+| 계산기 | `capstone_create_calculation`에 식과 선택적 단위를 전달합니다. 계산기에서 승인된 상태를 확인합니다. |
 
-앱이 실행되어 있지 않다면 `capstone_attach`의 `launch: true`로 실행할 수 있습니다.
-연결할 수 있는 것은 설치형 데스크톱 버전뿐입니다. Microsoft Store 버전만 실행 중이면 그 사실을 오류로 알려 줍니다.
-
-기존 실험 파일은 `capstone_open_experiment`로 엽니다. File > Open Experiment를 직접 실행하고 창 제목으로 결과를 확인합니다.
-현재 실험에 저장하지 않은 변경이 있으면 열지 않으며, 버리고 열려면 `discard_unsaved: true`를 명시해야 합니다.
-
-대화상자(업데이트 안내, About, 파일 열기 등)가 떠 있으면 Capstone이 뒤쪽 창을 비활성화합니다.
-이때 뒤쪽 창으로 보내는 클릭·키 입력은 전달하지 않고, 막고 있는 창의 `handle`과 제목을 오류로 알려 줍니다.
-그 대화상자를 먼저 처리한 뒤 다시 시도하세요.
-
-작업별 전체 규칙은 `capstone_guide`로 읽을 수 있습니다. 일부 클라이언트가 서버 안내문을 앞부분만
-남기기 때문에, 초기 안내문에는 핵심만 두고 `files`, `graphs`, `windows`, `recording` 같은 주제별 내용을 이 도구로 제공합니다.
-
-`capstone_interact_ui`는 기본적으로 창을 활성화하지 않습니다. 마우스·키 입력과 `invoke`·`focus`에는 `allow_foreground: true`를 명시해야 합니다. `ref`는 새 스냅샷이나 조작 후 만료되므로 재사용하지 마세요.
-
-### Capstone 안에서 그래프와 피팅 만들기
-
-그래프 작업을 요청하면 AI가 Capstone의 실제 페이지를 조작합니다. 좌표는 사용자가 외워서 입력하는 값이 아니라 AI가 현재 스크린샷에서 확인하는 위치입니다.
-
-1. 현재 페이지를 확인합니다. 기존 표시를 보존하려면 `Add Page` 버튼으로 분석용 페이지를 추가합니다.
-2. `capstone_manage_graph(action="create")`로 실제 그래프를 삽입합니다.
-3. `capstone_manage_graph`의 `observe`이 반환한 이미지에서 축 선택 위치를 확인한 뒤, `capstone_manage_graph(action="select_measurement")`를 호출합니다. `select_measurement`에 `handle`, `point`, `path`, `frame_id`를 전달합니다. `path`는 `["Index"]`, `["Init. Red v (m/s)"]`처럼 화면에서 확인한 정확한 메뉴 이름의 목록입니다. 다음 축을 조작하기 전에는 다시 관찰합니다.
-4. `capstone_read_graph(handle)`으로 선택한 그래프의 실제 축 입력·회차·피팅 상태를 읽습니다. `capstone_fit_models()`로 지원 모델 이름을 조회합니다.
-5. 새로 `capstone_manage_graph(action="observe")`를 호출하고, `capstone_manage_graph(action="analyze")`에 반환된 `frame_id`, `models` 목록과 `menu_point`(피팅 드롭다운 화살표), `master_point`(피팅 아이콘) 위치를 전달합니다. `["linear", "quadratic"]`는 두 모델만 남기는 요청이고, `[]`는 모두 제거하는 요청입니다. 이미 원하는 상태이면 모델을 다시 클릭하지 않습니다.
-6. `fits_successful`과 `after.series[].fits[]`를 확인합니다. 모델 선택 성공과 수치 계산 성공은 다릅니다. 각 결과에는 Capstone의 `error_status`, 계수·불확도, 유효한 r·MSE·RMSE 등이 들어 있습니다. 실패한 피팅이나 유효하지 않은 통계값은 사용할 수 있는 숫자로 반환하지 않습니다.
-7. 새 스크린샷에서 그래프와 주석을 확인합니다. 저장이 필요하면 `capstone_save_experiment`로 새 경로에 저장합니다.
-
-축과 피팅 위치는 현재 클라이언트 영역 스크린샷의 원본 픽셀 좌표입니다. `fit`의 `offset`은 선택한 그래프의 왼쪽 위를 기준으로 계산합니다. 응답의 `observe.frame_id`는 다음 그래프 조작에 한 번만 사용할 수 있습니다. `observe`에 `{"handle": 123, "allow_foreground": true}`를 전달하면 창을 활성화하고 실제 보이는 화면을 캡처합니다. 창이나 그래프를 이동·크기 변경한 뒤에는 다시 확인해야 합니다. 그래프 내부 컨트롤은 UIA 트리에 나타나지 않으므로 고정 좌표를 재사용하지 않습니다.
-
-비례·선형·가중 선형·2차·3차·다항식·멱함수·역함수·지수·로그·사인·감쇠 사인·가우시안 계열 등 **23개 내장 모델**을 선택할 수 있습니다. 사용자 정의 식 편집은 포함하지 않습니다. 전체 24행이 보이는 네이티브 메뉴를 기준으로 하므로 메뉴가 잘리지 않게 창을 충분히 크게 사용하세요. 특정 데이터에서 모든 모델이 수렴하는 것은 아니며, 네이티브 오류 상태를 그대로 확인해야 합니다.
-
-`capstone_manage_graph(action="analyze")`는 이미 생성·선택한 그래프의 축 선택과 피팅·결과 읽기를 한 호출로 연결합니다. `request.x`와 `request.y`는 각각 `point`, `menu_path`를 가지며, 바꾸지 않을 축은 생략합니다. `request.fitting`에는 위 피팅 요청을 넣습니다. 그래프 생성 후 달라진 배치를 먼저 확인해야 하므로 이전 페이지 좌표로 바로 분석하지 않습니다.
-
-그래프 상태는 저장 파일이나 외부 회귀 계산이 아니라 **Capstone의 Copy Display XML**에서 읽습니다. 이 과정에서 Windows 클립보드는 선택한 그래프로 바뀌지만 실험 파일은 저장되지 않습니다. `after.series[].inputs[]`는 각 렌더러의 소스·회차·단위 ID를 보존하며, 계수의 소수 문자열을 임의로 반올림하지 않습니다. 메뉴 동작 후 읽은 상태가 요청과 다르면 중단하고 불확실한 입력을 자동 재전송하지 않습니다.
-
-`capstone_plot`과 파일 피팅은 별도 결과를 만드는 보조 도구입니다. Capstone 페이지에 결과를 반영해 달라는 요청을 이 도구만으로 완료 처리하지 않습니다.
-
-### AI 클라이언트의 호출 순서와 확인 기준
-
-- `capstone_read_graph` → 최신 `capstone_manage_graph(action="observe")` → 필요하면 `capstone_fit_models` → `capstone_manage_graph(action="analyze")` 순서로 호출합니다.
-- 비교 보고서도 화면 관찰 전에 읽습니다. `capstone_read_graph`와 `capstone_graph_report`의 메뉴 조작은 이미 발급된 화면을 바꿀 수 있습니다.
-- `frame_id`는 한 요청에만 사용할 수 있습니다. 요청 시작 전 창 위치·크기와 이미지 픽셀이 달라지면 `STALE_FRAME`으로 차단합니다. 실시간 데이터나 애니메이션도 변경으로 판정되므로 오래된 좌표로 강행하지 않습니다. 실행 도중의 사용자 조작까지 잠그는 기능은 아니며, 일반 저수준 클릭 도구에는 이 가드가 적용되지 않습니다.
-- 실패하면 `capstone_graph_recovery()`에서 실패 단계, 확인된 단계, 입력이 전달됐을 가능성, 다음 행동을 읽습니다. 일부 입력이 전달됐을 수 있으면 상태부터 확인하고 새 프레임을 받습니다. `request_id`로 마지막 실패를 구분하며, 나중에 성공한 호출의 현재 상태와 혼동하지 않습니다. 워커 시간 초과처럼 실행 내역을 받지 못한 경우에는 단계 목록이 비어 있어도 아무 작업도 하지 않았다는 뜻이 아닙니다.
-- 읽은 그래프의 `data_signature`를 `request.expected_data_signature`에 그대로 전달합니다. 소스·회차·단위 연결이 바뀌면 피팅을 건드리기 전에 거부합니다. 이 값은 실시간 샘플 내용이나 화면 배치의 변경까지 감지하는 값은 아닙니다.
-- `capstone_analyze_graph`에서는 같은 서명을 `request.fitting.expected_data_signature`에 넣습니다. 축을 바꾸기 전의 그래프를 확인하고, 새 축 연결은 피팅 단계에서 다시 확인합니다.
-- `models`는 추가할 모델이 아니라 **남길 모델의 전체 목록**입니다. 임의의 `preserve_existing_models` 같은 옵션이나 오타가 있는 요청은 무시하지 않고 오류로 반환합니다.
-- 결과의 `next_action`이 `inspect_fit_status`이면 각 피팅의 `status`와 `successful`을 확인합니다. `IN_PROGRESS`나 계산 실패를 정상 계수로 설명하지 않습니다. `no_fits_requested`는 모델 목록이 비었다는 뜻입니다.
-- MCP 메타데이터에는 조회·변경·반복 호출 특성을 표시합니다. 안내 문구는 모델 선택을 돕는 힌트이며, 사용자의 작업 범위를 넓히는 권한은 아닙니다.
-
-서로 다른 회차나 단위를 섞어서 모델의 오차를 비교하지 마세요. 오차가 작거나 상관계수가 높다는 이유만으로 모델이 적절하다고 결론 내리지 않으며, 이상치를 자동으로 제거하지 않습니다.
-
-### 저장한 그래프 읽기
-
-`capstone_manage_graph`의 `read`에 `.cap` 파일을 지정하면 Capstone을 열지 않고 저장된 그래프와 피팅 결과를 읽습니다.
+`capstone_manage_display`에서 현재 표의 첫 페이지를 읽는 예제입니다. 여러 표가 있으면 관측한 이름을 `read_table.table_name`에 지정합니다.
 
 ```json
-{
-  "request": {
-    "action": "read",
-    "read": {"cap_file": "C:/Experiments/회로.cap", "graph_index": 0}
-  }
-}
+{"request":{"action":"read_table","read_table":{"page":1,"page_size":20}}}
 ```
 
-`graph_index`는 워크북에 저장된 그래프 순서이며 0부터 시작합니다. 그래프가 하나면 생략할 수 있습니다. 응답의 `cap_file`, `graph_index`, `graph_count`로 읽은 위치를 확인할 수 있습니다. 열린 문서의 미저장 변경은 마지막 저장본에 반영되지 않습니다.
+`capstone_save_experiment`는 새 `.cap` 경로에 저장하며 현재 문서 경로도 바뀝니다. `capstone_export_data`는 CSV와 요청한 행 미리보기를 반환합니다. 상위 폴더와 새 파일명을 준비하고 반환된 경로·크기·해시를 확인합니다. CSV는 표시 정밀도와 인덱스 정렬을 따릅니다. `capstone_open_experiment`로 다른 문서를 열기 전에 현재 실험의 저장 상태를 확인합니다.
 
-### 같은 데이터의 모델 비교 보고서
+## 실시간 조회
 
-`capstone_graph_report(handle)`는 선택한 그래프를 읽어 렌더러별로 모델·계수·유효한 오차 지표를 정리합니다. `groups[].provenance`의 소스·회차·단위 연결을 보존하고 다른 그룹을 한 순위로 합치지 않습니다. 각 행의 `request_model`은 다시 피팅을 요청할 때 쓸 수 있는 모델 이름이며, 사용자 정의 모델처럼 설정 대상이 아니면 비어 있습니다.
-
-`parameter_count`와 `free_parameter_count`는 각각 전체·잠기지 않은 매개변수 개수입니다. 같은 그룹의 성공한 모델들에 공통으로 있는 유효한 MSE/RMSE만 최소값과 동률을 표시합니다. 이는 기술적인 값 비교이며 “최고 모델” 선정이 아닙니다. 표본 수와 잔차 원자료가 없으므로 AIC/BIC나 잔차 검정을 만들어 내지 않으며, 이런 제약은 `limitations` 코드로 반환합니다.
-
-### 센서와 샘플링 속도
-
-측정이 정지된 상태에서 센서의 정확한 표시 이름을 확인합니다. `capstone_configure_sensor`의 `request`에 `sensor`와 `target`을 전달하면 센서 선택과 속도 설정을 함께 수행합니다.
-
-예를 들어 대상 센서의 표시 이름을 `sensor`에, `"100 Hz"`를 `target`에 지정합니다. 목표값의 단위는 현재 표시 단위와 같아야 합니다. 지원되지 않는 속도를 요청하면 임의의 값으로 반올림하지 않고 선택한 센서의 이전 속도로 되돌립니다.
-
-센서만 바꾸려면 `capstone_select_sensor`, 현재 속도에서 한 단계만 이동하려면 `capstone_step_sampling_rate`를 사용합니다.
-
-### 저장과 CSV 내보내기
-
-두 도구 모두 대상 창의 `handle`과 새 파일의 `path`를 받습니다. 저장할 상위 폴더를 미리 만들고, 열려 있는 대화상자는 닫아 두세요.
-
-| 목적 | 도구 | 동작 |
-| :--- | :--- | :--- |
-| 실험 파일 보관 | `capstone_save_experiment` | 새 `.cap` 파일로 저장합니다. 현재 실험의 파일 경로도 바뀝니다. |
-| 저장 전 데이터 읽기 | `capstone_export_data` | `.cap`을 저장하지 않고 전체 데이터를 CSV로 내보냅니다. |
-| CSV의 다음 부분 읽기 | `capstone_csv_page` | 기존 CSV를 `offset`·`limit`으로 나누어 읽습니다. |
-
-기존 파일은 덮어쓰지 않습니다. 저장·내보내기 결과에는 파일 경로, 크기, SHA-256 해시가 포함됩니다.
-
-CSV 내보내기는 모든 데이터를 선택하고 **인덱스 기준**으로 정렬합니다. CSV 값은 Capstone의 표시 정밀도를 따르며, 헤더에서 측정 소스 ID나 시간 정렬을 추정하지 않습니다. 저장된 수치의 정밀도를 유지하려면 `.cap` 저장 후 데이터 추출 도구를 사용하세요.
-
-## 실시간 조회와 반복 측정
-
-실시간 설정·현재값 조회와 반복 측정에는 Capstone의 디버깅 포트가 필요합니다. 일반 화면 조작, 파일 분석, 저장·CSV 내보내기에는 이 추가 설정이 필요하지 않습니다.
-
-기존 작업을 저장하고 Capstone을 닫은 뒤 PowerShell에서 실행합니다.
+CDP를 사용하는 센서 조회에는 동일한 Capstone 프로세스의 루프백 디버깅 포트가 필요합니다. 작업 내용을 먼저 저장하고 Capstone을 종료한 후 PowerShell에서 실행합니다.
 
 ```powershell
 $env:QTWEBENGINE_REMOTE_DEBUGGING = "127.0.0.1:9222"
@@ -175,194 +93,25 @@ Start-Process "C:/Program Files/PASCO scientific/Capstone/Capstone.exe"
 Remove-Item Env:QTWEBENGINE_REMOTE_DEBUGGING
 ```
 
-`capstone_live_configuration`으로 설정된 센서와 측정 소스를 조회하고, 반환된 측정 ID와 단위 ID를 `capstone_current_value`에 전달해 현재값을 읽습니다. 설정 목록에 센서가 있다는 사실만으로 실제 연결 상태를 판단하지는 않습니다.
+`capstone://measurements/live`에서 관측된 센서·측정 ID·단위·현재 값을 읽습니다. 누락값은 그대로 기록합니다. 응답 시각은 호스트 시계 기준입니다. `capstone://status`에는 연결 및 기록 상태, `capstone://hardware/inventory`에는 조회 가능한 장치 상태, `capstone://displays/active`에는 화면 정보가 있습니다. `capstone://runs/active`는 이 서버의 작업 목록을 표시합니다. 실험 회차별 수치는 저장된 데이터셋에서 확인하세요.
 
-### 반복 측정 준비
+## 실험 분석과 보고서
 
-실물 센서를 연결한 측정은 아직 검증되지 않았습니다. 먼저 Capstone에서 대상 센서·측정 소스를 설정하고 기록 버튼이 활성화되어 있는지 확인하세요.
-
-`capstone_repeat_acquisition`의 `plan`에 다음 항목을 지정합니다.
-
-| 항목 | 설명 |
-| :--- | :--- |
-| `process_id`, `window_handle` | 연결한 Capstone 프로세스 ID와 대상 창 핸들 |
-| `debug_port` | 위에서 지정한 디버깅 포트. 기본값 `9222` |
-| `repetitions` | 측정 횟수, 1~100회 |
-| `duration_seconds` | 회차별 측정 시간, 0초 초과~3600초 |
-| `pause_seconds` | 회차 사이 대기 시간, 기본값 `0` |
-| `capture.directory` | 자동 저장할 새 폴더 또는 빈 폴더. 생략하면 자동 저장하지 않음 |
-| `capture.fit` | 선택 사항. 피팅할 x·y 측정 소스 ID |
-
-프로세스 ID, 창 핸들, 디버깅 포트는 같은 Capstone 인스턴스를 가리켜야 합니다. 샘플링 속도는 반복 측정 전에 따로 설정합니다.
-
-### 자동 저장·분석
-
-`capture.directory`를 지정하면 측정 전 `baseline.cap`과 회차별 `run-001.cap`, `run-002.cap` 등의 파일이 생성됩니다. 각 파일은 해당 시점의 실험 전체를 저장한 스냅샷입니다.
-
-자동 피팅을 사용하려면 `capture.fit`의 `x_source_euid`와 `y_source_euid`에 조회한 측정 소스 ID를 지정합니다. **측정 소스 ID와 데이터셋 ID는 서로 다릅니다.**
-
-이전 스냅샷과 비교해 새로 추가된 샘플만 분석하고, 완료한 회차의 y값을 비교합니다. 새 샘플을 확실히 구분할 수 없으면 분석 오류를 반환합니다. 도중에 취소된 회차는 중단 여부와 저장 결과를 남기되 자동 피팅에서 제외합니다.
-
-### 진행 상태와 취소
-
-작업을 시작하면 `job_id`가 반환됩니다. `capstone_acquisition_job`으로 상태를 확인하고 `capstone_cancel_acquisition`으로 취소를 요청합니다.
-
-취소 요청이 접수되었다고 측정이 즉시 끝난 것은 아닙니다. 상태가 `completed`, `cancelled`, `failed` 중 하나로 바뀌었는지 확인하세요. 실패한 경우에도 이미 저장된 파일과 회차 정보는 결과에 남을 수 있습니다. 반복 측정 중에는 다른 조작을 함께 보내지 마세요.
-
-단일 시작·정지는 `capstone_set_recording`을 사용합니다. 응답의 `transition_pending`이 `true`라면 `capstone_recording_status`로 실제 상태를 다시 확인하세요.
-
-## 표(Table)와 대형 수치(Digits) 디스플레이
-
-실험 페이지에 표나 대형 디지털 수치 모니터를 생성하고 데이터를 추출할 수 있습니다.
-
-### 1. 표 생성 및 데이터 조회
-
-- `capstone_create_table`: 활성 페이지에 새 표 위젯을 배치합니다.
-- `capstone_set_table_columns`: 특정 측정값이나 계산식으로 열을 매핑합니다.
-- `capstone_read_table`: 표에 렌더링된 셀 데이터(페이지네이션 지원)와 열 요약 통계를 읽습니다.
+`capstone_run_experiment_macro`의 `analyze`는 제공된 측정 배열을 분석합니다. 광전효과에 사용하는 호출 형식이며 아래 수치는 설명용입니다.
 
 ```json
-{
-  "table_name": "Table 1",
-  "page": 1,
-  "page_size": 20,
-  "include_statistics": true
-}
+{"experiment_id":"photoelectric_effect","action":"analyze","parameters":{"wavelengths_nm":[436,546,577],"stopping_voltages_v":[1.25,0.68,0.55]}}
 ```
 
-### 2. 대형 수치(Digits) 디스플레이
+RLC 공진, 강제진동, 단열기체, 슬릿 회절도 각 실험의 측정 배열을 입력합니다. `success`와 `phase_results`에서 실제로 완료된 단계를 확인합니다. 장비를 자동 구성하거나 센서 측정을 대신 수행하는 경로는 구현되지 않았습니다.
 
-- `capstone_create_digits`: 단일 센서 측정값이나 계산 결과를 거대한 글꼴로 모니터링하는 Digits 위젯을 추가합니다.
+`capstone_generate_lab_report`는 저장 데이터 또는 명시적 입력에서 보고서를 만듭니다. 여러 회차나 축 후보가 있을 때는 파일에서 확인한 `run_id`와 `axes`를 사용합니다. 아래는 파일 선택과 출력 형식의 예제입니다.
 
 ```json
-{
-  "measurement": "Velocity",
-  "digits_name": "Speed Monitor"
-}
+{"file_path_or_run":"C:/Experiments/momentum.cap","experiment_id":"generic","format":"both"}
 ```
 
-## 그래프 툴박스와 다중 회차(Run) 비교
-
-그래프 상단의 고급 분석 툴바 도구를 직접 토글하고 수치 계측값을 추출합니다.
-
-- `capstone_toggle_graph_statistics`: 평균(Mean), 표준편차(Std Dev), 최솟값, 최댓값, 표본 수 통계 상자(Σ)를 토글하고 통계치를 추출합니다.
-- `capstone_measure_graph_area`: 곡선 아래 면적 적분(∫y dx) 도구를 토글하고 적분값을 반환합니다 (예: v-t 그래프의 총 변위 계측).
-- `capstone_graph_delta`: 두 점 사이의 좌표 차이(Δx, Δy)와 기울기를 측정하는 델타 십자선 도구를 활성화합니다.
-- `capstone_set_run_visibility`: 그래프나 표에서 특정 회차(예: `["Run #1", "Run #2"]`)만 선택해 동시에 오버레이하여 비교하거나 이전 회차를 숨깁니다.
-
-```json
-{
-  "runs": ["Run #1", "Run #2"],
-  "visible": true
-}
-```
-
-## 함수발생기(Signal Generator) 제어
-
-PASCO 850 Universal Interface 또는 550 Interface의 내장 신호발생기 출력을 제어합니다.
-
-- `capstone_set_signal_generator`: 출력 파형(`Sine`, `Square`, `Triangle`, `Ramp Up`, `Ramp Down`, `DC`), 주파수(Hz), 진폭 전압(V), 전원 On/Off를 설정합니다.
-- `capstone_read_signal_generator_status`: 현재 출력 상태와 파형/전압/주파수를 조회합니다.
-
-```json
-{
-  "waveform": "Sine",
-  "frequency": 1000.0,
-  "amplitude": 2.5,
-  "enabled": true
-}
-```
-
-## 오실로스코프(Scope) 및 FFT 주파수 스펙트럼
-
-고속 샘플링 파형 관측과 주파수 도메인 분석을 위한 전용 디스플레이 도구입니다.
-
-`capstone_manage_display`의 `create_scope`와 `create_fft`는 팔레트에서 디스플레이를 추가합니다. 추가 후 새 위젯과 쓰기 가능한 컨트롤이 노출될 때만 요청한 설정을 적용합니다. `verified=false` 또는 `display_id=null`이면 입력 후 상태를 확인하지 못한 것이므로 다시 추가하기 전에 페이지를 확인하세요.
-
-`set_scope_trigger`와 `read_fft_peaks`는 활성 페이지에서 확인한 위젯을 사용합니다. 위젯이 여러 개면 실제 관찰된 `scope_id` 또는 `fft_id`를 지정하세요. 설치된 버전이 위젯이나 설정을 UI Automation에 노출하지 않으면 Capstone에서 직접 설정해야 합니다.
-
-## 지능형 기록 조건과 수동 샘플링(Keep Sample)
-
-- `capstone_set_recording_condition`: 시간 초과 또는 센서 측정값이 역치(Threshold)를 넘었을 때 자동으로 기록이 시작/정지되도록 트리거 조건을 설정합니다.
-- `capstone_set_sampling_mode`: 연속 기록(`continuous`), 수동 측정(`keep_sample`), 고속 모니터(`fast_monitor`) 모드 간 전환을 수행합니다.
-- `capstone_keep_sample`: 중화 적정이나 보일의 법칙 실험처럼 수동 측정 모드일 때 센서값 1점을 기록하고 대응하는 독립변수(부피, 압력 등)를 함께 기입합니다.
-
-```json
-{
-  "value": 25.0,
-  "variable_name": "Volume"
-}
-```
-
-## 무선 센서 페어링과 캘리브레이션
-
-- `capstone_scan_wireless_sensors`: 주변의 PASCO 무선(Bluetooth) 센서를 검색하여 장치 ID 목록을 반환합니다.
-- `capstone_connect_wireless_sensor`: 검색된 `sensor_id`를 지정해 무선 페어링을 수행합니다.
-- `capstone_calibrate_sensor`: 표준 기준물(Standard 1, Standard 2)을 이용한 1점 또는 2점 센서 교정 위저드를 자동 실행합니다.
-- `capstone_zero_sensor`: 센서 도구 서랍에서 지정된 측정값의 현재 읽기 값을 즉시 영점(0)으로 보정합니다.
-
-```json
-{
-  "sensor_name": "Force Sensor",
-  "calibration_type": "two_point",
-  "standard_1": 0.0,
-  "standard_2": 9.8
-}
-```
-
-## 워크북 페이지와 화면 분할 레이아웃
-
-- `capstone_add_page`: 실험 워크북에 새 탭 페이지를 추가합니다.
-- `capstone_set_page_layout`: 현재 페이지를 다중 디스플레이 템플릿(`two_vertical`, `two_horizontal`, `three_pane`, `four_grid`)으로 자동 분할 배치합니다.
-
-```json
-{
-  "layout": "two_vertical"
-}
-```
-
-## 물리 실험 종합 패키지
-
-### 1. 실험 원클릭 자동화 매크로 (`capstone_run_experiment_macro`)
-
-5대 정규 물리 실험에 대한 설정, 수집, 분석 단계를 선언적으로 오케스트레이션합니다:
-- `photoelectric_effect`: 수은 램프 5개 파장(365~577nm) 저지전압 탐색 및 플랑크 상수($h/e$) 회귀
-- `rlc_resonance`: 850 신호발생기 주파수 스윕, 오실로스코프/FFT 공진 피크 및 $Q$ 인자 계산
-- `forced_harmonic_oscillation`: 스마트 카트 위치/힘 100Hz 수집, 480초 자동 정지 및 공진 곡선 작성
-- `adiabatic_gas`: 1000Hz 급격한 압축 및 $P$-$V$ 선도 순작업($\oint P dV$) 면적 적분
-- `slit_diffraction`: 회전 운동 센서 이송대 스캔, 단일/이중 슬릿 극소·극대점 추출 및 슬릿 기하 규명
-
-```json
-{
-  "experiment_id": "photoelectric_effect",
-  "action": "run"
-}
-```
-
-### 2. 자동 랩리포트 생성기 (`capstone_generate_lab_report`)
-
-저장된 `.cap`, CSV, JSON 데이터로 Markdown과 HTML 보고서를 생성합니다. `.cap`에 저장 런이 여러 개면 `run_id`를 지정하고, 회귀를 계산할 때는 `axes`에 x와 y의 측정 이름을 순서대로 지정합니다.
-
-```json
-{
-  "file_path_or_run": "C:/Experiments/광전효과.cap",
-  "experiment_id": "photoelectric_effect",
-  "run_id": "Run #1",
-  "axes": ["Frequency", "Stopping Voltage"],
-  "output_path": "C:/Experiments/광전효과_보고서.md",
-  "format": "both"
-}
-```
-
-`.cap`에서 `axes`를 생략하면 선택한 런의 측정 요약을 반환합니다. 저장 단위는 Capstone의 단위 ID로 표시하며, `.cap` 회귀는 해당 숫자 단위에서 일반 선형 회귀로 계산합니다. 두 형식을 저장할 때는 Markdown과 HTML에 새 파일 이름을 사용합니다. 같은 이름의 파일이 이미 있으면 해당 파일을 보존하고 오류를 반환합니다.
-
-### 3. 실시간 센서 텔레메트리 & 임계치 트리거 (`capstone://measurements/live`)
-
-Capstone 내부의 QtWebEngine CDP WebSocket 디버깅 포트(9222)를 통해 UI 자동화보다 20배 이상 빠른 초고속(10~15ms) 센서 인벤토리 및 실시간 계측값 조회를 제공합니다:
-- FastMCP 동적 리소스: `capstone://measurements/live` (연결된 모든 센서와 실시간 측정값의 JSON 스냅샷 스트림)
-- 임계치 자동 감시 및 정지: `monitor_until_stop`을 통해 힘, 전압, 가속도 등의 센서 값이 특정 기준(예: `force > 5.0 N`)에 도달했을 때 데이터 녹화를 자동으로 중단
-- 원격 디버그 포트 자동 연결: `capstone_attach(launch=True)` 시 `--remote-debugging-port=9222`가 자동 주입되어 별도 설정 없이 가동
-
+실행 중인 서버의 전체 도구와 인자는 MCP의 `tools/list`에서 확인할 수 있습니다. `capstone_guide`에 `files`, `graphs`, `sensors`, `recovery` 등의 주제를 지정하면 해당 흐름을 읽을 수 있습니다.
 
 ## HTTP 연결
 
@@ -390,7 +139,7 @@ http://127.0.0.1:8766/mcp
 | 기록 버튼이 비활성화됨 | Capstone에서 센서 연결과 측정 소스 설정을 확인합니다. |
 | 저장·내보내기가 중단됨 | 기존 대화상자, 출력 파일의 존재 여부, 상위 폴더를 확인합니다. |
 | 네이티브 조작 시간이 초과됨 | 작업 프로세스가 종료되며 입력은 자동 재시도하지 않습니다. 앱의 측정·저장 상태를 확인한 뒤 `capstone_attach`로 다시 연결합니다. |
-| 실시간 조회·반복 측정에 연결되지 않음 | 디버깅 포트를 지정해 앱을 다시 실행했는지, 해당 포트와 창이 같은 프로세스에 속하는지 확인합니다. |
+| 실시간 측정값을 조회할 수 없음 | 디버깅 포트를 지정해 앱을 다시 실행했는지, 해당 포트와 창이 같은 프로세스에 속하는지 확인합니다. |
 | 지원하지 않는 저장 형식·측정값 오류 | 해당 데이터는 임의로 변환하지 않습니다. 설정 조회와 수치 추출은 별개이므로 설정만 읽히는 파일도 있습니다. |
 
 화면 조작은 잠금이 해제된 로컬 데스크톱에서 사용하고, 여러 클라이언트가 같은 Capstone을 동시에 조작하지 않도록 하세요.

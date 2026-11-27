@@ -20,22 +20,12 @@ Use it to analyze saved `.cap` files or work with an open experiment, from senso
 
 | Task | Capabilities |
 | :--- | :--- |
-| **Analyze experiment files** | Inspect sensor and experiment settings, extract datasets, create scatter plots, fit lines, and compare runs |
-| **Operate the Capstone interface** | Inspect windows and controls, click, type, drag, scroll, and capture screenshots |
-| **Save and export data** | Save to a new `.cap` file or export data to CSV without saving the experiment first |
-| **Configure sensors and control recording** | Select sensors by name, set supported sampling rates, start and stop recording, and schedule repeated runs |
-| **Tables & numeric displays** | Create Table widgets, map columns, read cell data, create large Digits numeric displays |
-| **Graph toolbox & multi-run comparison** | Statistics box (Σ), curve area integration (∫ydx), delta (Δ) crosshairs, multi-run visibility overlays |
-| **Signal generator control** | Configure 850/550 internal generator: waveform (Sine/Square/Triangle/DC), frequency, amplitude, power On/Off |
-| **Oscilloscope & FFT spectrum** | Scope timebase and trigger (level/edge/mode), FFT frequency spectrum and harmonic peak analysis |
-| **Smart triggers & manual sampling** | Sensor threshold or timer automated recording start/stop, continuous vs Keep Sample (manual) mode |
-| **Wireless sensors & calibration** | Bluetooth wireless sensor discovery and pairing, automated 1-point and 2-point calibration wizards, zeroing |
-| **Workbook pages & split layouts** | Add workbook page tabs, apply 2-split (H/V), 3-pane, and 4-grid layout templates automatically |
-| **One-click physics macros** | Automated execution of multi-step physics experiments, constant derivation, and report generation |
-| **Live sensor telemetry** | High-speed sensor inventory and telemetry over CDP WebSocket (< 15ms), dynamic resource (`capstone://measurements/live`) |
-| **Polymorphic data seam** | Query disk archives (`.cap`, `.csv`) and live streams (`live://measurements`, `live://table`) behind a unified seam |
-
-> File analysis, UI operations, sensor settings, saving, exporting, numerical calculations, and physics suite tools have been verified with comprehensive unit and integration test suites. Physical acquisition with connected hardware should be verified in your lab environment.
+| Read saved experiments | Inspect settings, list runs and units, extract samples, and read saved graph bindings and fits. |
+| Analyze measurements | Plot paired samples, run linear regression and compare run statistics. |
+| Operate Capstone | Inspect windows and controls, capture screenshots, send input, save to a new path and export CSV. |
+| Work with displays | Manage graphs, tables, Digits, Scope, FFT and workbook layouts. Results indicate which settings and values were observed. |
+| Work with instruments | Select sensors and supported rates, configure timers, or request a manual sample. Confirm zeroing, calibration and 850/550 generator output on the actual equipment. |
+| Analyze physics experiments | Analyze supplied photoelectric, RLC, forced oscillation, adiabatic gas or slit diffraction measurements. Generate Markdown and HTML reports from recorded data. |
 
 ## Getting started
 
@@ -100,77 +90,11 @@ Replace the example path with an existing `.cap` file. To operate the app instea
 
 ## Example requests
 
-The MCP exposes workflow instructions, strict graph-request schemas, and tool annotations. Read the graph and a fresh screenshot before fitting; pass its `data_signature` as `expected_data_signature` to reject changed source/run/unit bindings. This signature does not detect live sample changes or a moved graph. Results include explicit native solver status and a machine-readable next action.
-
-Use `capstone_observe_graph` for the image and required one-use `frame_id` before graph input. Changed window bounds or image pixels reject the request before execution; this also rejects live-update changes and is not a lock against concurrent desktop input. `capstone_graph_recovery` exposes the last failed stage, confirmed steps and possible partial input without replaying it. `capstone_graph_report` compares native results only within matching renderer/run/unit groups, reports parameter complexity and descriptive MSE/RMSE minima, and never invents missing AIC/BIC or declares an overall best model.
-
-Frame observation activates the graph and captures its visible client area. Read graph data or comparison reports before capturing a frame; their menus may otherwise invalidate the image.
-
-Saved-file and explicit-sample OLS also return residual, leverage, Cook's-distance, and adjacent-residual-correlation diagnostics. Per-sample arrays are limited to the first 256 observations, with explicit truncation metadata; calculations use all observations. Influence flags are descriptive, not significance tests or instructions to remove data. These diagnostics are computed by the MCP, not Capstone's native solver.
-
-**Analyze data**
-
-> Add a graph to the open Capstone experiment, select data from the same run, and compare linear and quadratic fits. Report Capstone's own coefficients and errors.
-
-**Export data before saving**
-
-> Export the current experiment data to `C:/Experiments/current.csv` and show the first 20 rows.
-
-**Configure a sensor**
-
-> List the sensors in this experiment, then set the sensor I choose to 100 Hz.
-
-**Signal generator & oscilloscope**
-
-> Turn on the 850 Signal Generator with a 1 kHz, 2 V sine wave, and add an oscilloscope display to observe the waveform.
-
-**Tables & advanced graph tools**
-
-> Create a Table with Time in column 1 and Velocity in column 2, and show the first 20 rows. On the graph, integrate the area under the curve to find total displacement.
-
-**Smart triggers & manual sampling**
-
-> Set up an automated start recording condition when the Force sensor exceeds 0.5 N.
-
-**Record repeated runs**
-
-> Record three runs of five seconds each, with a two-second pause between runs. Save each run's experiment snapshot in a new folder, `C:/Experiments/session-01`.
-
-**One-click physics experiment macros**
-
-> Run the photoelectric effect experiment macro (`photoelectric_effect`) to sweep wavelengths, record stopping voltages, and compute Planck's constant ($h$).
-
-**Automated lab report generation**
-
-> Ingest data from `photoelectric_effect.cap` and generate a formal Markdown and HTML physics lab report with theoretical comparison, $R^2$ regression, and error percentages.
-
-**Interactive pedagogical lab tutor**
-
-> Load the full curriculum for `rlc_resonance`, verify the apparatus checklist, and guide me step-by-step through Capstone configuration and safety warnings.
-
-
-Choose sensor names, supported rates, dataset runs, and units based on the actual experiment. For individual saves and CSV exports, create the destination folder first and choose a filename that does not already exist.
-
-<details>
-<summary><strong>Setup for live queries and repeated recording</strong></summary>
-
-Live configuration/current-value queries and repeated recording require a debugging port. Save your work and close Capstone, then launch it from PowerShell:
-
-```powershell
-$env:QTWEBENGINE_REMOTE_DEBUGGING = "127.0.0.1:9222"
-Start-Process "C:/Program Files/PASCO scientific/Capstone/Capstone.exe"
-Remove-Item Env:QTWEBENGINE_REMOTE_DEBUGGING
-```
-
-Repeated recording also requires a configured, enabled recording source. The process ID, window handle, and debugging port must belong to the same Capstone instance.
-
-For automatic saving, set `plan.capture.directory` to a new or empty folder. The server saves `baseline.cap` before recording and `run-001.cap`, `run-002.cap`, and so on after each stopped run. These are snapshots of the entire experiment.
-
-To fit newly acquired samples automatically, set `plan.capture.fit.x_source_euid` and `y_source_euid` to the selected measurement source IDs. Use the returned `job_id` to check completion or request cancellation. A cancellation request does not itself confirm that recording has stopped.
-
-This extra launch configuration is not needed for ordinary UI operations, saved-file analysis, saving, or CSV export.
-
-</details>
+- **Saved experiment** — “Show the runs and units, then give me the first 20 paired time and velocity samples from a recorded run.”
+- **Graphs** — “Read the axes, run and fit coefficients from the second saved graph.” For changes to an open graph, observe the current window and verify native fit status after the change.
+- **Export before saving** — “Export this experiment to a new file, `C:/Experiments/current.csv`, and show the first 20 rows.”
+- **Photoelectric effect** — “Estimate Planck’s constant using my recorded wavelengths in nm and stopping voltages in V.”
+- **Live readings** — “Read the current value and unit from the connected force sensor.” Live measurement queries require the same Capstone process to own the local debugging port. [Setup in Korean](docs/usage.md#실시간-조회)
 
 ## Things to know
 
@@ -178,7 +102,7 @@ This extra launch configuration is not needed for ordinary UI operations, saved-
 - Saving and exporting never overwrite an existing file. Saving a new `.cap` file also changes the active experiment's file path.
 - CSV uses Capstone's display precision and aligns data by index, not necessarily by time. Extract values from a saved `.cap` file when you need the stored numerical precision.
 - Graph creation, axis selection, and 23 built-in fitting models operate directly on Capstone pages. Repeating the same model configuration does not toggle existing fits off.
-- Graph verification uses Capstone's Copy Display data and replaces the Windows clipboard with the selected graph. Coefficients, uncertainties, metrics, and run IDs come from Capstone itself. Custom-expression editing is not included.
+- Read saved graphs from the file. For an unsaved graph the server checks ownership of the native Copy Display result and restores supported clipboard formats while the copied generation is still current.
 - If native automation times out, the worker process is stopped without replaying the input. Check the app's recording and save state before reconnecting with `capstone_attach`.
 - The server uses internal interfaces and UI controls. Compatibility may vary with the Capstone version and screen configuration.
 

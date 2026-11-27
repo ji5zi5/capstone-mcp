@@ -1,0 +1,33 @@
+# 그래프·클립보드·다중 창 감사 대조
+
+저장본은 파일로 읽는다. 제공된 그래프 94개 중 한 그래프는 단위 변환기와 다른 어댑터를 함께 가지고 있었다. 미저장본은 Copy Display의 소유 프로세스와 세대를 확인하고 복원한다. 복사 직전 확인과 Capstone의 실제 복사 사이의 Windows 전역 경쟁은 완전히 원자화할 수 없다.
+
+기준은 upstream `c57410e` 및 근거 열의 수정 PR이다. 조사 이슈 [#141](https://github.com/ji5zi5/capstone-mcp/issues/141), 구현 에픽 [#125](https://github.com/ji5zi5/capstone-mcp/issues/125). 원장의 수정 상태에는 링크된 PR에 제출된 변경이 포함된다. [판정 기준과 남은 작업](RECONCILIATION_2026-11-27.md)
+
+## 식별자가 있는 원문 항목
+
+각 ID는 해당 판정의 원문 위치로 연결된다. 동일한 근거로 판정한 항목은 한 행에 모았다.
+
+|원문 ID|판정|근거와 남은 검증|
+|---|---|---|
+| [DEFECT-GR01](https://github.com/ji5zi5/capstone-mcp/blob/c57410e18df6302bfe15ec09b800ca480be9b1a6/EXHAUSTIVE_REPOSITORY_AUDIT_REPORT.md#L1000), [DEFECT-GR03](https://github.com/ji5zi5/capstone-mcp/blob/c57410e18df6302bfe15ec09b800ca480be9b1a6/EXHAUSTIVE_REPOSITORY_AUDIT_REPORT.md#L1022), [DEFECT-GR04](https://github.com/ji5zi5/capstone-mcp/blob/c57410e18df6302bfe15ec09b800ca480be9b1a6/EXHAUSTIVE_REPOSITORY_AUDIT_REPORT.md#L1033), [DEFECT-GR05](https://github.com/ji5zi5/capstone-mcp/blob/c57410e18df6302bfe15ec09b800ca480be9b1a6/EXHAUSTIVE_REPOSITORY_AUDIT_REPORT.md#L1049) | 수정 완료 | 대상 창과 시작 시 창 집합을 분리하고 새 참조로 메뉴를 닫는다. 실패 피트의 미제공 수치도 구분한다. [test_graph_workflows.py](../../tests/test_graph_workflows.py) [test_graph_state.py](../../tests/test_graph_state.py) |
+| [DEFECT-GR02](https://github.com/ji5zi5/capstone-mcp/blob/c57410e18df6302bfe15ec09b800ca480be9b1a6/EXHAUSTIVE_REPOSITORY_AUDIT_REPORT.md#L1012), [DEFECT-GR07](https://github.com/ji5zi5/capstone-mcp/blob/c57410e18df6302bfe15ec09b800ca480be9b1a6/EXHAUSTIVE_REPOSITORY_AUDIT_REPORT.md#L1073), [DEFECT-GR08](https://github.com/ji5zi5/capstone-mcp/blob/c57410e18df6302bfe15ec09b800ca480be9b1a6/EXHAUSTIVE_REPOSITORY_AUDIT_REPORT.md#L1084), [DEFECT-GR14](https://github.com/ji5zi5/capstone-mcp/blob/c57410e18df6302bfe15ec09b800ca480be9b1a6/EXHAUSTIVE_REPOSITORY_AUDIT_REPORT.md#L1153), [DEFECT-WF07](https://github.com/ji5zi5/capstone-mcp/blob/c57410e18df6302bfe15ec09b800ca480be9b1a6/EXHAUSTIVE_REPOSITORY_AUDIT_REPORT.md#L2286) | 실기 검증 필요 | 설치 문자열과 관측 라벨로 항목을 지정하고 모호한 후보는 거부한다. 특정 로케일의 전체 팝업·팔레트 실제 배치는 별도 검증 대상이다. [ROUND3_GRAPHS.md](../../docs/audits/ROUND3_GRAPHS.md) [test_graph_popup_geometry_labels.py](../../tests/test_graph_popup_geometry_labels.py) |
+| [DEFECT-GR06](https://github.com/ji5zi5/capstone-mcp/blob/c57410e18df6302bfe15ec09b800ca480be9b1a6/EXHAUSTIVE_REPOSITORY_AUDIT_REPORT.md#L1061), [P0-WIN01](https://github.com/ji5zi5/capstone-mcp/blob/c57410e18df6302bfe15ec09b800ca480be9b1a6/PHASE4_EXHAUSTIVE_EDGE_AUDIT_REPORT.md#L72) | 수정 완료 | 팝업의 소유권·실제 모니터 경계·가림 여부를 확인한다. 여러 어댑터를 가진 저장 그래프도 읽는다. [test_graph_popup_geometry_labels.py](../../tests/test_graph_popup_geometry_labels.py) [PR150](https://github.com/ji5zi5/capstone-mcp/pull/150) |
+| [DEFECT-GR09](https://github.com/ji5zi5/capstone-mcp/blob/c57410e18df6302bfe15ec09b800ca480be9b1a6/EXHAUSTIVE_REPOSITORY_AUDIT_REPORT.md#L1094), [P1-WIN04](https://github.com/ji5zi5/capstone-mcp/blob/c57410e18df6302bfe15ec09b800ca480be9b1a6/PHASE4_EXHAUSTIVE_EDGE_AUDIT_REPORT.md#L87) | 실기 검증 필요 | 작업자에서 Per-Monitor V2를 우선 설정하고 새 프로세스의 시스템 API로 해당 모드를 확인했다. 혼합 배율 모니터의 실제 좌표는 별도 검증 대상이다. [native_main.py](../../src/capstone_mcp/native_main.py) [PR151](https://github.com/ji5zi5/capstone-mcp/pull/151) |
+| [DEFECT-GR10](https://github.com/ji5zi5/capstone-mcp/blob/c57410e18df6302bfe15ec09b800ca480be9b1a6/EXHAUSTIVE_REPOSITORY_AUDIT_REPORT.md#L1110), [DEFECT-GR12](https://github.com/ji5zi5/capstone-mcp/blob/c57410e18df6302bfe15ec09b800ca480be9b1a6/EXHAUSTIVE_REPOSITORY_AUDIT_REPORT.md#L1132), [DEFECT-GR13](https://github.com/ji5zi5/capstone-mcp/blob/c57410e18df6302bfe15ec09b800ca480be9b1a6/EXHAUSTIVE_REPOSITORY_AUDIT_REPORT.md#L1142) | 수정 완료 | 토글의 관측 상태, 두 좌표쌍, 선택한 그래프의 도구 소유 관계를 확인한다. [test_graph_toolbox.py](../../tests/test_graph_toolbox.py) [test_graph_toolbar_ownership.py](../../tests/test_graph_toolbar_ownership.py) |
+| [DEFECT-GR11](https://github.com/ji5zi5/capstone-mcp/blob/c57410e18df6302bfe15ec09b800ca480be9b1a6/EXHAUSTIVE_REPOSITORY_AUDIT_REPORT.md#L1120) | 실기 검증 필요 | 두 네이티브 핸들의 위치를 독립 검증할 수 없어 좌표 지정 요청을 입력 전에 거부한다. 실제 핸들 드래그 증거가 필요하다. [toolbox.py](../../src/capstone_mcp/graphs/toolbox.py) [P0_REMAINING_2026-11-16.md](../../docs/audits/P0_REMAINING_2026-11-16.md) |
+| [DEFECT-WF01](https://github.com/ji5zi5/capstone-mcp/blob/c57410e18df6302bfe15ec09b800ca480be9b1a6/EXHAUSTIVE_REPOSITORY_AUDIT_REPORT.md#L2213) | 실기 검증 필요 | 일회용 Windows CI에서 유니코드·등록 형식을 실제 백업·복원했고, 뒤에 복사된 내용도 보존했다. 실제 Capstone이 만든 미저장 그래프와 OLE 지연 렌더링 조합의 검증은 남는다. [inspection.py](../../src/capstone_mcp/graphs/inspection.py) [test_ui_workflow_safety.py](../../tests/test_ui_workflow_safety.py) [PR151](https://github.com/ji5zi5/capstone-mcp/pull/151) |
+| [DEFECT-WF02](https://github.com/ji5zi5/capstone-mcp/blob/c57410e18df6302bfe15ec09b800ca480be9b1a6/EXHAUSTIVE_REPOSITORY_AUDIT_REPORT.md#L2229) | 반증·오탐 | 저장본은 워크북 XML로 읽는다. 미저장본의 Copy Display는 선택된 정책이며 클립보드 변경 알림을 구독한다. [inspection.py](../../src/capstone_mcp/graphs/inspection.py) [test_graph_state.py](../../tests/test_graph_state.py) |
+| [P2-STRS04](https://github.com/ji5zi5/capstone-mcp/blob/c57410e18df6302bfe15ec09b800ca480be9b1a6/PHASE4_EXHAUSTIVE_EDGE_AUDIT_REPORT.md#L426) | 실기 검증 필요 | 고정된 크기의 입력을 반복하여 핸들 수와 RSS를 각각 측정해야 한다. 메모리 할당기가 예약한 공간과 살아 있는 객체는 다른 지표다. [archive.py](../../src/capstone_mcp/capfiles/archive.py) [test_capfile_pages.py](../../tests/test_capfile_pages.py) |
+
+## 고유 ID가 없는 원문 보고서
+
+아래 위치는 서술형 조사 항목을 찾기 위한 좌표다. 한 항목 안의 세부 예시와 위 표의 중복은 총계에 다시 더하지 않는다.
+
+|원문 위치|판정|근거와 남은 검증|
+|---|---|---|
+| [보고서 55, L939](https://github.com/ji5zi5/capstone-mcp/blob/c57410e18df6302bfe15ec09b800ca480be9b1a6/EXHAUSTIVE_REPOSITORY_AUDIT_REPORT.md#L939), [보고서 55, L951](https://github.com/ji5zi5/capstone-mcp/blob/c57410e18df6302bfe15ec09b800ca480be9b1a6/EXHAUSTIVE_REPOSITORY_AUDIT_REPORT.md#L951), [보고서 55, L960](https://github.com/ji5zi5/capstone-mcp/blob/c57410e18df6302bfe15ec09b800ca480be9b1a6/EXHAUSTIVE_REPOSITORY_AUDIT_REPORT.md#L960), [보고서 55, L975](https://github.com/ji5zi5/capstone-mcp/blob/c57410e18df6302bfe15ec09b800ca480be9b1a6/EXHAUSTIVE_REPOSITORY_AUDIT_REPORT.md#L975) | 실기 검증 필요 | 클립보드 왕복과 모형 메뉴 상태 전이는 검증했다. 설치 언어의 실제 팝업, 여러 시리즈 도구값·가림·재배열은 화면에서 확인해야 한다. 개별 GR 항목에 세부 근거가 있다. [기존 검증](ROUND3_GRAPHS.md) [PR151](https://github.com/ji5zi5/capstone-mcp/pull/151) |
+
+## 클립보드 복원 검증
+
+저장 그래프의 XML 읽기, Unicode 및 Capstone 등록 형식을 넣은 실제 Windows 클립보드 복원, 소유 세대가 달라진 뒤 최신 복사본 보존을 각각 검사했다. 확인되지 않은 OLE 형식은 복사 전에 거부한다. 복원 실패는 입력 형식과 함께 오류로 전달한다. [Windows 실측 CI](https://github.com/ji5zi5/capstone-mcp/actions/runs/45927775898) [복원 소유 창에 대한 Windows 계약](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setclipboarddata)

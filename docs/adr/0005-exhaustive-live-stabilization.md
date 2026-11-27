@@ -1,30 +1,31 @@
-# ADR 0005: 실기(Live Capstone) 런타임 사각지대 전수 격퇴 및 무결성 아키텍처 확립
+# ADR 0005. 설치된 Capstone에서 검증할 수 있는 자동화 범위
 
-- **상태 (Status)**: 승인됨 (Accepted)
-- **일자 (Date)**: 2026-11-15
-- **결정권자 (Deciders)**: 사용자, 에이전트
+최초 결정은 2026-11-15에 승인되었다. 2026-11-27 개정안은 사용자가 선택한 미저장 그래프 읽기 정책과 설치본 조사 결과를 반영한다. 개정안의 저장소 채택은 이 PR의 리뷰와 병합에서 결정한다.
 
-## 맥락 (Context)
-1. **Live Runtime Blind Spot의 착시**: Phase 11에서 570개 단위 테스트가 100% 통과하고 Seam 커버리지 85.0%를 달성했으나, 이 테스트들은 가상 백엔드(`InMemoryFakeBackend`)와 `MagicMock` 위에서 구동되어 실제 Windows OS 환경 및 실물 Capstone 런타임 뇌관들을 은폐하고 있었음.
-2. **OS 전역 자원 침범 잔존**: Phase 11 Ticket 1에서 박멸되었다고 보고된 클립보드 코드가 `graphs/inspection.py`에서 `_backup_clipboard()` / `_restore_clipboard()` 트릭으로 온존하여, 실기 구동 시 사용자 OS의 클립보드를 오버라이트하고 외부 앱과의 경합 시 즉시 폭발하는 위험이 상존함.
-3. **무음 실패(Silent Failure)의 만연**: 코드베이스 전역 44곳에 `contextlib.suppress`가 산재하여, 포커스 실패, F2 키입력 씹힘, Delete 키입력 무시, 마우스 드래그 실패 시 에러를 던지지 않고 엉뚱한 폴백(드래그 실패 시 더블클릭 등)을 감행하거나 성공으로 위장함.
-4. **로케일 종속성으로 인한 한글 환경 폭발**: `file_workflows.py`, `calculator.py`, `instruments/` 등에서 `"File"`, `"Export to file..."`, `"Select All"`, `"Calculator"` 등 영문 UI 문자열이 하드코딩되어 한글 윈도우/한글 언어팩 Capstone에서 100% `AutomationError`가 폭발함.
-5. **리버싱 자산과 런타임 구현의 단절**: `.cap` 복합 아카이브 구조(ZIP+XML)와 QWebChannel 53개 RPC를 역공학해두었음에도, 실기 도구들은 여전히 가장 취약한 UIA 화면 마우스/키보드 매크로에 전적으로 의존하고 있었음.
+## 결정 배경
 
-## 결정 (Decision)
+초기 ADR은 단위 테스트가 실제 Windows 포커스, Qt 컨트롤 및 물리 측정 완료를 증명할 수 없다고 지적했다. 이후 저장 파일과 실제 앱을 검사하면서 그래프 직접 읽기 RPC, 모든 컨트롤의 안정된 접근성 ID, 완전한 쓰기용 아카이브 명세를 전제로 한 요구를 재검토했다. [설치 앱 관측](../remediation-verification.md) [네이티브 서비스 목록](../audits/reconcile_recipes_numerics_reports.md)
 
-### 1. Zero OS Pollution (외부 OS 자원 침범 원천 금지)
-- MCP 서버는 실행 중인 호스트 OS의 전역 클립보드, 마우스 포커스 강탈, 시스템 단축키 전역 가로채기, 관리되지 않는 임시파일 잔류를 일체 금지함.
-- `graphs/inspection.py`의 `_backup_clipboard()`, `_restore_clipboard()`, `GetClipboardSequenceNumber()`를 완전 적출하고, 데이터 수집은 QWebChannel RPC 직접 질의 또는 파일 덤프/파싱으로만 수행함.
+## 그래프와 Windows 클립보드
 
-### 2. Bi-furcated Exception Contract (이중 예외 처리 계약)
-- **단순 조회형 프로빙 (Inspection Probing)**: 노드의 특정 COM 인터페이스나 속성 유무를 확인하는 검사(`hasattr(node, "iface_value")`)에 한해서만 안전한 예외 제어를 허용함.
-- **상태 변경 액션 (State-Mutating Action)**: 마우스 클릭, 드래그, 키입력(F2, Delete), 값 변경, 창 닫기 등 시스템 상태를 바꾸는 모든 액션의 실패는 절대 `suppress`하지 않으며, 즉시 구체적인 도메인 예외(`AutomationError`)를 던져 페일패스트(Fail-Fast)함. 드래그 실패 시 더블클릭과 같은 기만적 폴백은 영구 추방함.
+저장된 그래프는 `read.cap_file`이 가리키는 파일의 워크북 XML로 읽는다. 열려 있는 미저장 그래프에는 사용자가 선택한 `Copy Display` 예외를 적용한다.
 
-### 3. Locale Decoupling (다국어 로케일 비종속성)
-- UI 컨트롤 탐색 시 텍스트 매칭(`c.name == "..."`)을 1순위로 사용하는 방식을 전면 폐기하고, 언어 중립적인 `AutomationId` 매칭을 최우선으로 일원화함.
-- 부득이한 UI 문자열 탐색이 필요한 경우, 중앙 집중식 다국어 매핑 테이블(`LocaleTable`) 또는 정규식 패턴을 통해서만 매칭하여 한글/영문 환경 모두에서 동일하게 작동하도록 보장함.
+1. 대상 프로세스·창·그래프의 유일한 복사 메뉴를 확인한다. 현재 클립보드의 형식을 모두 보존할 수 있어야 한다. 알 수 없는 형식이나 백업 오류가 있으면 복사 명령 전에 중단한다.
+2. 변경 알림을 등록하고 클립보드 세대를 다시 확인한 다음 Capstone에 복사를 한 번 요청한다. 바뀐 내용의 소유 PID와 등록 형식을 확인한다.
+3. 같은 세대가 유지될 때만 도구 소유의 유효한 창 핸들로 클립보드를 열어 백업한 형식을 복원한다. 다른 애플리케이션이 나중에 복사한 내용은 그대로 둔다. 형식 복원이 실패하면 나머지 형식도 시도하고 실패를 호출자에게 전달한다.
 
-### 4. Direct Synthesis Path (리버싱 자산 기반 직통로 구축)
-- `.cap` 아카이브(ZIP+XML)의 쓰기/합성(Synthesis) 엔진을 구축하여, 계산식 등록, 센서 설정, 워크북 페이지 구성을 불안정한 UI 매크로 대신 파일 직접 주입 방식으로 전환함.
-- QWebChannel 53개 RPC 슬롯을 실기 `bridge.py`와 `SessionCdpClient`에 순차적으로 연결하여 고속 네이티브 IPC 통신을 실현함.
+복사 전 마지막 세대 확인과 외부 앱의 실제 복사를 하나의 원자적 연산으로 만들 수는 없다. 일회용 Windows 환경에서 유니코드 텍스트와 등록 형식의 복원, 더 최근 복사 내용 보존을 검증했다. 실제 Capstone 위젯의 지연 렌더링과 버전별 메뉴는 실기 항목이다. [그래프 조사](../audits/reconcile_graphs_clipboard.md) [Windows CI](https://github.com/ji5zi5/capstone-mcp/actions/runs/45927775898)
+
+## 입력과 오류
+
+읽기 전용 탐색은 지원하지 않는 패턴을 명시적으로 처리할 수 있다. 상태 변경에는 대상과 입력 준비 상태를 확인하고, 입력 전달과 독립적으로 관측한 완료를 구별한다. 타임아웃 뒤 효과가 불명확한 변경은 자동 재실행하지 않는다. 복구 작업에 실패하면 원래 오류와 아직 남은 창이나 상태를 알린다. [런타임 조사](../audits/reconcile_runtime_ipc.md)
+
+## 설치 언어와 컨트롤 식별
+
+확인한 안정된 `AutomationId`와 소유 창·컨트롤 유형을 우선 사용한다. 실제 `File`·`Display` 상위 메뉴와 일부 내보내기 버튼에는 접근성 ID가 비어 있었다. 이 경우 설치된 문자열 리소스의 정확한 캡션, 또는 `workflow_labels`와 그래프 요청에 명시된 실제 관측 라벨을 사용한다. 두 후보가 일치하거나 스냅샷이 잘렸으면 입력 전에 중단한다. 지원 언어는 각 설치본이 제공한 리소스로 결정한다. [실물 UI 관측](../remediation-verification.md) [파일 라벨 계약](../audits/ROUND3_FILE_LABELS.md)
+
+## 네이티브 데이터와 미지원 기능
+
+확인된 서비스 중 `RequestSensorsAndMeasurements`와 `RequestReadMeasurement`는 목록·단일 측정 판독에 사용한다. 설치된 `capstonelibrary.js`에서 덤프에 있는 서비스 멤버 53개의 이름을 모두 확인했다. `Request` 접두사가 있는 51개에는 블록 편집, 객체 참조 및 이미지 관리가 포함된다. 메서드의 이름만으로 장비 명령의 인자, 효과 또는 완료를 보장할 수 없다. [메서드별 대조](../audits/reconcile_recipes_numerics_reports.md)
+
+현재 지원 범위는 관측된 파일 형식의 읽기, 명시적으로 지원되는 앱 조작, 출처가 있는 측정 데이터 분석이다. `100 kHz` 벌크 스트림, 하드웨어 시계의 다채널 동기화, 범용 샘플링률·센서설정 RPC, `.cap` 파일 직접 합성은 지원 범위 밖에 둔다. 저장은 앱의 기본 저장 기능과 새 출력 경로를 사용한다. 지원 확대에는 공급자 명세나 재현 가능한 실제 요청·응답, 파일 쓰기에는 앱에서 다시 열고 내보낸 데이터와의 일치 증거가 필요하다. [텔레메트리와 하드웨어](../audits/reconcile_telemetry_instruments.md) [실험 파일 검증](../audits/reconcile_files_locales_tests.md)
