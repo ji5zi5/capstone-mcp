@@ -20,6 +20,7 @@ from capstone_mcp.instruments.models import (
     _Settings,
 )
 from capstone_mcp.models import Action, Control, Snapshot
+from capstone_mcp.ui_strings import label_matches
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -349,17 +350,21 @@ def target_sampling_rate(
 
 def _is_zero_button(ctrl: Control) -> bool:
     """Check if a control represents a Zero or Tare action."""
-    if not ctrl.visible or ctrl.control_type not in ("Button", "CheckBox"):
+    if not ctrl.visible or not ctrl.enabled or ctrl.control_type != "Button":
         return False
-    name_lower = ctrl.name.strip().lower()
-    aid_lower = ctrl.automation_id.lower()
     return (
-        "zero" in name_lower
-        or "tare" in name_lower
-        or "zero" in aid_lower
-        or "tare" in aid_lower
-        or name_lower == "0"
+        ctrl.automation_id.rsplit(".", 1)[-1].casefold() in {"zerobutton", "tarebutton"}
+        or label_matches(ctrl.name, "STR_PROPERTY_SENSOR_ZERO_SENSOR")
+        or ctrl.name.strip().casefold() in {"zero sensor", "tare sensor"}
     )
+
+
+def _zero_buttons(app: Capstone, handle: int) -> list[Control]:
+    snapshot = app.snapshot(handle, depth=16, limit=10_000)
+    if snapshot.truncated:
+        msg = "Sensor zeroing requires a complete snapshot."
+        raise AutomationError(msg)
+    return [ctrl for ctrl in snapshot.controls if _is_zero_button(ctrl)]
 
 
 def zero_sensor(app: Capstone, request: ZeroSensorRequest) -> ZeroSensorResult:
@@ -372,8 +377,7 @@ def zero_sensor(app: Capstone, request: ZeroSensorRequest) -> ZeroSensorResult:
     if recording.recording:
         msg = "Stop recording before zeroing sensors."
         raise AutomationError(msg)
-    snapshot = app.snapshot(request.handle, depth=16, limit=10_000)
-    zero_buttons = [c for c in snapshot.controls if _is_zero_button(c)]
+    zero_buttons = _zero_buttons(app, request.handle)
 
     if not zero_buttons:
         msg = "No zeroable sensors or Zero buttons found in the active window."
@@ -401,15 +405,12 @@ def zero_sensor(app: Capstone, request: ZeroSensorRequest) -> ZeroSensorResult:
         if recording.recording:
             msg = "Stop recording before zeroing sensors."
             raise AutomationError(msg)
-        fresh = app.snapshot(request.handle, depth=16, limit=10_000)
         matches = [
             c
-            for c in fresh.controls
-            if _is_zero_button(c)
-            and c.automation_id == btn.automation_id
-            and c.name == btn.name
+            for c in _zero_buttons(app, request.handle)
+            if c.automation_id == btn.automation_id and c.name == btn.name
         ]
-        if len(matches) != 1 or not matches[0].enabled:
+        if len(matches) != 1:
             msg = "Zero button became unavailable; no further zero inputs were sent."
             raise AutomationError(msg)
         _ = app.act(matches[0].ref, Action.INVOKE, allow_foreground=True)

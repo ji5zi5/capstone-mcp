@@ -4,7 +4,7 @@
 from enum import StrEnum
 from typing import Literal, Self
 
-from pydantic import Field, model_validator
+from pydantic import AwareDatetime, Field, model_validator
 
 from capstone_mcp.analysis import (
     AnalysisError,
@@ -155,6 +155,9 @@ class CapturedRun(Model):
     """One stopped cycle's saved artifact, changes, and optional analysis."""
 
     ordinal: int
+    saved_at_utc: AwareDatetime | None = Field(
+        default=None, description="Host UTC time when the native save returned.",
+    )
     interrupted: bool
     artifact: FileArtifact
     datasets: list[DatasetChange]

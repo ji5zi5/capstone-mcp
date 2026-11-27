@@ -10,7 +10,7 @@ from unittest.mock import Mock
 import pytest
 
 from capstone_mcp.bridge import NativeInventory
-from capstone_mcp.csv_data import CsvDataError, read_csv_page
+from capstone_mcp.csv_data import CsvDataError, parse_csv_number, read_csv_page
 from capstone_mcp.data_sources.adapters.csv_file import (
     read_csv_all_columns,
     read_csv_datasets,
@@ -18,6 +18,12 @@ from capstone_mcp.data_sources.adapters.csv_file import (
 )
 from capstone_mcp.data_sources.adapters.live_telemetry import LiveMeasurementAdapter
 from capstone_mcp.session.telemetry import TelemetryBuffer, TelemetryClock
+
+
+def test_numeric_cell_accepts_a_leading_bom_and_unicode_minus() -> None:
+    assert parse_csv_number(" \ufeff\u22120,75 ") == Decimal("-0.75")
+    with pytest.raises(CsvDataError, match="Invalid numeric CSV value"):
+        _ = parse_csv_number("1\ufeff2")
 
 
 @pytest.mark.parametrize("encoding", ["utf-8-sig", "cp949", "utf-16"])

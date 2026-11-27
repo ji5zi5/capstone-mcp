@@ -2,9 +2,37 @@
 """Check native output-file readiness without delay-based polling."""
 
 from pathlib import Path
+from unittest.mock import Mock
 
+import pytest
+
+from capstone_mcp import file_events
 from capstone_mcp.file_events import FileEvents, file_is_closed
 from capstone_mcp.ui_events import StateChanges
+
+
+def test_partial_subscription_releases_directory_notification(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    close = Mock()
+    handle = Mock()
+    monkeypatch.setattr(file_events.win32file, "FindFirstChangeNotification", Mock(return_value=handle))
+    monkeypatch.setattr(file_events.win32file, "FindCloseChangeNotification", close)
+    monkeypatch.setattr(file_events.win32event, "CreateEvent", Mock(side_effect=OSError("unavailable")))
+    with pytest.raises(OSError, match="unavailable"), FileEvents(tmp_path, StateChanges()):
+        pytest.fail("subscription must succeed before entering the workflow")
+    close.assert_called_once_with(handle)
+
+
+def test_receiver_start_failure_releases_both_handles(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    close, handle, stop = Mock(), Mock(), Mock()
+    monkeypatch.setattr(file_events.win32file, "FindFirstChangeNotification", Mock(return_value=handle))
+    monkeypatch.setattr(file_events.win32file, "FindCloseChangeNotification", close)
+    monkeypatch.setattr(file_events.win32event, "CreateEvent", Mock(return_value=stop))
+    events = FileEvents(tmp_path, StateChanges())
+    monkeypatch.setattr(events.thread, "start", Mock(side_effect=RuntimeError("start failed")))
+    with pytest.raises(RuntimeError, match="start failed"), events:
+        pytest.fail("receiver must start before entering the workflow")
+    close.assert_called_once_with(handle)
+    stop.Close.assert_called_once()
 
 
 def test_directory_event_confirms_closed_file(tmp_path: Path) -> None:

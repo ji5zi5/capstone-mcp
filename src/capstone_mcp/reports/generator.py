@@ -16,6 +16,7 @@ from capstone_mcp.numerics import (
     compute_series_summary,
     fit_linear_series,
 )
+from capstone_mcp.numerics.regression import strictly_monotonic
 from capstone_mcp.reports.models import (
     DataSummary,
     ErrorAnalysisRow,
@@ -587,10 +588,12 @@ def _analyze_constants(
 def _fit_adiabatic(
     x_vals: list[float],
     y_vals: list[float],
-) -> tuple[RegressionSummary, list[ErrorAnalysisRow], str]:
+) -> tuple[RegressionSummary | None, list[ErrorAnalysisRow], str]:
     if not all(math.isfinite(v) and v > 0 for v in (*x_vals, *y_vals)):
         msg = "Adiabatic fitting requires finite positive volume and absolute pressure."
         raise ValueError(msg)
+    if not strictly_monotonic(x_vals):
+        return None, [], ""
     ln_v = [math.log(v) for v in x_vals]
     ln_p = [math.log(p) for p in y_vals]
     reg = compute_linear_regression(

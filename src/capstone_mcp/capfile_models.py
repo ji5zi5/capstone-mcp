@@ -192,6 +192,7 @@ class CapDatasetSummary(CapFileModel):
     dataset_id: str | None
     source_euid: str | None
     name: str | None
+    dataset_name: str | None = None
     run_name: str | None = None
     run_number: int | None = None
     unit_id: int | None

@@ -244,6 +244,16 @@ def test_generate_report_rlc_resonance() -> None:
     assert any(r.symbol in ("f_0", "f0") for r in report.error_analysis)
 
 
+def test_adiabatic_cycle_is_summarized_without_a_spurious_gamma() -> None:
+    report = generate_report(
+        experiment_id="adiabatic_gas",
+        data_series={"Volume": [30, 20, 10, 20, 30], "Pressure": [10, 20, 30, 22, 10]},
+    )
+    assert report.data_summaries[0].count == 5
+    assert report.regression is None
+    assert not report.error_analysis
+
+
 def test_generate_report_adiabatic_gas() -> None:
     volumes = [100.0, 80.0, 60.0, 40.0]
     pressures = [100.0 * ((100.0 / v) ** 1.4) for v in volumes]
@@ -297,6 +307,31 @@ def test_render_markdown_output() -> None:
     assert "## 4. Experimental Data & Summary Statistics" in md
     assert "## 5. Regression & Curve Fitting" in md
     assert "```text" in md
+
+
+def test_markdown_keeps_external_labels_inside_their_sections() -> None:
+    report = generate_report(
+        experiment_id="generic", data_series={"x": [1, 2], "y": [3, 4]},
+        title="Trial\n# 2", apparatus=["Sensor <optical>"],
+    )
+    report.metadata.channels_or_sensors["A | B"] = "`meter`"
+    report = report.model_copy(update={"ascii_plot": "trial\n```\nend"})
+    md = render_markdown(report)
+    assert "Trial &#35; 2" in md
+    assert "Sensor &lt;optical&gt;" in md
+    assert "| A &#124; B | &#96;meter&#96; |" in md
+    assert "````text\ntrial\n```\nend\n````" in md
+
+
+def test_additional_regressions_appear_in_both_report_formats() -> None:
+    report = generate_report(experiment_id="generic", data_series={"x": [1, 2], "y": [3, 4]})
+    extra = RegressionSummary(model_name="Second observation", slope=2.0, intercept=1.0)
+    report.additional_regressions.append(extra)
+    for rendered in (render_markdown(report), render_html(report)):
+        assert rendered.index("Linear Fit") < rendered.index("Second observation")
+    only_extra = report.model_copy(update={"regression": None})
+    assert "Second observation" in render_markdown(only_extra)
+    assert "Second observation" in render_html(only_extra)
 
 
 def test_render_html_output() -> None:
@@ -416,6 +451,24 @@ async def test_capstone_generate_lab_report_tool(tmp_path: Path) -> None:
     saved_text = out_file.read_text(encoding="utf-8")
     assert "Laboratory Report" in saved_text
     assert "Sample / Demonstration" in saved_text
+
+
+@pytest.mark.anyio
+async def test_large_tool_report_preserves_statistics_and_declares_preview_lengths(
+    tmp_path: Path,
+) -> None:
+    count = 9_000
+    path = tmp_path / "observations.csv"
+    path.write_text("x,y\n" + "".join(f"{i},{2 * i}\n" for i in range(count)))
+    result = await capstone_generate_lab_report(file_path_or_run=str(path))
+    report = result.lab_report
+    assert report.original_point_counts == {"raw_data_points": {"x": count, "y": count}}
+    x, y = report.raw_data_points["x"], report.raw_data_points["y"]
+    assert 0 < len(x) < count
+    assert len(x) == len(y)
+    assert y == [2 * i for i in range(len(x))]
+    assert report.data_summaries[1].max == 2 * (count - 1)
+    assert report.data_summaries[0].count == count
 
 
 @pytest.mark.parametrize("invalid", [0.0, -1.0, float("nan"), float("inf")])

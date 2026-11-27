@@ -1,6 +1,8 @@
 # Copyright 2026 Capstone MCP contributors.
 """Exact labels from Capstone's installed resources for controls without IDs."""
 
+import re
+import unicodedata
 from functools import cache
 from typing import Final
 
@@ -17,12 +19,14 @@ _ENGLISH: Final = {
     "STR_TABLE_DATA_ALIGNMENT_MODE_INDEX": "Align by Index",
     "STR_EXPORT_DATA_DIALOG_EXPORT": "Export to file...",
     "STR_CLOSE": "Close",
+    "STR_PROPERTY_SENSOR_ZERO_SENSOR": "Zero Sensor Now",
+    "STR_FORMAT_RUN_NAME": "Run #%1",
 }
 
 
 def _normalize(text: str) -> str:
     caption = text.replace("&&", "\0").replace("&", "").replace("\0", "&")
-    return caption.strip().casefold()
+    return " ".join(unicodedata.normalize("NFC", caption).casefold().split())
 
 
 @cache
@@ -45,3 +49,17 @@ def _labels() -> dict[str, set[str]]:
 def label_matches(text: str, resource_key: str) -> bool:
     """Match a control caption to one known string ID across installed languages."""
     return _normalize(text) in _labels()[resource_key]
+
+
+def numbered_run(text: str) -> str | None:
+    """Read the number only from a complete native run caption or legacy Run label."""
+    caption = _normalize(text)
+    match = re.fullmatch(r"run\s*#?\s*(\d+)", caption)
+    if match:
+        return match[1]
+    for template in _labels()["STR_FORMAT_RUN_NAME"]:
+        if template.count("%1") == 1:
+            pattern = re.escape(template).replace("%1", r"(\d+)")
+            if match := re.fullmatch(pattern, caption):
+                return match[1]
+    return None

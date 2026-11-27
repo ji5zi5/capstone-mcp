@@ -179,7 +179,8 @@ def register_physics_tools(mcp: FastMCP, native: NativeCaller) -> dict[str, Any]
             format: Output format ('markdown', 'html', or 'both').
 
         Returns:
-            GenerateLabReportResult containing report model, rendered text, and status.
+            Report, rendered text, and status. Large sample arrays are returned as
+            aligned prefixes with original_point_counts. Fits use all input samples.
         """
         report = await anyio.to_thread.run_sync(
             partial(
@@ -216,7 +217,7 @@ def register_physics_tools(mcp: FastMCP, native: NativeCaller) -> dict[str, Any]
             report_markdown=md_text,
             report_html=html_text,
             summary=summary_text,
-            lab_report=report,
+            lab_report=report.transport_preview(),
         )
 
     @mcp.tool(
@@ -233,26 +234,17 @@ def register_physics_tools(mcp: FastMCP, native: NativeCaller) -> dict[str, Any]
         action: str = "run",
         parameters: dict[str, JsonValue] | None = None,
     ) -> ExperimentMacroResult:
-        """Execute high-level automation macro for canonical physics experiments.
+        """Analyze supplied measurements for a supported physics experiment.
 
-        Supported experiments:
-        - 'photoelectric_effect': Mercury lamp wavelength sweep (365, 405, 436, 546,
-          577 nm), DC amplifier Ch A / DC power supply Ch B, Keep Sample stopping
-          potential acquisition, and h/e linear fit.
-        - 'rlc_resonance': 850 Signal generator sine sweep (10Hz-10kHz), Scope/FFT
-          peak measurement, resonant frequency f_0, and Q-factor calculation.
-        - 'forced_harmonic_oscillation' / 'forced_oscillation': Smart Cart 100Hz
-          position, 480s stop condition, resonance amplitude curve, and damping b.
-        - 'adiabatic_gas': 1000Hz sampling, cyclic work area integration (oint P dV),
-          and adiabatic index gamma fit (PV^gamma = const).
-        - 'slit_diffraction': Light intensity vs position scan, diffraction
-          minima/maxima extraction, and slit geometry (width a, separation d).
+        Use action='analyze' with measured arrays in parameters. The supported
+        experiment IDs are photoelectric_effect, rlc_resonance,
+        forced_harmonic_oscillation (alias forced_oscillation), adiabatic_gas
+        and slit_diffraction. For example, photoelectric_effect accepts
+        wavelengths_nm and stopping_voltages_v.
 
-        Actions:
-        - 'setup': Configure apparatus sensors, displays, and excitation sources.
-        - 'acquire': Record or sample experimental datasets.
-        - 'analyze': Perform numerical regression, peak detection, and error metrics.
-        - 'run': Sequentially execute setup, acquire, and analyze phases.
+        'acquire' accepts previously recorded inputs. Automatic apparatus setup
+        and live acquisition are unavailable. 'run' stops at the first failed
+        phase. Inspect success, phase_results and error before reporting results.
         """
         params = dict(parameters or {})
         return await anyio.to_thread.run_sync(

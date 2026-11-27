@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from threading import Thread
+from threading import Lock, Thread
 from typing import TYPE_CHECKING, Final, Self
 
 import win32event
@@ -48,18 +48,41 @@ class FileEvents:
     """Wake state predicates when the target directory changes, without polling."""
 
     def __init__(self, directory: Path, changes: StateChanges) -> None:
-        """Register before the native save/export input is delivered."""
+        """Prepare a receiver for the target directory."""
+        self.directory = directory
         self.changes: StateChanges = changes
-        self.change_handle: Handle = win32file.FindFirstChangeNotification(
-            str(directory), 0, FILE_CHANGE_FLAGS,
-        )
-        self.stop_handle: Handle = win32event.CreateEvent(None, 1, 0, None)
+        self._handle_lock = Lock()
+        self._closed = False
         self.thread: Thread = Thread(target=self._watch, daemon=True)
         self.error: str | None = None
 
+    def _close_handles(self) -> None:
+        with self._handle_lock:
+            self._closed = True
+            try:
+                win32file.FindCloseChangeNotification(self.change_handle)
+            finally:
+                self.stop_handle.Close()
+
     def __enter__(self) -> Self:
-        """Start the receiver; the OS subscription already exists."""
-        self.thread.start()
+        """Register and start the receiver before the native workflow sends input."""
+        if self.thread.ident is not None:
+            msg = "File notification receiver has already been started."
+            raise AutomationError(msg)
+        self.change_handle: Handle = win32file.FindFirstChangeNotification(
+            str(self.directory), 0, FILE_CHANGE_FLAGS,
+        )
+        try:
+            self.stop_handle: Handle = win32event.CreateEvent(None, 1, 0, None)
+        except BaseException:
+            win32file.FindCloseChangeNotification(self.change_handle)
+            raise
+        self._closed = False
+        try:
+            self.thread.start()
+        except RuntimeError:
+            self._close_handles()
+            raise
         return self
 
     def __exit__(
@@ -67,13 +90,17 @@ class FileEvents:
         _error: BaseException | None, _traceback: TracebackType | None,
     ) -> None:
         """Wake and close the receiver without an unbounded join."""
-        win32event.SetEvent(self.stop_handle)
+        with self._handle_lock:
+            if not self._closed:
+                win32event.SetEvent(self.stop_handle)
         self.thread.join(2)
         if self.thread.is_alive():
             msg = "File notification receiver did not stop."
             raise AutomationError(msg)
-        win32file.FindCloseChangeNotification(self.change_handle)
-        self.stop_handle.Close()
+        if self.error is not None:
+            if _error is None:
+                raise AutomationError(self.error)
+            _error.add_note(self.error)
 
     def _watch(self) -> None:
         try:
@@ -88,6 +115,12 @@ class FileEvents:
         except (win32event.error, win32file.error) as error:
             self.error = str(error)
             self.changes.notify()
+        finally:
+            try:
+                self._close_handles()
+            except (win32event.error, win32file.error) as error:
+                self.error = str(error)
+                self.changes.notify()
 
     def ready(self, path: Path) -> bool:
         """Surface watcher failures instead of silently waiting on a dead receiver."""

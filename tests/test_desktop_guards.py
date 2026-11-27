@@ -9,10 +9,12 @@ import pytest
 import win32gui
 import win32process
 from pywinauto.application import ProcessNotFoundError
+from pywinauto.uia_defines import NoPatternInterfaceError
 
 from capstone_mcp import desktop
 from capstone_mcp.desktop import AutomationError, Capstone
 from capstone_mcp.models import Action, Bounds, Window
+from capstone_mcp.native.errors import classify_native_error
 
 if TYPE_CHECKING:
     from pywinauto.controls.uiawrapper import UIAWrapper
@@ -21,6 +23,22 @@ MAIN = 1
 DIALOG = 2
 SHADOW = 11
 BOUNDS = Bounds(left=0, top=0, right=5, bottom=5)
+
+
+def test_missing_value_pattern_preserves_the_ref_and_returns_an_actionable_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    app = Capstone()
+    node = cast("UIAWrapper", Mock(iface_value=None))
+    app.refs["ref"] = node
+    monkeypatch.setattr(app, "control", Mock(return_value=node))
+    with pytest.raises(NoPatternInterfaceError, match="readable") as read_error:
+        _ = app.read_value("ref")
+    with pytest.raises(NoPatternInterfaceError, match="writable") as write_error:
+        _ = app.set_value("ref", "42")
+    assert app.refs["ref"] is node
+    assert classify_native_error(read_error.value)[0] == "CONTROL_PATTERN_UNAVAILABLE"
+    assert classify_native_error(write_error.value)[0] == "CONTROL_PATTERN_UNAVAILABLE"
 
 
 def _only_dialog_enabled(handle: int) -> bool:

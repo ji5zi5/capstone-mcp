@@ -8,6 +8,25 @@ from capstone_mcp.session.telemetry import TelemetryBuffer, TelemetryClock
 CLOCK = TelemetryClock(clock_id="device:fixture:run1", unit="milliseconds", origin="run-start")
 
 
+@pytest.mark.parametrize("value", [float("nan"), float("inf"), float("-inf")])
+def test_invalid_value_cannot_create_a_channel_or_evict_samples(value: float) -> None:
+    buffer = TelemetryBuffer(capacity=1)
+    buffer.push_sample("force", 2.0)
+    before = buffer.get_snapshot("force")
+    with pytest.raises(ValueError, match="sample value must be finite"):
+        buffer.push_sample("force", value)
+    assert buffer.get_snapshot("force") == before
+    with pytest.raises(ValueError, match="sample value must be finite"):
+        buffer.push_sample("new", value)
+    assert buffer.get_clock("new") is None
+
+
+def test_mean_of_large_finite_observations_is_finite() -> None:
+    buffer = TelemetryBuffer()
+    buffer.push_sample("force", 1e308)
+    buffer.push_sample("force", 1e308)
+    assert buffer.compute_stats("force")["mean"] == 1e308
+
 def test_explicit_timestamp_requires_provenance() -> None:
     buffer = TelemetryBuffer()
     with pytest.raises(ValueError, match="require a clock"):

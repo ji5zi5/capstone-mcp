@@ -26,10 +26,13 @@ def main() -> None:
         packet = RequestPacket.model_validate_json(line)
         try:
             result = runtime.dispatch(packet.command)
+            payload = NativeReply(
+                identifier=packet.identifier, result=result,
+            ).model_dump_json()
         except GraphOperationError as error:
             LOGGER.exception("Native graph operation failed")
             code, remediation = classify_native_error(error)
-            reply = NativeReply(
+            payload = NativeReply(
                 identifier=packet.identifier,
                 error=str(error),
                 error_code=code,
@@ -39,19 +42,17 @@ def main() -> None:
                         "request_id": packet.identifier,
                     },
                 ),
-            )
+            ).model_dump_json()
         except Exception as error:
             LOGGER.exception("Native Capstone operation failed")
             code, remediation = classify_native_error(error)
-            reply = NativeReply(
+            payload = NativeReply(
                 identifier=packet.identifier,
                 error=f"{type(error).__name__}: {error}",
                 error_code=code,
                 remediation=remediation,
-            )
-        else:
-            reply = NativeReply(identifier=packet.identifier, result=result)
-        _ = sys.stdout.write(reply.model_dump_json() + "\n")
+            ).model_dump_json()
+        _ = sys.stdout.write(payload + "\n")
         _ = sys.stdout.flush()
         line = sys.stdin.readline(MAX_MESSAGE_BYTES + 1)
 

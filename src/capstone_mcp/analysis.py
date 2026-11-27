@@ -2,6 +2,7 @@
 """Numerical analysis of explicitly supplied Capstone measurement samples."""
 
 import math
+from statistics import mean
 from typing import Annotated, Final
 
 from pydantic import Field, FiniteFloat
@@ -67,8 +68,8 @@ def linear_fit(samples: FitInput) -> LinearFit:
         msg = "x and y must contain the same number of paired samples."
         raise AnalysisError(msg)
     count = len(samples.x)
-    mean_x = math.fsum(value / count for value in samples.x)
-    mean_y = math.fsum(value / count for value in samples.y)
+    mean_x = mean(samples.x)
+    mean_y = mean(samples.y)
     dx = [value - mean_x for value in samples.x]
     dy = [value - mean_y for value in samples.y]
     sxx = math.fsum(value * value for value in dx)
@@ -100,11 +101,10 @@ def linear_fit(samples: FitInput) -> LinearFit:
         for index, distance in enumerate(cooks_distance)
         if distance is not None and distance > threshold
     ]
-    lag_count = count - 1
     lagged = residuals[:-1]
     leading = residuals[1:]
-    lagged_mean = math.fsum(value / lag_count for value in lagged)
-    leading_mean = math.fsum(value / lag_count for value in leading)
+    lagged_mean = mean(lagged)
+    leading_mean = mean(leading)
     lagged_sum = math.fsum((value - lagged_mean) ** 2 for value in lagged)
     leading_sum = math.fsum((value - leading_mean) ** 2 for value in leading)
     if lagged_sum == 0 or leading_sum == 0:

@@ -34,8 +34,8 @@ def test_hardware_setup_workflow_prompt_defaults() -> None:
     assert "scan_wireless" in text
     assert "set_sampling_rate" in text
     assert "zero_sensor" in text
-    assert "set_signal_generator" in text
-    assert "read_signal_generator" in text
+    assert "configure_signal_generator" in text
+    assert "read_only=true" in text
 
 
 def test_hardware_setup_workflow_prompt_custom() -> None:
@@ -50,7 +50,7 @@ def test_hardware_setup_workflow_prompt_custom() -> None:
     assert "50 Hz" in text
     assert "capstone://hardware/inventory" in text
     assert "sensor_name='Motion Sensor'" in text
-    assert "sampling_rate='50 Hz'" in text
+    assert "target='50 Hz'" in text
 
 
 def test_hardware_setup_workflow_registered_on_fastmcp() -> None:

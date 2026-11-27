@@ -109,6 +109,10 @@ def test_measure_stop_save_fit_and_compare_keeps_each_cycle_distinct(
         "baseline.cap", "run-001.cap", "run-002.cap",
     ]
     assert all(path.is_file() for path in saver.paths)
+    assert report.runs[0].saved_at_utc is not None
+    assert report.runs[0].model_dump(mode="json")["saved_at_utc"].endswith("Z")
+    previous = report.runs[0].model_dump(exclude={"saved_at_utc"})
+    assert type(report.runs[0]).model_validate(previous).saved_at_utc is None
     assert report.runs[0].fit is not None
     assert report.runs[1].fit is not None
     assert report.runs[0].fit.x.dataset_id == "x1"

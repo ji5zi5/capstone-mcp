@@ -19,6 +19,7 @@ from capstone_mcp.capfiles import (
     read_cap_file,
 )
 from capstone_mcp.capfiles import archive as archive_parser
+from capstone_mcp.data_sources import list_source_datasets
 from tests.test_capfiles import _payload, _write_cap, _xml
 
 
@@ -53,6 +54,11 @@ def test_metadata_listing_does_not_read_payloads(tmp_path: Path, monkeypatch: py
     monkeypatch.setattr(archive_parser, "_read_member", read)
     summaries = list_cap_datasets(path)
     assert summaries[0].count == 2
+    assert [call.args[1].filename for call in read.call_args_list] == ["main.xml"]
+    read.reset_mock()
+    inventory = list_source_datasets(str(path))
+    assert inventory[0].sample_count == 2
+    assert inventory[0].name == summaries[0].name
     assert [call.args[1].filename for call in read.call_args_list] == ["main.xml"]
 
 

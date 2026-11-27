@@ -144,9 +144,7 @@ class NativeDesktop:
                     allow_foreground=r.allow_foreground,
                 ),
             ),
-            "read_value": lambda r: self.app.control(
-                r.ref,
-            ).iface_value.CurrentValue,
+            "read_value": lambda r: self.app.read_value(r.ref),
             "set_value": lambda r: _json(self.app.set_value(r.ref, r.value)),
             "screenshot": lambda r: base64.b64encode(
                 self.app.screenshot(

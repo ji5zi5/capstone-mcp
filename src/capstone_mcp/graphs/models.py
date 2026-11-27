@@ -403,7 +403,7 @@ class GraphOperationError(RuntimeError):
         """Initialize GraphOperationError with machine-readable failure details."""
         self.failure = failure
         message = f"{failure.code}: {failure.detail}"
-        super().__init__(message + " Call capstone_graph_recovery before retrying.")
+        super().__init__(message + " Inspect last_graph_failure in capstone://status.")
 
 
 class GraphProgress:

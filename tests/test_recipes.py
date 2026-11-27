@@ -1,6 +1,7 @@
 # Copyright 2026 Capstone MCP contributors.
 """Comprehensive unit and integration tests for Experiment Automation Macro Engine."""
 
+import math
 from typing import Any
 
 import pytest
@@ -19,6 +20,7 @@ from capstone_mcp.recipes import (
     run_experiment_macro,
 )
 from capstone_mcp.recipes.base import RecipePhaseResult
+from capstone_mcp.recipes.slit_diffraction import _find_local_extrema
 from capstone_mcp.server import capstone_run_experiment_macro
 
 # ---------------------------------------------------------------------------
@@ -178,10 +180,21 @@ def test_adiabatic_gas_user_data_cycle() -> None:
     # Area = Delta P * Delta V = 100 kPa * 30 cm^3 = 3000 mJ = 3.0 J
     p_pts = [100.0, 200.0, 200.0, 100.0]
     v_pts = [20.0, 20.0, 50.0, 50.0]
-    res = recipe.analyze({"pressure_kpa": p_pts, "volume_cm3": v_pts})
+    res = recipe.analyze({"pressure_kpa": p_pts, "volume_cm3": v_pts, "closed_cycle": True})
     assert res.status == "completed"
     assert abs(res.details["cyclic_work_joules"] - 3.0) < 1e-4
     assert abs(res.details["cyclic_work_mj"] - 3000.0) < 1e-1
+    assert res.details["gamma_fit_status"] == "requires_single_stroke"
+    assert "adiabatic_index_gamma_exp" not in res.details
+
+
+def test_open_compression_integrates_only_measured_segments() -> None:
+    result = AdiabaticGasRecipe().analyze({
+        "pressure_kpa": [100, 120, 150, 200], "volume_cm3": [50, 40, 30, 20],
+    })
+    assert result.status == "completed"
+    assert result.details["path_work_joules"] == pytest.approx(-4.2)
+    assert "cyclic_work_joules" not in result.details
 
 
 # ---------------------------------------------------------------------------
@@ -249,8 +262,11 @@ def test_adiabatic_constant_volume_does_not_return_theory() -> None:
     assert "distinct volumes" in result.message
 
 
-def test_adiabatic_measured_power_law() -> None:
+@pytest.mark.parametrize("expanding", [False, True])
+def test_adiabatic_measured_power_law(*, expanding: bool) -> None:
     volumes = [50.0, 40.0, 30.0, 20.0, 10.0]
+    if expanding:
+        volumes.reverse()
     pressures = [1000.0 / v**1.25 for v in volumes]
     result = AdiabaticGasRecipe().analyze(
         {"pressure_kpa": pressures, "volume_cm3": volumes},
@@ -289,6 +305,16 @@ def test_double_slit_does_not_misidentify_interference_minima() -> None:
     assert "derived_slit_width_mm" not in result.details
 
 
+def test_single_slit_first_minimum_uses_measured_angle() -> None:
+    result = SlitDiffractionRecipe().analyze({
+        "positions_mm": [-15, -10, -5, 0, 5, 10, 15],
+        "intensities": [1, 0, 3, 5, 3, 0, 1],
+        "screen_distance_m": 0.01, "wavelength_m": 1e-5,
+    })
+    assert result.status == "completed"
+    assert result.details["derived_slit_width_mm"] == pytest.approx(0.0141)
+
+
 def test_single_slit_input_units_match() -> None:
     recipe = SlitDiffractionRecipe()
     positions = [-20, -16.25, -8, 0, 8, 16.25, 20]
@@ -300,6 +326,11 @@ def test_single_slit_input_units_match() -> None:
     assert mm.status == metres.status == "completed"
     assert mm.details == metres.details
     assert mm.details["derived_slit_width_mm"] == pytest.approx(0.04)
+    assert "nominal_slit_width_mm" not in mm.details
+    assert "slit_width_error_pct" not in mm.details
+    with_nominal = {"positions_mm": positions, "intensities": intensity, "nominal_slit_width_m": 8e-5}
+    assert recipe.analyze(with_nominal).details["slit_width_error_pct"] == pytest.approx(50, abs=0.1)
+    assert recipe.analyze({**with_nominal, "nominal_slit_width_m": 0}).status == "failed"
 
 
 @pytest.mark.parametrize(
@@ -367,7 +398,9 @@ def test_slit_separation_counts_spacing_through_central_fringe() -> None:
     })
     assert result.status == "completed"
     assert "derived_slit_width_mm" not in result.details
-    assert result.details["derived_slit_separation_mm"] == pytest.approx(0.325)
+    # The second-order fringe is 4 mm from center on a screen 1 m away.
+    expected_mm = 2 * 650e-6 / math.sin(math.atan(4 / 1000))
+    assert result.details["derived_slit_separation_mm"] == pytest.approx(expected_mm)
 
 
 # ---------------------------------------------------------------------------
@@ -392,3 +425,10 @@ def test_diffraction_isolated_outer_spike_is_rejected() -> None:
     assert result.status == "failed"
     assert "spike" in result.message
     assert not result.details
+
+
+def test_quantized_diffraction_profiles_have_only_two_sided_extrema() -> None:
+    positions = [0.0, 1.0, 3.0, 4.0, 6.0, 8.0, 9.0, 10.0]
+    levels = [0.0, 1.0, 1.0, 2.0, 2.0, 0.0, 0.0, 1.0]
+    assert _find_local_extrema(positions, levels) == ([(5.0, 2.0)], [(8.5, 0.0)])
+    assert _find_local_extrema(positions[:4], [0.0, 1.0, 1.0, 1.0]) == ([], [])

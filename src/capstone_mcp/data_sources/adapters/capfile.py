@@ -8,7 +8,7 @@ from dataclasses import dataclass, replace
 from math import isfinite
 from typing import TYPE_CHECKING
 
-from capstone_mcp.capfiles import read_cap_file
+from capstone_mcp.capfiles import list_cap_datasets, read_cap_file
 from capstone_mcp.data_sources.models import (
     DataSeries,
     DatasetMetadata,
@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     from decimal import Decimal
     from pathlib import Path
 
-    from capstone_mcp.capfile_models import CapDataSet
+    from capstone_mcp.capfile_models import CapDataSet, CapDatasetSummary
 
 
 @dataclass(frozen=True)
@@ -35,22 +35,17 @@ class SavedRunData:
 
 def read_capfile_datasets(path: Path) -> list[DatasetMetadata]:
     """Extract dataset metadata from a .cap archive."""
-    archive = read_cap_file(path)
     metadata: list[DatasetMetadata] = []
 
-    for d in archive.datasets:
+    for d in list_cap_datasets(path):
         unit_str = str(d.unit_id) if d.unit_id is not None else ""
-        count = (
-            len(d.numeric_values)
-            if d.numeric_values is not None
-            else len(d.raw_values)
-        )
+        fallback = f"Dataset_{d.dataset_id}" if d.dataset_id else "Unnamed"
         metadata.append(
             DatasetMetadata(
-                name=_dataset_name(d),
+                name=d.name or d.dataset_name or fallback,
                 units=unit_str,
                 run_id=_run_id(d),
-                sample_count=count,
+                sample_count=d.count,
             ),
         )
     return metadata
@@ -61,7 +56,7 @@ def _dataset_name(dataset: CapDataSet) -> str:
     return dataset.source_name or dataset.name or fallback
 
 
-def _run_id(dataset: CapDataSet) -> str | None:
+def _run_id(dataset: CapDataSet | CapDatasetSummary) -> str | None:
     if dataset.run_name:
         return dataset.run_name
     return f"Run #{dataset.run_number}" if dataset.run_number is not None else None

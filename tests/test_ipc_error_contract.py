@@ -4,10 +4,14 @@
 from __future__ import annotations
 
 import json
+import sys
+from io import StringIO
+from unittest.mock import Mock
 
 import pytest
 
-from capstone_mcp.automation_models import NativeReply, NativeRequest
+from capstone_mcp import native_loop
+from capstone_mcp.automation_models import NativeReply, NativeRequest, RequestPacket
 from capstone_mcp.automation_worker import AutomationWorker, NativeSessionError
 from capstone_mcp.desktop import AutomationError
 from capstone_mcp.graphs.models import GraphFailure, GraphOperationError
@@ -16,6 +20,30 @@ from capstone_mcp.native_loop import (  # pyright: ignore[reportPrivateUsage]
 )
 from capstone_mcp.native_main import init_dpi_awareness
 from capstone_mcp.server import ToolErrorPayload, format_tool_error
+
+
+def test_unserializable_result_preserves_request_identity_and_worker(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    command = NativeRequest(operation="windows")
+    packets = (RequestPacket(identifier=i, command=command) for i in ("a", "b"))
+    incoming = StringIO("".join(p.model_dump_json() + "\n" for p in packets))
+    outgoing = StringIO()
+    dispatch = Mock(side_effect=[object(), ["observed"]])
+    monkeypatch.setattr(
+        native_loop, "NativeDesktop", Mock(return_value=Mock(dispatch=dispatch)),
+    )
+    monkeypatch.setattr(sys, "stdin", incoming)
+    monkeypatch.setattr(sys, "stdout", outgoing)
+    native_loop.main()
+    first, second = (
+        NativeReply.model_validate_json(line) for line in outgoing.getvalue().splitlines()
+    )
+    assert first.identifier == "a"
+    assert first.error
+    assert first.error_code
+    assert second.identifier == "b"
+    assert second.result == ["observed"]
 
 
 def test_native_reply_model_includes_error_code_and_remediation() -> None:

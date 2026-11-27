@@ -1,6 +1,7 @@
 # Copyright 2026 Capstone MCP contributors.
 """High-level formula and variable creation in Capstone Calculator."""
 
+import ast
 import contextlib
 import re
 import sys
@@ -67,6 +68,25 @@ def _validate_delimiters(expression: str) -> None:
     if depth:
         msg = "Calculator expression has unbalanced parentheses, brackets, or quotes."
         raise AutomationError(msg)
+
+
+def _validate_arithmetic(expression: str) -> None:
+    """Check numeric operators while preserving native functions and unit syntax."""
+    assignment = re.match(r"^\s*[\w\s]+?\s*=(?!=)", expression)
+    body = expression[assignment.end():].strip() if assignment else expression
+    if not body:
+        msg = "Calculator assignment requires a right-hand expression."
+        raise AutomationError(msg)
+    numeric = re.sub(r"\[[^\]]+\]", "1", body)
+    if not re.fullmatch(r"[0-9eE.\s()+*/^\-]+", numeric):
+        return
+    # Capstone numeric literals can have leading zeroes that Python integers reject.
+    numeric = re.sub(r"(?<![\w.])0+(?=\d)", "", numeric)
+    try:
+        _ = ast.parse(numeric.replace("^", "**"), mode="eval")
+    except (SyntaxError, RecursionError) as exc:
+        msg = "Invalid arithmetic expression; check operands and operators."
+        raise AutomationError(msg) from exc
 
 
 def _find_calculator_toggle(snapshot: Snapshot) -> Control:
@@ -182,6 +202,7 @@ def create_calculation(
         raise AutomationError(msg)
 
     _validate_delimiters(raw_expr)
+    _validate_arithmetic(raw_expr)
     if request.variables:
         msg = "Calculator variable bindings are not implemented; no input was sent."
         raise AutomationError(msg)

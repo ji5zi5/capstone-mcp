@@ -142,9 +142,9 @@ def test_clipboard_restores_only_its_own_copy(sequence: int) -> None:
     with patch("capstone_mcp.graphs.inspection.win32clipboard") as clipboard:
         clipboard.GetClipboardSequenceNumber.return_value = sequence
 
-        _restore_clipboard({13: "previous text"}, copied_sequence=10)
+        _restore_clipboard({13: "previous text"}, copied_sequence=10, owner_handle=37)
 
-        clipboard.OpenClipboard.assert_called_once()
+        clipboard.OpenClipboard.assert_called_once_with(37)
         clipboard.CloseClipboard.assert_called_once()
         if sequence == 10:
             clipboard.EmptyClipboard.assert_called_once()
@@ -169,7 +169,7 @@ def test_clipboard_restores_an_empty_clipboard() -> None:
     with patch("capstone_mcp.graphs.inspection.win32clipboard") as clipboard:
         clipboard.GetClipboardSequenceNumber.return_value = 99
 
-        _restore_clipboard({}, copied_sequence=99)
+        _restore_clipboard({}, copied_sequence=99, owner_handle=37)
 
         clipboard.EmptyClipboard.assert_called_once()
         clipboard.SetClipboardData.assert_not_called()

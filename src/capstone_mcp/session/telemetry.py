@@ -7,6 +7,7 @@ import math
 import time
 from collections import OrderedDict, deque
 from itertools import islice
+from statistics import mean
 from threading import Lock
 from typing import Final, Literal
 from uuid import uuid4
@@ -60,6 +61,9 @@ class TelemetryBuffer:
         clock: TelemetryClock | None = None,
     ) -> None:
         """Record a sample, rejecting missing or mixed timestamp provenance."""
+        if not math.isfinite(value):
+            msg = "Telemetry sample value must be finite."
+            raise ValueError(msg)
         if timestamp is not None and clock is None:
             msg = (
                 "Explicit telemetry timestamps require a clock identity, "
@@ -169,10 +173,9 @@ class TelemetryBuffer:
             return {"count": 0.0, "mean": 0.0, "min": 0.0, "max": 0.0}
         vals = [v for _, v in samples]
         count = len(vals)
-        mean_val = sum(vals) / count
         return {
             "count": float(count),
-            "mean": mean_val,
+            "mean": mean(vals),
             "min": min(vals),
             "max": max(vals),
         }

@@ -15,6 +15,13 @@ from capstone_mcp.analysis import (
 )
 
 
+def test_horizontal_fit_preserves_a_subnormal_intercept() -> None:
+    intercept = math.ulp(0.0)
+    result = linear_fit(FitInput(x=[-1, 0, 1], y=[intercept] * 3))
+    assert result.intercept == intercept
+    assert result.slope == 0
+
+
 def test_fit_recovers_exact_line() -> None:
     # Given
     samples = FitInput(x=[0, 1, 2, 3], y=[3, 5, 7, 9])

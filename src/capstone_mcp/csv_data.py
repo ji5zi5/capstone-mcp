@@ -30,7 +30,9 @@ class CsvTable:
 
 def parse_csv_number(value: str) -> Decimal | None:
     """Parse decimal-point or decimal-comma values, without thousands grouping."""
-    value = value.strip()
+    value = value.strip().removeprefix("\ufeff").strip()
+    if value.startswith("\u2212"):
+        value = "-" + value[1:]
     if not value:
         return None
     if "," in value and "." not in value and value.count(",") == 1:

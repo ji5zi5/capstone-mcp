@@ -243,6 +243,27 @@ def _workflow_window(app: Capstone, handle: int) -> Window:
     return windows[0]
 
 
+def _new_output_path(destination: str, suffix: str) -> Path:
+    path = Path(destination)
+    for part in path.parts:
+        if part in {path.anchor, ".."}:
+            continue
+        if (
+            Path(part).is_reserved() or part.endswith((" ", "."))
+            or any(c in '<>:"|?*' or ord(c) < 32 for c in part)  # noqa: PLR2004
+        ):
+            msg = "Choose an ordinary Windows file name for the output."
+            raise AutomationError(msg)
+    if path.suffix.lower() != suffix or path.exists(follow_symlinks=False):
+        msg = f"Choose a new {suffix} path; existing files are never overwritten."
+        raise AutomationError(msg)
+    path = path.parent.resolve() / path.name
+    if not path.parent.is_dir():
+        msg = "Output directory must already exist."
+        raise AutomationError(msg)
+    return path
+
+
 def _prepare(
     app: Capstone, handle: int, destination: str, suffix: str,
     *, allow_foreground: bool,
@@ -250,13 +271,7 @@ def _prepare(
     if not allow_foreground:
         msg = "Saving/exporting uses native dialog input; foreground input is disabled."
         raise AutomationError(msg)
-    path = Path(destination).resolve()
-    if path.suffix.lower() != suffix or path.exists():
-        msg = f"Choose a new {suffix} path; existing files are never overwritten."
-        raise AutomationError(msg)
-    if not path.parent.is_dir():
-        msg = "Output directory must already exist."
-        raise AutomationError(msg)
+    path = _new_output_path(destination, suffix)
     window = _workflow_window(app, handle)
     return path, window.title, window.process_id
 

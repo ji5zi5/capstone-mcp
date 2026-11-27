@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import html
 import math
+import re
 from typing import TYPE_CHECKING, Final, Literal
 
 from capstone_mcp.numerics.sparklines import (
@@ -17,19 +18,28 @@ if TYPE_CHECKING:
     from capstone_mcp.reports.models import LabReport
 
 MIN_DATA_POINTS_FOR_PLOT: Final[int] = 2
+_MD_ENTITIES: Final = {
+    ord(char): f"&#{ord(char)};" for char in "\\`*_[]|#~$!"
+}
+
+
+def _md_text(value: str) -> str:
+    """Keep a metadata field on one line and render Markdown punctuation literally."""
+    line = " ".join(value.splitlines()).strip()
+    return html.escape(line, quote=False).translate(_MD_ENTITIES)
 
 
 def _render_md_header(report: LabReport) -> list[str]:
     meta = report.metadata
     lines = [
-        f"# Laboratory Report: {meta.title}",
+        f"# Laboratory Report: {_md_text(meta.title)}",
         "",
-        f"**Date:** {meta.date}  ",
-        f"**Experiment ID:** `{meta.experiment_id}`  ",
-        f"**Domain:** {meta.domain or 'Physics Laboratory'}  ",
+        f"**Date:** {_md_text(meta.date)}  ",
+        f"**Experiment ID:** {_md_text(meta.experiment_id)}  ",
+        f"**Domain:** {_md_text(meta.domain or 'Physics Laboratory')}  ",
     ]
     if meta.run_name:
-        lines.append(f"**Run Name:** `{meta.run_name}`  ")
+        lines.append(f"**Run Name:** {_md_text(meta.run_name)}  ")
     lines.append("")
     return lines
 
@@ -39,7 +49,7 @@ def _render_md_theory(report: LabReport) -> list[str]:
     lines = [
         "## 1. Executive Summary",
         "",
-        meta.description or report.theory_summary or "No summary provided.",
+        _md_text(meta.description) or report.theory_summary or "No summary provided.",
         "",
         "## 2. Theoretical Background & Governing Equations",
         "",
@@ -59,7 +69,7 @@ def _render_md_apparatus(report: LabReport) -> list[str]:
     lines = ["## 3. Apparatus & Setup Configuration", ""]
     if meta.apparatus:
         lines.append("**Equipment List:**")
-        lines.extend(f"- {item}" for item in meta.apparatus)
+        lines.extend(f"- {_md_text(item)}" for item in meta.apparatus)
         lines.append("")
 
     if meta.channels_or_sensors:
@@ -70,7 +80,7 @@ def _render_md_apparatus(report: LabReport) -> list[str]:
             "| :--- | :--- |",
         ])
         lines.extend(
-            f"| `{ch}` | {sen} |"
+            f"| {_md_text(ch)} | {_md_text(sen)} |"
             for ch, sen in meta.channels_or_sensors.items()
         )
         lines.append("")
@@ -90,7 +100,8 @@ def _render_md_data(report: LabReport) -> list[str]:
         sd_str = f"{s.std_dev:.4g}" if s.std_dev is not None else "N/A"
         peak_str = f"{s.peak_value:.4g}" if s.peak_value is not None else "N/A"
         lines.append(
-            f"| **{s.variable_name}** | {s.unit or '-'} | {s.count} | "
+            f"| **{_md_text(s.variable_name)}** | {_md_text(s.unit) or '-'} | "
+            f"{s.count} | "
             f"{s.mean:.4g} | {sd_str} | {s.min:.4g} | {s.max:.4g} | "
             f"{peak_str} |",
         )
@@ -104,26 +115,28 @@ def _format_standard_error(value: float | None) -> str:
 
 def _render_md_regression(report: LabReport) -> list[str]:
     lines = ["## 5. Regression & Curve Fitting", ""]
-    if report.regression:
-        reg = report.regression
+    for reg in report.regressions:
         se_m = _format_standard_error(reg.slope_error)
         se_b = _format_standard_error(reg.intercept_error)
         r2_s = f"`{reg.r_squared:.4f}`" if reg.r_squared is not None else "'N/A'"
         lines.extend([
-            f"**Model:** {reg.model_name}  ",
-            f"**Fitted Equation:** `{reg.equation}`  ",
+            f"**Model:** {_md_text(reg.model_name)}  ",
+            f"**Fitted Equation:** {_md_text(reg.equation)}  ",
             f"- **Slope ($m$):** `{reg.slope:.5e}` (std err: `{se_m}`)  ",
             f"- **Intercept ($b$):** `{reg.intercept:.5e}` (std err: `{se_b}`)  ",
             f"- **Coefficient of Determination ($R^2$):** {r2_s}  ",
             "",
         ])
     if report.ascii_plot:
+        runs = re.findall(r"`+", report.ascii_plot)
+        longest = max(map(len, runs), default=0)
+        fence = "`" * max(3, longest + 1)
         lines.extend([
             "### Visual Data Fit (ASCII Plot)",
             "",
-            "```text",
+            f"{fence}text",
             report.ascii_plot,
-            "```",
+            fence,
             "",
         ])
     return lines
@@ -174,7 +187,7 @@ def render_markdown(report: LabReport) -> str:
     lines.extend([
         "## 8. Conclusion",
         "",
-        report.conclusion or "Analysis complete.",
+        _md_text(report.conclusion) or "Analysis complete.",
         "",
     ])
     return "\n".join(lines)
@@ -473,8 +486,7 @@ def _render_html_body_data(report: LabReport) -> list[str]:
 
 def _render_html_body_regression(report: LabReport) -> list[str]:
     sections = ["  <h2>5. Regression & Curve Fitting</h2>"]
-    if report.regression:
-        reg = report.regression
+    for reg in report.regressions:
         se_m = _format_standard_error(reg.slope_error)
         se_b = _format_standard_error(reg.intercept_error)
         r2 = f"{reg.r_squared:.4f}" if reg.r_squared is not None else "N/A"

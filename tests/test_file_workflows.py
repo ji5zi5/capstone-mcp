@@ -110,6 +110,21 @@ def _titled(handle: int, title: str) -> Window:
     return Window(handle=handle, title=title, process_id=7, bounds=BOUNDS)
 
 
+def test_output_validation_checks_the_directory_entry_before_resolution(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    exists = Mock(return_value=True)
+    monkeypatch.setattr(Path, "exists", exists)
+    with pytest.raises(AutomationError, match="never overwritten"):
+        _ = file_workflows._new_output_path(str(tmp_path / "trial.cap"), ".cap")
+    exists.assert_called_once_with(follow_symlinks=False)
+
+
+def test_output_validation_refuses_a_directory_name_ending_in_a_space(tmp_path: Path) -> None:
+    with pytest.raises(AutomationError, match="ordinary Windows file name"):
+        _ = file_workflows._new_output_path(str(tmp_path / "trial " / "data.csv"), ".csv")
+
+
 def test_localized_file_menu_keeps_using_the_native_command_id(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:

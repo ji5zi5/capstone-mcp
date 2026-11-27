@@ -23,6 +23,7 @@ from pywinauto.controls.uiawrapper import UIAWrapper
 from pywinauto.findwindows import find_windows
 from pywinauto.keyboard import send_keys as keyboard_send_keys
 from pywinauto.mouse import click as mouse_click
+from pywinauto.uia_defines import NoPatternInterfaceError
 
 from capstone_mcp.models import Action, Bounds, Control, Result, Snapshot, Window
 
@@ -390,9 +391,23 @@ class Capstone:
                 return Result(detail="Focus delivered; inspect to verify.")
         assert_never(action)
 
+    def read_value(self, ref: str) -> str:
+        """Read the current literal value from a control supporting ValuePattern."""
+        node = self.control(ref)
+        try:
+            return node.iface_value.CurrentValue
+        except (NoPatternInterfaceError, AttributeError) as exc:
+            msg = "Selected control does not expose a readable UIA ValuePattern."
+            raise NoPatternInterfaceError(msg) from exc
+
     def set_value(self, ref: str, value: str) -> Result:
         """Set a control through its Value pattern, preserving literal text."""
-        self.control(ref).iface_value.SetValue(value)
+        node = self.control(ref)
+        try:
+            node.iface_value.SetValue(value)
+        except (NoPatternInterfaceError, AttributeError) as exc:
+            msg = "Selected control does not expose a writable UIA ValuePattern."
+            raise NoPatternInterfaceError(msg) from exc
         self.refs.clear()
         return Result(detail="Value delivered; take a snapshot to verify.")
 

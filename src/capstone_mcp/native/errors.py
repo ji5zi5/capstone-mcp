@@ -6,6 +6,8 @@ from __future__ import annotations
 import re
 from typing import Final
 
+from pywinauto.uia_defines import NoPatternInterfaceError
+
 from capstone_mcp.graphs import GraphOperationError
 
 _ERROR_RULES: Final[tuple[tuple[tuple[str, ...], str, str], ...]] = (
@@ -70,6 +72,11 @@ _ERROR_RULES: Final[tuple[tuple[tuple[str, ...], str, str], ...]] = (
 
 def classify_native_error(error: Exception) -> tuple[str, str]:
     """Return (error_code, remediation) tuple for native worker exceptions."""
+    if isinstance(error, NoPatternInterfaceError):
+        return (
+            "CONTROL_PATTERN_UNAVAILABLE",
+            "Inspect the control and choose a supported action.",
+        )
     if isinstance(error, GraphOperationError):
         code = (
             error.failure.code
@@ -111,11 +118,12 @@ def classify_native_error(error: Exception) -> tuple[str, str]:
             ),
         )
 
-    for keywords, code, remediation in _ERROR_RULES:
-        if any(re.search(r"\b" + re.escape(kw) + r"\b", lower) for kw in keywords):
-            return code, remediation
-
-    return (
+    fallback = (
         "AUTOMATION_ERROR",
         "Check Capstone application state using capstone_windows and retry.",
     )
+    for keywords, code, remediation in _ERROR_RULES:
+        if any(re.search(r"\b" + re.escape(kw) + r"\b", lower) for kw in keywords):
+            fallback = code, remediation
+            break
+    return fallback

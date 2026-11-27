@@ -833,6 +833,7 @@ def _dataset_summary(dataset: CapDataSet, index: int) -> CapDatasetSummary:
         dataset_id=dataset.data_set_id,
         source_euid=dataset.source_euid,
         name=dataset.source_name,
+        dataset_name=dataset.name,
         run_name=dataset.run_name,
         run_number=dataset.run_number,
         unit_id=dataset.unit_id,

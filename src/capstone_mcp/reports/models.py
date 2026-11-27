@@ -1,11 +1,13 @@
 # Copyright 2026 Capstone MCP contributors.
 """Data models for automated physics laboratory report generation."""
 
-from typing import Literal
+from typing import Final, Literal, Self
 
 from pydantic import Field
 
 from capstone_mcp.models import Model
+
+MAX_REPORT_SAMPLE_VALUES: Final = 16_384
 
 
 class ExperimentMetadata(Model):
@@ -76,8 +78,36 @@ class LabReport(Model):
     ascii_plot: str = ""
     raw_data_points: dict[str, list[float | None]] = Field(default_factory=dict)
     plotted_data_points: dict[str, list[float | None]] | None = None
+    original_point_counts: dict[str, dict[str, int]] | None = None
     discussion_questions: list[str] = Field(default_factory=list)
     conclusion: str = ""
+
+    @property
+    def regressions(self) -> list[RegressionSummary]:
+        """Return fitted models in the order used by both report formats."""
+        primary = [self.regression] if self.regression is not None else []
+        return [*primary, *self.additional_regressions]
+
+    def transport_preview(self) -> Self:
+        """Bound sample arrays in an MCP reply after full analysis and rendering."""
+        channels = {"raw_data_points": self.raw_data_points}
+        if self.plotted_data_points is not None:
+            channels["plotted_data_points"] = self.plotted_data_points
+        counts = {
+            field: {name: len(values) for name, values in series.items()}
+            for field, series in channels.items()
+        }
+        total = sum(sum(sizes.values()) for sizes in counts.values())
+        if total <= MAX_REPORT_SAMPLE_VALUES:
+            return self
+        limit = MAX_REPORT_SAMPLE_VALUES // sum(len(sizes) for sizes in counts.values())
+        return self.model_copy(update={
+            **{
+                field: {name: values[:limit] for name, values in series.items()}
+                for field, series in channels.items()
+            },
+            "original_point_counts": counts,
+        })
 
 
 class GenerateLabReportResult(Model):

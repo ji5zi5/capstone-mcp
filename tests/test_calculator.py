@@ -53,6 +53,14 @@ def test_unbalanced_formula_is_rejected_before_ui_input(expression: str) -> None
     app.snapshot.assert_not_called()
 
 
+@pytest.mark.parametrize("expression", ["a = ", "a = 1 +", "a = [Force] * / 2"])
+def test_incomplete_arithmetic_never_opens_the_calculator(expression: str) -> None:
+    app = MagicMock(spec=Capstone)
+    with pytest.raises(AutomationError, match="expression"):
+        _ = create_calculation(app, CreateCalculationRequest(expression=expression))
+    app.snapshot.assert_not_called()
+
+
 def test_unimplemented_variable_bindings_are_rejected_before_ui_input() -> None:
     app = MagicMock(spec=Capstone)
     with pytest.raises(AutomationError, match="variable bindings"):

@@ -2,11 +2,12 @@
 """Consolidated, deep Run Management engine for Capstone Data Summary."""
 
 import contextlib
-import re
 import time
+import unicodedata
 from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Final, Literal
 
@@ -51,17 +52,17 @@ from capstone_mcp.runs.models import (
     SetRunVisibilityResult,
     SourceFit,
 )
+from capstone_mcp.ui_strings import numbered_run
 
 if TYPE_CHECKING:
     from pywinauto.controls.uiawrapper import UIAWrapper
 
-RUN_NAME_PATTERN: Final = re.compile(r"run\s*#?\s*\d+", re.IGNORECASE)
 RUN_DELETE_TIMEOUT_SECONDS: Final = 3
 LAST_RUN_NAMES: Final = frozenset({"last_run", "last", "latest"})
 
 
 def _run_name_key(name: str) -> str:
-    return name.replace("\N{NO-BREAK SPACE}", " ").strip()
+    return unicodedata.normalize("NFC", name).replace("\N{NO-BREAK SPACE}", " ").strip()
 
 
 # ---------------------------------------------------------------------------
@@ -295,7 +296,7 @@ def _find_run_controls(
         ):
             continue
         name = _run_name_key(ctrl.name)
-        if not (RUN_NAME_PATTERN.fullmatch(name) or name.casefold() in requested_names):
+        if name.casefold() not in requested_names and numbered_run(name) is None:
             continue
 
         if target_containers is None or any(
@@ -311,11 +312,9 @@ def _matches_run_name(ctrl: Control, target_run: str) -> bool:
     tname = _run_name_key(target_run).casefold()
     if cname == tname:
         return True
-    if not RUN_NAME_PATTERN.fullmatch(cname):
-        return False
-    if not (RUN_NAME_PATTERN.fullmatch(tname) or tname.isdecimal()):
-        return False
-    return re.findall(r"\d+", cname) == re.findall(r"\d+", tname)
+    number = numbered_run(cname)
+    requested_number = tname if tname.isdecimal() else numbered_run(tname)
+    return number is not None and number == requested_number
 
 
 def _get_control_visibility_state(app: Capstone, ctrl: Control) -> bool | None:
@@ -624,6 +623,7 @@ class CaptureSession:
             msg = "Record requires a captured baseline."
             raise CaptureError(msg)
         artifact = self.save(str(self.directory / f"run-{ordinal:03d}.cap"))
+        saved_at = datetime.now(UTC)
         parsed: CapFile | None = None
         changes: list[_Delta] = []
         removed: list[DatasetIdentity] = []
@@ -650,6 +650,7 @@ class CaptureSession:
         finally:
             self.runs.append(
                 CapturedRun(
+                    saved_at_utc=saved_at,
                     ordinal=ordinal,
                     interrupted=interrupted,
                     artifact=artifact,

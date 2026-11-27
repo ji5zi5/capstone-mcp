@@ -196,7 +196,7 @@ def test_clipboard_restore_preserves_newer_external_copy(monkeypatch: pytest.Mon
     clipboard = MagicMock()
     clipboard.GetClipboardSequenceNumber.return_value = 11
     monkeypatch.setattr(inspection, "win32clipboard", clipboard)
-    inspection._restore_clipboard({1: "original"}, copied_sequence=10)
+    inspection._restore_clipboard({1: "original"}, copied_sequence=10, owner_handle=37)
     clipboard.EmptyClipboard.assert_not_called()
     clipboard.CloseClipboard.assert_called_once()
 
@@ -207,8 +207,21 @@ def test_empty_clipboard_can_be_restored_without_touching_external_data(
     clipboard = MagicMock()
     clipboard.GetClipboardSequenceNumber.return_value = 10
     monkeypatch.setattr(inspection, "win32clipboard", clipboard)
-    inspection._restore_clipboard({}, copied_sequence=10)
+    inspection._restore_clipboard({}, copied_sequence=10, owner_handle=37)
     clipboard.EmptyClipboard.assert_called_once()
+
+
+def test_partial_clipboard_restore_attempts_remaining_formats_and_reports_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    clipboard = MagicMock()
+    clipboard.GetClipboardSequenceNumber.return_value = 10
+    clipboard.SetClipboardData.side_effect = [ValueError("unavailable"), None]
+    monkeypatch.setattr(inspection, "win32clipboard", clipboard)
+    with pytest.raises(AutomationError, match=r"clipboard formats \[1\]"):
+        inspection._restore_clipboard({1: b"a", 13: "a"}, copied_sequence=10, owner_handle=37)
+    assert clipboard.SetClipboardData.call_count == 2
+    clipboard.CloseClipboard.assert_called_once()
 
 
 def test_unsupported_clipboard_handle_fails_before_copy(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -250,6 +263,7 @@ def test_invalid_graph_payload_still_restores_owned_clipboard(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     app, events, clipboard = MagicMock(), MagicMock(), MagicMock()
+    events.clipboard_handle = 37
     app.windows.return_value = [_snapshot([]).window]
     app.snapshot.return_value = _snapshot([_control("Display", "MenuItem")])
     popup = _snapshot([_control("Copy Display", "MenuItem")])
@@ -266,7 +280,7 @@ def test_invalid_graph_payload_still_restores_owned_clipboard(
     monkeypatch.setattr(inspection, "release_menu_bar", MagicMock())
     with pytest.raises(inspection.GraphStateError):
         inspection.read_graph(app, 1)
-    restore.assert_called_once_with({1: "original"}, copied_sequence=10)
+    restore.assert_called_once_with({1: "original"}, copied_sequence=10, owner_handle=37)
 
 
 def test_export_cleanup_failure_reports_original_error_and_unresolved_dialog() -> None:

@@ -5,9 +5,17 @@ import math
 from collections.abc import Sequence
 from dataclasses import dataclass
 from decimal import Decimal, localcontext
+from itertools import pairwise
 from typing import Final
 
 MIN_LINEAR_POINTS: Final[int] = 2
+
+
+def strictly_monotonic(values: Sequence[float]) -> bool:
+    """Whether the independent variable moves in one direction along the whole run."""
+    return all(a < b for a, b in pairwise(values)) or all(
+        a > b for a, b in pairwise(values)
+    )
 
 
 @dataclass(frozen=True)

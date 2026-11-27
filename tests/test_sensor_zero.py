@@ -5,6 +5,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from capstone_mcp import ui_strings
 from capstone_mcp.desktop import AutomationError, Capstone
 from capstone_mcp.instruments import (
     InstrumentAction,
@@ -14,7 +15,32 @@ from capstone_mcp.instruments import (
     ZeroSensorResult,
     manage_instrument,
 )
+from capstone_mcp.instruments.sensors import _is_zero_button
 from capstone_mcp.models import Action, Bounds, Control, Snapshot, Window
+
+
+@pytest.mark.parametrize(
+    ("name", "aid", "kind", "expected"),
+    [
+        ("Mettre à zéro le capteur", "", "Button", True),
+        ("Force", "ForceSensor.ZeroButton", "Button", True),
+        ("Remove Sensor Zero Offset", "Sensor.UnzeroButton", "Button", False),
+        ("Zero Sensor Measurements at Start", "", "CheckBox", False),
+        ("Zero Offset", "Scope.ZeroOffset", "Button", False),
+        ("0", "", "Button", False),
+    ],
+)
+def test_zero_action_identifies_only_sensor_commands(
+    name: str, aid: str, kind: str, *, expected: bool, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(ui_strings, "_labels", lambda: {
+        "STR_PROPERTY_SENSOR_ZERO_SENSOR": {"mettre à zéro le capteur"},
+    })
+    control = Control(
+        name=name, automation_id=aid, control_type=kind, enabled=True, visible=True,
+        ref="1", parent=None, bounds=Bounds(left=0, top=0, right=1, bottom=1),
+    )
+    assert _is_zero_button(control) is expected
 
 
 def test_zero_sensor_raises_when_no_zero_button_found(

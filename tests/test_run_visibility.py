@@ -5,6 +5,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from capstone_mcp import ui_strings
 from capstone_mcp.desktop import AutomationError, Capstone
 from capstone_mcp.models import Bounds, Control, Snapshot, Window
 from capstone_mcp.runs import (
@@ -21,6 +22,24 @@ def _make_window() -> Window:
         process_id=1,
         bounds=Bounds(left=0, top=0, right=1200, bottom=900),
     )
+
+
+def test_numbered_localized_run_is_resolved_without_matching_nearby_labels(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(ui_strings, "_labels", lambda: {"STR_FORMAT_RUN_NAME": {"essai #%1"}})
+    window = _make_window()
+    button = Control(
+        ref="run", parent=None, name="Essai  #2", control_type="CheckBox",
+        automation_id="", enabled=True, visible=True, bounds=window.bounds,
+    )
+    other = button.model_copy(update={"ref": "other", "name": "Essai #2 calibration"})
+    app = MagicMock(spec=Capstone)
+    app.snapshot.return_value = Snapshot(window=window, controls=[button, other], truncated=False)
+    app.control.return_value.iface_toggle.CurrentToggleState = 1
+    result = set_run_visibility(app, SetRunVisibilityRequest(handle=100, runs=["2"]))
+    assert result.verified
+    assert {call.args[0] for call in app.control.call_args_list} == {"run"}
 
 
 def test_set_run_visibility_rejects_empty_runs() -> None:

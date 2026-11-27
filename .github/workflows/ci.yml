@@ -32,4 +32,6 @@ jobs:
         run: uv run --no-sync basedpyright src
 
       - name: Run test suite
+        env:
+          CAPSTONE_TEST_DISPOSABLE_CLIPBOARD: "1"
         run: uv run --no-sync pytest
