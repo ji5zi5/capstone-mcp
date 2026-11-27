@@ -1,6 +1,11 @@
 # Copyright 2026 Capstone MCP contributors.
 """Exercise multiple HTTP sessions in memory without launching any native app."""
 
+import os
+import socket
+import subprocess
+import sys
+from pathlib import Path
 from unittest.mock import Mock
 
 import anyio
@@ -77,3 +82,29 @@ async def test_cancelled_lifespan_still_releases_owned_resources(
     jobs.close.assert_called_once_with()
     worker.close.assert_called_once_with()
     close_pool.assert_called_once_with()
+
+
+def test_http_occupied_port_exits_with_nonzero_diagnostic() -> None:
+    root = Path(__file__).resolve().parents[1]
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as occupied:
+        occupied.bind(("127.0.0.1", 0))
+        occupied.listen(1)
+        port = occupied.getsockname()[1]
+        proc = subprocess.run(  # noqa: S603
+            [
+                sys.executable,
+                "-c",
+                "from capstone_mcp.server import http_main; http_main()",
+                "--port",
+                str(port),
+            ],
+            cwd=str(root),
+            env={**os.environ, "PYTHONPATH": str(root / "src")},
+            capture_output=True,
+            text=True,
+            timeout=15,
+            check=False,
+        )
+        assert proc.returncode != 0
+        combined = proc.stderr + proc.stdout
+        assert combined.strip()

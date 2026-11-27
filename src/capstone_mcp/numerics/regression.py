@@ -133,6 +133,86 @@ def fit_linear_series(
     )
 
 
+def fit_weighted_linear_series(
+    x: Sequence[float],
+    y: Sequence[float],
+    weights: Sequence[float],
+) -> LinearRegressionResult:
+    """Perform inverse-variance weighted OLS linear regression: y = m*x + b."""
+    if not len(x) == len(y) == len(weights):
+        msg = "x, y, and weights must have matching lengths."
+        raise ValueError(msg)
+    if any(not math.isfinite(v) for v in (*x, *y, *weights)):
+        msg = "Weighted regression inputs must be finite."
+        raise ValueError(msg)
+    pairs = [
+        (float(xi), float(yi), float(wi))
+        for xi, yi, wi in zip(x, y, weights, strict=True)
+        if wi > 0
+    ]
+    if any(w <= 0 for w in weights):
+        msg = "Weighted regression requires strictly positive weights."
+        raise ValueError(msg)
+    n = len(pairs)
+    if n < MIN_LINEAR_POINTS:
+        msg = (
+            f"Need at least {MIN_LINEAR_POINTS} points "
+            f"for weighted regression, got {n}"
+        )
+        raise ValueError(msg)
+
+    clean_x = [p[0] for p in pairs]
+    clean_y = [p[1] for p in pairs]
+    clean_w = [p[2] for p in pairs]
+    w_scale = max(clean_w) or 1.0
+    norm_w = [w / w_scale for w in clean_w]
+    w_sum = math.fsum(norm_w)
+
+    x_scale = max(abs(v) for v in clean_x) or 1.0
+    y_scale = max(abs(v) for v in clean_y) or 1.0
+    sx = [v / x_scale for v in clean_x]
+    sy = [v / y_scale for v in clean_y]
+
+    mean_x = math.fsum(w * xi for w, xi in zip(norm_w, sx, strict=True)) / w_sum
+    mean_y = math.fsum(w * yi for w, yi in zip(norm_w, sy, strict=True)) / w_sum
+    dx = [xi - mean_x for xi in sx]
+    dy = [yi - mean_y for yi in sy]
+    wsxx = math.fsum(w * a * a for w, a in zip(norm_w, dx, strict=True))
+    if wsxx == 0.0:
+        msg = "Independent variable x has zero variance (cannot fit vertical line)"
+        raise ValueError(msg)
+    wsyy = math.fsum(w * b * b for w, b in zip(norm_w, dy, strict=True))
+    wsxy = math.fsum(w * a * b for w, a, b in zip(norm_w, dx, dy, strict=True))
+    scaled_slope = wsxy / wsxx
+    slope = _rescale_ratio(scaled_slope, y_scale, x_scale)
+    intercept = (mean_y - scaled_slope * mean_x) * y_scale
+    scaled_residuals = [b - scaled_slope * a for a, b in zip(dx, dy, strict=True)]
+    residuals = [r * y_scale for r in scaled_residuals]
+    wss_res = math.fsum(
+        w * r * r for w, r in zip(norm_w, scaled_residuals, strict=True)
+    )
+    r_squared = max(0.0, min(1.0, 1.0 - wss_res / wsyy)) if wsyy else 1.0
+    std_err_slope = std_err_intercept = None
+    if n > MIN_LINEAR_POINTS:
+        wmse = wss_res / (n - 2)
+        std_err_slope = _rescale_ratio(math.sqrt(wmse / wsxx), y_scale, x_scale)
+        std_err_intercept = math.sqrt(wmse * (1.0 / w_sum + mean_x**2 / wsxx)) * y_scale
+    if not all(
+        v is None or math.isfinite(v)
+        for v in (slope, intercept, std_err_slope, std_err_intercept, *residuals)
+    ):
+        msg = "Weighted regression result exceeds the finite floating-point range."
+        raise ValueError(msg)
+    return LinearRegressionResult(
+        slope=slope,
+        intercept=intercept,
+        r_squared=r_squared,
+        std_err_slope=std_err_slope,
+        std_err_intercept=std_err_intercept,
+        residuals=residuals,
+    )
+
+
 def _polynomial_qr(x: list[float], y: list[float], degree: int) -> list[float]:
     """Reorthogonalized QR avoids squaring the normalized design condition number."""
     columns: list[list[float]] = []

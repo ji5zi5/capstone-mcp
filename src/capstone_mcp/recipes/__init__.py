@@ -17,6 +17,7 @@ from capstone_mcp.recipes.base import (
 )
 from capstone_mcp.recipes.forced_oscillation import ForcedOscillationRecipe
 from capstone_mcp.recipes.photoelectric import PhotoelectricEffectRecipe
+from capstone_mcp.recipes.polarization import PolarizationRecipe
 from capstone_mcp.recipes.rlc_resonance import RLCResonanceRecipe
 from capstone_mcp.recipes.slit_diffraction import SlitDiffractionRecipe
 
@@ -41,6 +42,10 @@ register_recipe(
     SlitDiffractionRecipe(),
     aliases=["slit", "slit_diffraction", "diffraction"],
 )
+register_recipe(
+    PolarizationRecipe(),
+    aliases=["malus", "polarization", "polarization_light"],
+)
 
 __all__ = [
     "REGISTRY",
@@ -49,6 +54,7 @@ __all__ = [
     "ExperimentRecipe",
     "ForcedOscillationRecipe",
     "PhotoelectricEffectRecipe",
+    "PolarizationRecipe",
     "RLCResonanceRecipe",
     "RecipeAction",
     "RecipePhase",

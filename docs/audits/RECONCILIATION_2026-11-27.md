@@ -50,11 +50,13 @@
 
 ### 잔여 백로그 및 에이전트 E2E 검증 이슈 (#153~#155)
 
-- **코드 백로그 (`ready-for-agent`)**:
-  - [[Backlog P1] 회절 잡음 환경 극값 구분 모델 도입 (DEFECT-DIFF02)](https://github.com/ji5zi5/capstone-mcp/issues/153)
-  - [[Backlog P2] CSV ISO 벽시계 열 시간대·원점·원문 보존 계약 도입 (P2-L10N14)](https://github.com/ji5zi5/capstone-mcp/issues/154)
-- **무센서 앱·`.cap` 파일 E2E 검증 (`ready-for-agent`)** — [[E2E] 무센서 Capstone 앱·.cap 파일 실기 검증](https://github.com/ji5zi5/capstone-mcp/issues/155):
-  - 로컬 설치 Capstone 2.5.0.10과 폐기 가능 워크북·일회용 클립보드로 에이전트가 직접 실행할 수 있는 `Copy Display`/OLE 지연 렌더링/중간 다른 복사/오래된 프레임 거부, File 메뉴·회차 관리, 계산기/디스플레이 판독 및 저장·내보내기 대조.
+- **코드 백로그 해결 완료 (`#153`, `#154`, Phase 2~3 확장 백로그 일괄 구현)**:
+  - **#153 (`DEFECT-DIFF02`)**: [slit_diffraction.py](../../src/capstone_mcp/recipes/slit_diffraction.py)에 1D 위상 돌출도 필터링(`DEFAULT_MIN_PROMINENCE_RATIO = 0.005`, `min_prominence_ratio`, `min_prominence`), 선택적 삼각 이동평균(`smoothing_window`), 부분 픽셀 포물선 꼭짓점 보간(`DEFECT-DIFF03`), 다차수 회절 최소 선형 피팅(`DEFECT-DIFF12`), 이중슬릿 결손 차수 간격 복원 및 프린지 통계(`DEFECT-DIFF13`, `DIFF14`), GUM 표준·확장 불확도 전파(`DEFECT-DIFF15`, `DIFF16`) 구현 완료. ([test_recipes.py](../../tests/test_recipes.py), [test_phase2_recipes_and_reports.py](../../tests/test_phase2_recipes_and_reports.py))
+  - **#154 (`P2-L10N14`)**: [csv_data.py](../../src/capstone_mcp/csv_data.py) 및 [csv_file.py](../../src/capstone_mcp/data_sources/adapters/csv_file.py)에 strict ISO 8601 타임스탬프 파싱(`CsvTimestampAxis`), 혼용 시간대/비ISO 행 fail-closed 차단, CSV 1행 기준 페이지네이션 원점 고정(`epoch_anchor_s`), 상대 경과 초 투영 및 `x_basis` 메타데이터 보존 구현 완료. ([test_csv_locales.py](../../tests/test_csv_locales.py))
+  - **`보고서 #81` · `보고서 #102` 수치·레시피·리포트 보강**: [spectral.py](../../src/capstone_mcp/numerics/spectral.py) (`compute_power_spectrum` radix-2 FFT / exact DFT + Hann 창), [regression.py](../../src/capstone_mcp/numerics/regression.py) (`fit_weighted_linear_series`), [analysis.py](../../src/capstone_mcp/analysis.py) (`_sample_cooks_distance` 0-분산/leverage≈1 안전화, `r_squared` `[0, 1]` 클램핑), [polarization.py](../../src/capstone_mcp/recipes/polarization.py) (`PolarizationRecipe`, `fit_malus_law`), [adiabatic_gas.py](../../src/capstone_mcp/recipes/adiabatic_gas.py) (`weighted_log`, $\gamma < 1.0$ 아등온/비물리 차단, 다주기 행정 분할, 사이클 부호 분류, 온도/열역학 제1법칙 일관성 검사), [generator.py](../../src/capstone_mcp/reports/generator.py) (`polarization` 리포트·단열 안정성 검증), [desktop.py](../../src/capstone_mcp/desktop.py) (잠긴/비대화형 데스크톱 `AutomationError` 변환 가드) 및 HTTP 포트 충돌 종료 검증([test_http_lifecycle.py](../../tests/test_http_lifecycle.py)) 구현 완료. ([test_spectral_and_weighted_numerics.py](../../tests/test_spectral_and_weighted_numerics.py), [test_phase2_recipes_and_reports.py](../../tests/test_phase2_recipes_and_reports.py), [test_desktop_guards.py](../../tests/test_desktop_guards.py))
+- **무센서 앱·`.cap` 파일 E2E 검증 (`#155` — 부분 실기 통과 + 대화형 데스크톱 실행 대기)**:
+  - **에이전트 환경(`ThreadDesktop=exebox-...`) 내 실기 통과 범위**: `CAPSTONE_RUN_LIVE_TESTS=1 CAPSTONE_TEST_DISPOSABLE_CLIPBOARD=1` 실행으로 [test_live_smoke.py](../../tests/test_live_smoke.py) 6건, [test_native_clipboard.py](../../tests/test_native_clipboard.py) 1건, [test_live_e2e_app.py](../../tests/test_live_e2e_app.py) 비대화형 실기 2건(실제 `Capstone.exe 2.5.0.10` 기동·`Untitled.cap` UIA 메뉴/워크북 검증·PNG 스크린샷·모달/비활성 데스크톱 가드·스냅샷 10회 핸들/RSS 누수 검사·QuickStart 공식 데이터 `.cap` 코퍼스·stdio MCP 왕복) 통과 확인(`9 passed`).
+  - **대화형 데스크톱(`WinSta0\Default`) 전용 UI 입력 범위**: `open_experiment`/`save_experiment`/`export_data`, `Copy Display`(`read_graph`), Table/Digits/Calculator 실제 UI 입력 3건(`test_live_e2e_interactive_*`)은 Windows 세션 경계(`exebox` 비입력 데스크톱 vs `WinSta0\Default`에서 OS가 `SetCursorPos`/`SetForegroundWindow` 차단)로 인해 에이전트 샌드박스에서는 `SKIPPED` 처리되었으며, 일반 콘솔에서 사용자 단회 실행 시 즉시 검증 가능(`#155`에 검증 결과 및 실행 명령 기록).
 - **물리 850/550·센서 검증 (`wontfix`, `CLOSED`)** — [#156](https://github.com/ji5zi5/capstone-mcp/issues/156):
   - 물리 하드웨어 미보유로 현장 실기 검증을 수행할 수 없어 `wontfix`로 종결(장비 확보·현장 재현 시 재개).
 
@@ -68,5 +70,6 @@
 |#120|`CLOSED`|1~4차 감사·11/27 대조 완료, Phase 5 종결 및 잔여 항목 이관 후 종결|
 |#123~#130|`CLOSED`|각 에픽에 11/27 판정 요약 및 `#153`~`#156` 이관 링크 기록 후 일괄 종결(`안 A`)|
 |#156|`CLOSED` (`wontfix`)|물리 PASCO 850/550·센서 미보유로 현장 검증 불가 종결|
-|#153~#155|`OPEN` (`ready-for-agent`)|에이전트 실행 가능 후속 3건(`DIFF02`, `P2-L10N14`, 무센서 Capstone 앱 E2E)만 유지|
+|#153·#154|`CLOSED`|회절 잡음/고차·불확도(#153), CSV ISO 8601(#154) 및 Phase 2~3 확장 백로그 일괄 구현·검증 후 종결|
+|#155|`OPEN` (`ready-for-human`)|Capstone 2.5.0.10 실기 비대화형/`.cap`/클립보드/stdio 통과분 기록; 대화형 `WinSta0\Default` UI 3건 실행 대기|
 |#138·#149|`CLOSED`|원장·트래커 동기화 완료 후 지도 및 정리 작업 최종 종결|

@@ -432,3 +432,84 @@ def test_quantized_diffraction_profiles_have_only_two_sided_extrema() -> None:
     levels = [0.0, 1.0, 1.0, 2.0, 2.0, 0.0, 0.0, 1.0]
     assert _find_local_extrema(positions, levels) == ([(5.0, 2.0)], [(8.5, 0.0)])
     assert _find_local_extrema(positions[:4], [0.0, 1.0, 1.0, 1.0]) == ([], [])
+
+
+def test_single_slit_rejects_micro_analog_noise_ripples_by_prominence() -> None:
+    # 0.004 V micro-ripple dips inside the slope well before the true +-16.25 mm minima.
+    positions = [-20.0, -16.25, -10.0, -6.0, -5.0, -4.0, 0.0, 4.0, 5.0, 6.0, 10.0, 16.25, 20.0]
+    noisy = [0.1, 0.0, 2.0, 3.002, 2.998, 3.005, 5.0, 3.005, 2.998, 3.002, 2.0, 0.0, 0.1]
+    assert len(_find_local_extrema(positions, noisy)[1]) == 4
+    result = SlitDiffractionRecipe().analyze(
+        {"positions_mm": positions, "intensities": noisy},
+    )
+    assert result.status == "completed"
+    assert result.details["diffraction_minima_count"] == 2
+    assert result.details["first_minimum_distance_mm"] == pytest.approx(16.25)
+    assert result.details["derived_slit_width_mm"] == pytest.approx(0.04)
+    assert result.details["noise_filter"]["smoothing_window"] == 1
+
+
+def test_double_slit_separation_ignores_small_noise_ripples() -> None:
+    positions = [-5.0, -4.0, -3.0, -2.5, -2.2, -2.0, -1.0, 0.0, 1.0, 2.0, 2.2, 2.5, 3.0, 4.0, 5.0]
+    intensities = [0.0, 2.0, 0.0, 1.500, 1.499, 1.501, 1.0, 5.0, 1.0, 1.501, 1.499, 1.500, 0.0, 2.0, 0.0]
+    result = SlitDiffractionRecipe().analyze({
+        "positions_mm": positions,
+        "intensities": intensities,
+        "slit_type": "double_slit",
+    })
+    assert result.status == "completed"
+    expected_mm = 2 * 650e-6 / math.sin(math.atan(4 / 1000))
+    assert result.details["derived_slit_separation_mm"] == pytest.approx(expected_mm)
+
+
+def test_diffraction_optional_smoothing_recovers_jittered_central_plateau() -> None:
+    positions = [-22.0, -16.25, -11.0, -6.0, -1.0, 0.0, 1.0, 6.0, 11.0, 16.25, 22.0]
+    jittered = [0.4, 0.0, 0.4, 2.0, 5.0, 4.999, 5.0, 2.0, 0.4, 0.0, 0.4]
+    strict_result = SlitDiffractionRecipe().analyze(
+        {"positions_mm": positions, "intensities": jittered},
+    )
+    assert strict_result.status == "failed"
+    smoothed_result = SlitDiffractionRecipe().analyze({
+        "positions_mm": positions,
+        "intensities": jittered,
+        "smoothing_window": 3,
+    })
+    assert smoothed_result.status == "completed"
+    assert smoothed_result.details["central_maximum"]["position_mm"] == pytest.approx(0.0)
+    assert smoothed_result.details["derived_slit_width_mm"] == pytest.approx(0.04)
+    assert smoothed_result.details["noise_filter"]["smoothing_window"] == 3
+
+
+@pytest.mark.parametrize(
+    "bad_params",
+    [
+        {"min_prominence_ratio": -0.01},
+        {"min_prominence_ratio": 1.5},
+        {"min_prominence_ratio": True},
+        {"min_prominence": -0.1},
+        {"smoothing_window": 2},
+        {"smoothing_window": 11},
+        {"smoothing_window": True},
+    ],
+)
+def test_diffraction_rejects_invalid_noise_filter_parameters(
+    bad_params: dict[str, Any],
+) -> None:
+    result = SlitDiffractionRecipe().analyze({
+        "positions_mm": [-20, -16.25, -8, 0, 8, 16.25, 20],
+        "intensities": [0.1, 0.0, 2.0, 5.0, 2.0, 0.0, 0.1],
+        **bad_params,
+    })
+    assert result.status == "failed"
+    assert not result.details
+
+
+def test_diffraction_excessive_prominence_threshold_fails_cleanly() -> None:
+    result = SlitDiffractionRecipe().analyze({
+        "positions_mm": [-20, -16.25, -8, 0, 8, 16.25, 20],
+        "intensities": [0.1, 0.0, 2.0, 5.0, 2.0, 0.0, 0.1],
+        "min_prominence": 0.5,
+    })
+    assert result.status == "failed"
+    assert "minimum" in result.message
+

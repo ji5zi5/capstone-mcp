@@ -126,3 +126,75 @@ def test_live_adapter_reads_native_inventory_fields_without_invented_time() -> N
     assert timed.x.values == [0.0, 0.5]
     assert timed.metadata["x_basis"] == "declared_clock_elapsed"
     session.read_live_measurement.assert_not_called()
+
+
+def test_csv_iso_wall_clock_preserves_raw_text_origin_and_timezone(tmp_path: Path) -> None:
+    path = tmp_path / "wall_clock.csv"
+    path.write_text(
+        "Timestamp,Voltage (V)\n"
+        "2026-11-27T03:00:00Z,1.0\n"
+        ",1.5\n"
+        "2026-11-27T12:00:01.500+09:00,2.0\n",
+        encoding="utf-8",
+    )
+    page = read_csv_page(str(path), offset=1, limit=2)
+    ts_col = page.columns[0]
+    assert ts_col.numeric_values is None
+    assert ts_col.values == ["", "2026-11-27T12:00:01.500+09:00"]
+    assert ts_col.iso_timestamps is not None
+    # Pagination starting at offset=1 still anchors elapsed seconds to row 1 origin.
+    assert ts_col.iso_timestamps.origin_iso == "2026-11-27T03:00:00Z"
+    assert ts_col.iso_timestamps.timezone_status == "mixed_offsets_normalized_utc"
+    assert ts_col.iso_timestamps.observed_offsets == ["Z", "+09:00"]
+    assert ts_col.iso_timestamps.elapsed_seconds == [None, Decimal("1.5")]
+
+    series = read_csv_series(path, "Timestamp", "Voltage")
+    assert series.x.units == "s"
+    assert series.x.values == [0.0, None, 1.5]
+    assert series.metadata["x_basis"] == "csv_iso_wall_clock_elapsed"
+    assert series.metadata["timestamp_origin_iso"] == "2026-11-27T03:00:00Z"
+    assert series.metadata["timestamp_timezone_status"] == "mixed_offsets_normalized_utc"
+
+    cols = read_csv_all_columns(path)
+    assert math.isnan(cols["Timestamp"][1])
+    assert cols["Timestamp"][0] == pytest.approx(0.0)
+    assert cols["Timestamp"][2] == pytest.approx(1.5)
+
+
+def test_csv_naive_iso_timestamps_preserve_wall_clock_contract(tmp_path: Path) -> None:
+    path = tmp_path / "naive_clock.csv"
+    path.write_text(
+        "Time,Signal\n2026-11-27 09:00:00,10\n2026-11-27 09:00:02.25,20\n",
+        encoding="utf-8",
+    )
+    series = read_csv_series(path, "Time", "Signal")
+    assert series.x.values == [0.0, 2.25]
+    assert series.metadata["timestamp_timezone_status"] == "naive_wall_clock"
+    assert series.metadata["timestamp_observed_offsets"] == ""
+
+
+@pytest.mark.parametrize(
+    "bad_rows",
+    [
+        "2026-11-27T03:00:00Z,1\n2026-11-27T03:00:01,2\n",
+        "2026-11-27T03:00:00Z,1\nnot-a-time,2\n",
+        "2026-13-45T00:00:00Z,1\n",
+    ],
+)
+def test_csv_iso_timestamp_rejects_mixed_awareness_or_malformed_values(
+    tmp_path: Path, bad_rows: str,
+) -> None:
+    path = tmp_path / "bad_clock.csv"
+    path.write_text("Timestamp,Val\n" + bad_rows, encoding="utf-8")
+    with pytest.raises(CsvDataError):
+        read_csv_page(str(path))
+    with pytest.raises(CsvDataError):
+        read_csv_series(path, "Timestamp", "Val")
+
+
+def test_csv_non_iso_text_column_keeps_none_timestamps(tmp_path: Path) -> None:
+    path = tmp_path / "notes.csv"
+    path.write_text("Note,Val\nTrial A,1\n01/11/2026,2\n", encoding="utf-8")
+    page = read_csv_page(str(path))
+    assert page.columns[0].numeric_values is None
+    assert page.columns[0].iso_timestamps is None

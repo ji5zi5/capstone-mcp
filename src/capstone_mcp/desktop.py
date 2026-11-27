@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, Final, assert_never
 from uuid import uuid4
 
 import psutil
+import pywintypes
 import win32gui
 import win32process
 from PIL import Image, ImageGrab
@@ -113,6 +114,18 @@ def tokenize_keys(keys_str: str) -> list[str]:
             tokens.append(keys_str[i])
             i += 1
     return tokens
+
+
+def _focus_hwnd(handle: int) -> None:
+    """Activate native HWND, translating inactive-desktop pywinauto errors."""
+    try:
+        _ = HwndWrapper(handle).set_focus()
+    except (RuntimeError, pywintypes.error) as exc:
+        msg = (
+            "Capstone window cannot be focused because the interactive Windows "
+            "desktop is locked or unavailable. Unlock the desktop and retry."
+        )
+        raise AutomationError(msg) from exc
 
 
 class Capstone:
@@ -316,6 +329,13 @@ class Capstone:
         whatever application is in front instead of Capstone.
         """
         foreground = win32gui.GetForegroundWindow()
+        if not foreground:
+            msg = (
+                "No interactive foreground window is active (desktop locked or "
+                "background/sandbox desktop). Bring Capstone to an interactive "
+                "desktop, then retry."
+            )
+            raise AutomationError(msg)
         if win32process.GetWindowThreadProcessId(foreground)[1] == self.pid:
             return
         title = win32gui.GetWindowText(foreground) or "an untitled window"
@@ -330,7 +350,7 @@ class Capstone:
         """Activate the native HWND; UIA SetFocus alone may not activate Qt."""
         window = self.window(handle)
         self.require_input_ready(handle)
-        _ = HwndWrapper(handle).set_focus()
+        _focus_hwnd(handle)
         self.require_foreground()
         return window
 
@@ -345,6 +365,35 @@ class Capstone:
             raise AutomationError(msg)
         return node
 
+    def _invoke_control(
+        self, node: UIAWrapper, *, allow_foreground: bool, double: bool,
+    ) -> Result:
+        if not allow_foreground:
+            msg = "Activation uses mouse input; set allow_foreground=true."
+            raise AutomationError(msg)
+        top_level = node.top_level_parent().handle
+        modal = not win32gui.IsWindowEnabled(top_level)
+        if modal:
+            top_level = self.owning_window(node)
+            self.require_input_ready(top_level)
+        _focus_hwnd(top_level)
+        self.require_foreground()
+        rect = node.rectangle()
+        point = ((rect.left + rect.right) // 2, (rect.top + rect.bottom) // 2)
+        if modal:
+            self.require_uncovered(top_level, point)
+        try:
+            node.click_input(
+                button="left", coords=point, absolute=True, double=double,
+            )
+        except (RuntimeError, pywintypes.error) as exc:
+            msg = (
+                "Pointer input could not be delivered because the interactive "
+                "Windows desktop is locked or unavailable."
+            )
+            raise AutomationError(msg) from exc
+        return Result(detail="Control clicked; inspect to verify.")
+
     def act(
         self, ref: str, action: Action, *, allow_foreground: bool = True,
         double: bool = False,
@@ -354,26 +403,9 @@ class Capstone:
         self.refs.clear()
         match action:
             case Action.INVOKE:
-                if not allow_foreground:
-                    msg = "Activation uses mouse input; set allow_foreground=true."
-                    raise AutomationError(msg)
-                top_level = node.top_level_parent().handle
-                modal = not win32gui.IsWindowEnabled(top_level)
-                if modal:
-                    top_level = self.owning_window(node)
-                    self.require_input_ready(top_level)
-                _ = HwndWrapper(top_level).set_focus()
-                self.require_foreground()
-                rect = node.rectangle()
-                point = (
-                    (rect.left + rect.right) // 2, (rect.top + rect.bottom) // 2,
+                return self._invoke_control(
+                    node, allow_foreground=allow_foreground, double=double,
                 )
-                if modal:
-                    self.require_uncovered(top_level, point)
-                node.click_input(
-                    button="left", coords=point, absolute=True, double=double,
-                )
-                return Result(detail="Control clicked; inspect to verify.")
             case Action.TOGGLE:
                 node.iface_toggle.Toggle()
                 return Result(detail="Toggle delivered; inspect to verify.")

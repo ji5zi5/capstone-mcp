@@ -172,7 +172,7 @@ def register_physics_tools(mcp: FastMCP, native: NativeCaller) -> dict[str, Any]
             file_path_or_run: .cap archive, CSV/JSON file, inline JSON, or 'sample'.
             experiment_id: Canonical experiment identifier ('photoelectric_effect',
                 'rlc_resonance', 'forced_harmonic_oscillation', 'adiabatic_gas',
-                'slit_diffraction', or 'generic').
+                'slit_diffraction', 'polarization', or 'generic').
             output_path: Optional new path to save the report without overwriting files.
             run_id: Saved run name or number for a .cap file with multiple runs.
             axes: Explicit (x, y) series for linear regression from a saved .cap file.
@@ -238,9 +238,9 @@ def register_physics_tools(mcp: FastMCP, native: NativeCaller) -> dict[str, Any]
 
         Use action='analyze' with measured arrays in parameters. The supported
         experiment IDs are photoelectric_effect, rlc_resonance,
-        forced_harmonic_oscillation (alias forced_oscillation), adiabatic_gas
-        and slit_diffraction. For example, photoelectric_effect accepts
-        wavelengths_nm and stopping_voltages_v.
+        forced_harmonic_oscillation (alias forced_oscillation), adiabatic_gas,
+        slit_diffraction and polarization (alias malus). For example,
+        photoelectric_effect accepts wavelengths_nm and stopping_voltages_v.
 
         'acquire' accepts previously recorded inputs. Automatic apparatus setup
         and live acquisition are unavailable. 'run' stops at the first failed

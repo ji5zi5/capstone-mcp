@@ -17,6 +17,7 @@ from capstone_mcp.numerics import (
     fit_linear_series,
 )
 from capstone_mcp.numerics.regression import strictly_monotonic
+from capstone_mcp.recipes.polarization import fit_malus_law
 from capstone_mcp.reports.models import (
     DataSummary,
     ErrorAnalysisRow,
@@ -40,6 +41,7 @@ STANDARD_GRAVITY: Final[float] = 9.80665  # m / s^2
 ELECTRON_MASS: Final[float] = 9.1093837e-31  # kg
 
 MIN_REGRESSION_POINTS: Final[int] = 2
+MIN_PHYSICAL_ADIABATIC_GAMMA: Final[float] = 1.0
 MIN_PREVIEW_POINTS: Final[int] = 6
 DECIMAL_EXPONENT_LOW: Final[float] = 0.01
 DECIMAL_EXPONENT_HIGH: Final[float] = 10000.0
@@ -55,6 +57,7 @@ _PHYSICAL_FIT_AXES: Final = {
     "photoelectric_effect": ("Frequency", "Stopping Voltage"),
     "rlc_resonance": ("Frequency", "Resistor Voltage"),
     "adiabatic_gas": ("Volume", "Pressure"),
+    "polarization": ("Angle", "Light Intensity"),
 }
 
 
@@ -469,6 +472,28 @@ _CANONICAL_EXPERIMENT_METADATA: Final[
             ),
         ],
     ),
+    "polarization": (
+        "Malus's Law Optical Polarization Measurement",
+        "Optics",
+        [
+            "Rotary Motion / Angle Sensor",
+            "High Sensitivity Light Sensor",
+            "Polarizer & Analyzer Pair",
+        ],
+        "Verification of I(theta) = I_bg + I_max * cos^2(theta - theta_0).",
+        [
+            "I(theta) = I_bg + I_max * cos^2(theta - theta_0)",
+            "cos^2(theta - theta_0) = 1/2 + (1/2) * cos(2*(theta - theta_0))",
+        ],
+        {
+            "Sensor 1": "Light Intensity",
+            "Sensor 2": "Analyzer Angle",
+        },
+        [
+            "How closely does transmitted intensity follow cos^2(theta - theta_0)?",
+            "What optical alignment or stray light accounts for background I_bg?",
+        ],
+    ),
 }
 
 
@@ -533,6 +558,14 @@ def _canonical_fallback_series(experiment_id: str) -> dict[str, list[float]]:
         positions = [-0.04, -0.03, -0.02, -0.01, 0.0, 0.01, 0.02, 0.03, 0.04]
         intensities = [0.05, 0.15, 0.35, 0.80, 1.0, 0.80, 0.35, 0.15, 0.05]
         active_series["Position"] = positions
+        active_series["Light Intensity"] = intensities
+    elif experiment_id == "polarization":
+        angles = [0.0, 15.0, 30.0, 45.0, 60.0, 75.0, 90.0, 120.0, 150.0, 180.0]
+        intensities = [
+            100.0 * (math.cos(math.radians(angle - 15.0)) ** 2) + 2.0
+            for angle in angles
+        ]
+        active_series["Angle"] = angles
         active_series["Light Intensity"] = intensities
     else:
         active_series["x"] = [1.0, 2.0, 3.0, 4.0, 5.0]
@@ -602,6 +635,12 @@ def _fit_adiabatic(
         variable_names=("ln(V)", "ln(P)"),
     )
     exp_gamma = -reg.slope
+    if exp_gamma < MIN_PHYSICAL_ADIABATIC_GAMMA:
+        msg = (
+            f"Fitted adiabatic index gamma={exp_gamma:.4f} violates "
+            f"thermodynamic stability (gamma >= {MIN_PHYSICAL_ADIABATIC_GAMMA:.1f})."
+        )
+        raise ValueError(msg)
     errs = [
         compute_error_analysis(
             accepted_value=ADIABATIC_INDEX_AIR,
@@ -618,6 +657,39 @@ def _fit_adiabatic(
         labels=("ln(V)", "ln(P)"),
     )
     return reg, errs, plot
+
+
+def _fit_polarization(
+    x_vals: list[float],
+    y_vals: list[float],
+) -> tuple[RegressionSummary, list[ErrorAnalysisRow], str]:
+    fit = fit_malus_law(x_vals, y_vals)
+    theta0 = fit["axis_offset_deg"]
+    i_max = fit["max_intensity"]
+    i_bg = fit["background_intensity"]
+    basis_x = [math.cos(math.radians(angle - theta0)) ** 2 for angle in x_vals]
+    sign = "+" if i_bg >= 0 else "-"
+    reg = RegressionSummary(
+        model_name="Malus's Law Fit (I = I_bg + I_max * cos^2(theta - theta_0))",
+        slope=i_max,
+        intercept=i_bg,
+        r_squared=fit["r_squared"],
+        equation=(
+            f"I(theta) = {i_max:.3f} * cos^2(theta - {theta0:.2f} deg) "
+            f"{sign} {abs(i_bg):.3f}"
+        ),
+        x_variable="cos^2(theta - theta_0)",
+        y_variable="Light Intensity",
+        x_unit="dimensionless",
+        y_unit="V",
+    )
+    plot = generate_ascii_plot(
+        basis_x,
+        y_vals,
+        fit=(i_max, i_bg),
+        labels=("cos^2(theta - theta_0)", "Light Intensity"),
+    )
+    return reg, [], plot
 
 
 def _fit_general(
@@ -667,6 +739,8 @@ def _compute_fit(
 
     if experiment_id == "adiabatic_gas":
         return _fit_adiabatic(x_vals, y_vals)
+    if experiment_id == "polarization":
+        return _fit_polarization(x_vals, y_vals)
 
     return _fit_general(
         experiment_id, x_vals, y_vals, (x_key, y_key),
@@ -782,6 +856,7 @@ def generate_report(  # noqa: PLR0913
         "Driver Frequency": "Hz",
         "Amplitude": "m",
         "Position": "m",
+        "Angle": "deg",
         "Light Intensity": "V",
         "x": "",
         "y": "",

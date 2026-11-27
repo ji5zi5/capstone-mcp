@@ -6,10 +6,16 @@ from capstone_mcp.numerics.regression import (
     PolynomialRegressionResult,
     fit_linear_series,
     fit_polynomial_series,
+    fit_weighted_linear_series,
 )
 from capstone_mcp.numerics.sparklines import (
     render_ascii_sparkline,
     render_svg_sparkline,
+)
+from capstone_mcp.numerics.spectral import (
+    SpectralPeak,
+    SpectralResult,
+    compute_power_spectrum,
 )
 from capstone_mcp.numerics.summary import (
     SeriesSummary,
@@ -20,9 +26,13 @@ __all__ = [
     "LinearRegressionResult",
     "PolynomialRegressionResult",
     "SeriesSummary",
+    "SpectralPeak",
+    "SpectralResult",
+    "compute_power_spectrum",
     "compute_series_summary",
     "fit_linear_series",
     "fit_polynomial_series",
+    "fit_weighted_linear_series",
     "render_ascii_sparkline",
     "render_svg_sparkline",
 ]

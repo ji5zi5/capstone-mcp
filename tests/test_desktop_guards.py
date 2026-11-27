@@ -280,3 +280,25 @@ def test_input_proceeds_when_a_capstone_window_is_in_front(
 ) -> None:
     app = _foreground(monkeypatch, owner=7)
     app.require_foreground()
+
+
+def test_locked_desktop_focus_raises_actionable_automation_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    app, activate = _blocked_app(monkeypatch)
+    monkeypatch.setattr(win32gui, "IsWindowEnabled", Mock(return_value=True))
+    activate.return_value.set_focus.side_effect = RuntimeError(
+        "There is no active desktop required for moving mouse cursor!",
+    )
+    with pytest.raises(AutomationError, match="locked or unavailable"):
+        _ = app.focus_window(MAIN)
+
+
+def test_require_foreground_reports_zero_hwnd_as_inactive_desktop(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    app = Capstone()
+    app.pid = 7
+    monkeypatch.setattr(win32gui, "GetForegroundWindow", Mock(return_value=0))
+    with pytest.raises(AutomationError, match="No interactive foreground window"):
+        app.require_foreground()

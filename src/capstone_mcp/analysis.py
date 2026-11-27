@@ -11,6 +11,7 @@ from capstone_mcp.models import Model
 
 MIN_COMPARISON_RUNS: Final = 2
 MAX_DIAGNOSTIC_SAMPLES: Final = 256
+LEVERAGE_EPSILON: Final = 1e-12
 
 
 class AnalysisError(ValueError):
@@ -62,6 +63,27 @@ class LinearFit(Model):
     diagnostics: LinearFitDiagnostics
 
 
+def _sample_cooks_distance(
+    residual: float,
+    variance: float,
+    sample_leverage: float,
+) -> float | None:
+    """Return finite Cook's distance, or None when variance=0 or leverage ~= 1."""
+    complement = 1.0 - sample_leverage
+    if variance == 0.0 or complement <= LEVERAGE_EPSILON:
+        return None
+    try:
+        distance = (
+            residual * residual
+            / (2.0 * variance)
+            * sample_leverage
+            / (complement * complement)
+        )
+    except OverflowError:
+        return None
+    return distance if math.isfinite(distance) else None
+
+
 def linear_fit(samples: FitInput) -> LinearFit:
     """Fit OLS with an intercept and attach diagnostics without dropping samples."""
     if len(samples.x) != len(samples.y):
@@ -85,14 +107,7 @@ def linear_fit(samples: FitInput) -> LinearFit:
     variance = residual_sum / (count - 2)
     leverage = [1 / count + value * value / sxx for value in dx]
     cooks_distance = [
-        None
-        if variance == 0 or sample_leverage == 1
-        else (
-            residual * residual
-            / (2 * variance)
-            * sample_leverage
-            / ((1 - sample_leverage) ** 2)
-        )
+        _sample_cooks_distance(residual, variance, sample_leverage)
         for residual, sample_leverage in zip(residuals, leverage, strict=True)
     ]
     threshold = 4 / count
@@ -130,7 +145,7 @@ def linear_fit(samples: FitInput) -> LinearFit:
             variance * (1 / count + mean_x * mean_x / sxx),
         ),
         residual_standard_error=math.sqrt(variance),
-        r_squared=None if syy == 0 else 1 - residual_sum / syy,
+        r_squared=None if syy == 0 else max(0.0, min(1.0, 1 - residual_sum / syy)),
         diagnostics=LinearFitDiagnostics(
             residuals=residuals[:MAX_DIAGNOSTIC_SAMPLES],
             leverage=leverage[:MAX_DIAGNOSTIC_SAMPLES],
