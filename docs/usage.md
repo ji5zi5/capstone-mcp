@@ -369,7 +369,7 @@ Capstone 내부의 QtWebEngine CDP WebSocket 디버깅 포트(9222)를 통해 UI
 클라이언트가 Streamable HTTP 연결을 지원한다면 저장소 폴더에서 서버를 실행합니다.
 
 ```powershell
-uv run capstone-mcp-http
+uv run --no-sync capstone-mcp-http
 ```
 
 클라이언트의 MCP 서버 URL에 아래 주소를 등록하고 터미널을 실행 상태로 유지합니다. 서버는 로컬 루프백 주소에서만 수신합니다.

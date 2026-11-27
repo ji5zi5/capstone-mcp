@@ -12,6 +12,7 @@ import anyio
 import httpx2
 from pydantic import JsonValue, TypeAdapter
 
+from capstone_mcp import __version__
 from capstone_mcp.agent_instructions import guide
 from capstone_mcp.automation_models import NativeRequest
 from capstone_mcp.session import UnifiedSessionManager
@@ -83,7 +84,7 @@ async def _read_status_doc(
             recording_json = await native(NativeRequest(operation="recording_status"))
     status_doc = {
         "server": "capstone-mcp",
-        "version": "0.1.0",
+        "version": __version__,
         "attached": not worker.retired and bool(worker.process_id),
         "worker_retired": worker.retired,
         "process_id": worker.process_id,

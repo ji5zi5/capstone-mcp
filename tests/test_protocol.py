@@ -2,7 +2,6 @@
 """Stdio protocol integration, with a separate live desktop case."""
 
 import base64
-import os
 import sys
 from pathlib import Path
 from typing import Final
@@ -14,15 +13,12 @@ from mcp.client.stdio import stdio_client
 from mcp.types import ImageContent
 from pydantic import BaseModel
 
+from capstone_mcp import __version__
 from capstone_mcp.agent_instructions import INSTRUCTIONS
 from capstone_mcp.analysis import LinearFit
 from capstone_mcp.models import Snapshot, Window
 
 ROOT: Final = str(Path(__file__).resolve().parents[1])
-pytestmark = pytest.mark.skipif(
-    os.environ.get("CAPSTONE_RUN_LIVE_TESTS") != "1",
-    reason="Set CAPSTONE_RUN_LIVE_TESTS=1 to allow desktop interaction",
-)
 
 
 class WindowsResult(BaseModel):
@@ -41,7 +37,7 @@ class ForegroundSchema(BaseModel):
     properties: InputProperties
 
 
-async def exercise_protocol(*, check_desktop: bool) -> None:
+async def exercise_protocol(*, process_id: int | None = None) -> None:
     parameters = StdioServerParameters(
         command=sys.executable,
         args=["-m", "capstone_mcp.server"],
@@ -54,6 +50,7 @@ async def exercise_protocol(*, check_desktop: bool) -> None:
             ClientSession(reader, writer) as session,
         ):
             initialized = await session.initialize()
+            assert initialized.serverInfo.version == __version__
             assert initialized.instructions == INSTRUCTIONS
             tools = await session.list_tools()
             assert len(tools.tools) <= 22
@@ -72,7 +69,7 @@ async def exercise_protocol(*, check_desktop: bool) -> None:
             interact_tool = next(t for t in tools.tools if t.name == "capstone_interact_ui")
             schema = ForegroundSchema.model_validate(interact_tool.inputSchema)
             assert schema.properties.allow_foreground.default is False
-            if not check_desktop:
+            if process_id is None:
                 invalid_fit = await session.call_tool(
                     "capstone_linear_fit", {"samples": {"x": [0, 1, 2], "y": [1, 3]}},
                 )
@@ -85,13 +82,14 @@ async def exercise_protocol(*, check_desktop: bool) -> None:
                 assert LinearFit.model_validate(fit.structuredContent).slope == 2.0
                 return
 
-            attached = await session.call_tool("capstone_attach")
-            if attached.isError:
-                pytest.skip("Could not attach to Capstone (not installed or running)")
+            attached = await session.call_tool("capstone_attach", {"process_id": process_id})
+            assert not attached.isError, attached.content
             windows = WindowsResult.model_validate(attached.structuredContent).result
-            if not windows:
-                pytest.skip("No running Capstone instance found on desktop")
-            handle = windows[0].handle
+            assert windows
+            assert all(window.process_id == process_id for window in windows)
+            documents = [window for window in windows if ".cap" in window.title.casefold()]
+            assert len(documents) == 1, [window.title for window in windows]
+            handle = documents[0].handle
             # When: request actual control state and image via the MCP wire.
             observed = await session.call_tool(
                 "capstone_snapshot", {"handle": handle},
@@ -111,7 +109,7 @@ async def exercise_protocol(*, check_desktop: bool) -> None:
             )
             # Then: real controls, actual PNG data, and stale-ref rejection.
             assert snapshot.controls
-            assert snapshot.window.process_id == windows[0].process_id
+            assert snapshot.window.process_id == process_id
             images = [c for c in captured.content if isinstance(c, ImageContent)]
             assert len(images) == 1
             assert base64.b64decode(images[0].data).startswith(b"\x89PNG\r\n\x1a\n")
@@ -120,9 +118,4 @@ async def exercise_protocol(*, check_desktop: bool) -> None:
 
 @pytest.mark.anyio
 async def test_headless_calls_over_stdio() -> None:
-    await exercise_protocol(check_desktop=False)
-
-
-@pytest.mark.anyio
-async def test_real_capstone_observation_over_stdio() -> None:
-    await exercise_protocol(check_desktop=True)
+    await exercise_protocol()

@@ -123,15 +123,14 @@ def _single_descendant(element: Element, tag: str) -> Element:
 
 
 def _graph_input(element: Element) -> GraphInput:
-    adapters = list(element.iter("DataAdapter"))
-    if len(adapters) > 1:
-        msg = "BundleInput contains multiple DataAdapter elements."
+    converters = element.findall(".//DataAdapter[@ConverterConverterUnit]")
+    if len(converters) > 1:
+        msg = "BundleInput contains multiple unit converters."
         raise GraphStateError(msg)
-    unit_id = None
-    if adapters:
-        raw_unit = adapters[0].attrib.get("ConverterConverterUnit")
-        if raw_unit is not None:
-            unit_id = _integer(raw_unit, context="DataAdapter.ConverterConverterUnit")
+    unit_id = (
+        _required_integer(converters[0], "ConverterConverterUnit")
+        if converters else None
+    )
     index = _required_integer(element, "BundleIndex")
     if index < 0:
         msg = "BundleInput.BundleIndex must be nonnegative."

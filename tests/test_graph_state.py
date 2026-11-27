@@ -111,6 +111,24 @@ def _payload(
     """.encode()
 
 
+@pytest.mark.parametrize("converter_first", [True, False])
+def test_bundle_unit_is_independent_of_other_data_adapters(*, converter_first: bool) -> None:
+    converter = '<DataAdapter DataAdapterType="1003" DataAdapterRank="50" ConverterConverterUnit="1536" />'
+    adapter = '<DataAdapter DataAdapterType="1002" DataAdapterRank="10" />'
+    children = converter + adapter if converter_first else adapter + converter
+    renderer = _renderer("r", source_id="channel", dataset_id="run", unit=None, fits="")
+    xml = _payload(renderer.replace("</BundleInput>", children + "</BundleInput>"))
+    binding = parse_graph_xml(xml).series[0].inputs[0]
+    assert (binding.source_id, binding.dataset_id, binding.unit_id) == ("channel", "run", 1536)
+
+
+def test_bundle_rejects_ambiguous_unit_converters() -> None:
+    renderer = _renderer("r", source_id="channel", dataset_id="run", unit="256", fits="")
+    xml = _payload(renderer.replace("</BundleInput>", '<DataAdapter ConverterConverterUnit="1536"/></BundleInput>'))
+    with pytest.raises(GraphStateError, match="multiple unit converters"):
+        parse_graph_xml(xml)
+
+
 def test_failed_fit_can_omit_unavailable_result_values() -> None:
     fit = re.sub(
         r'\s+(?:ZCFDICurveFitParameterResultValue|ZCFDICurveFitParameterFitGoodness|ZCFDICurveFitResultsValue)="[^"]*"',

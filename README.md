@@ -68,7 +68,7 @@ uv sync --python 3.12
       "command": "uv",
       "args": [
         "--directory", "C:/Projects/capstone-mcp",
-        "run", "capstone-mcp"
+        "run", "--no-sync", "capstone-mcp"
       ]
     }
   }

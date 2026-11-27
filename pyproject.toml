@@ -7,9 +7,12 @@ license = "MIT"
 license-files = ["LICENSE"]
 requires-python = ">=3.12"
 dependencies = [
+    "anyio>=4,<5",
     "defusedxml>=0.7.1,<0.8",
     "httpx2[http2,brotli,zstd]",
     "mcp>=1.20,<2",
+    "pydantic>=2,<3",
+    "pywin32>=305; sys_platform == 'win32'",
     "pywinauto>=0.6.9,<0.7",
     "pillow>=11",
     "psutil>=7,<9",
@@ -26,6 +29,17 @@ capstone-mcp-http = "capstone_mcp.server:http_main"
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.sdist]
+exclude = [
+    "/.github",
+    "/scratch",
+    "/docs/audits",
+    "/docs/reverse_engineering_dump.json",
+    "/docs/reverse_engineering_findings.md",
+    "/EXHAUSTIVE_*.md",
+    "/PHASE4_EXHAUSTIVE_EDGE_AUDIT_REPORT.md",
+]
 
 [tool.ruff.lint]
 select = ["ALL"]

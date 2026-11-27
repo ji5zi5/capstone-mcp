@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import argparse
 import json
 import re
 from contextlib import asynccontextmanager, nullcontext
@@ -26,7 +27,7 @@ if TYPE_CHECKING:
     from pydantic import JsonValue
     from starlette.applications import Starlette
 
-from capstone_mcp import bridge
+from capstone_mcp import __version__, bridge
 from capstone_mcp.agent_instructions import INSTRUCTIONS
 from capstone_mcp.automation_models import NativeRequest
 from capstone_mcp.automation_worker import AutomationWorker, NativeSessionError
@@ -152,6 +153,8 @@ MCP: Final = CapstoneMCP(
     lifespan=_lifespan,
     instructions=INSTRUCTIONS,
 )
+# FastMCP otherwise advertises the SDK distribution's version during initialize.
+MCP._mcp_server.version = __version__  # noqa: SLF001
 
 # ---------------------------------------------------------------------------
 # Tool & Resource Router Registrations
@@ -397,13 +400,27 @@ async def _safe_fastmcp_call_tool(
 MCP.call_tool = _safe_fastmcp_call_tool
 
 
+def _parser(program: str, description: str) -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(prog=program, description=description)
+    _ = parser.add_argument("--version", action="version", version=__version__)
+    return parser
+
+
 def main() -> None:
     """Serve MCP over stdio; diagnostics must never go to stdout."""
+    _ = _parser("capstone-mcp", "Serve PASCO Capstone MCP over stdio.").parse_args()
     MCP.run(transport="stdio")
 
 
 def http_main() -> None:
     """Serve only on loopback for local MCP clients supporting HTTP."""
+    parser = _parser("capstone-mcp-http", "Serve PASCO Capstone MCP on loopback.")
+    _ = parser.add_argument("--port", type=int, default=MCP.settings.port,
+                            help="Local listening port (default: %(default)s)")
+    port = parser.parse_args().port
+    if not 1 <= port <= 65_535:  # noqa: PLR2004
+        parser.error("--port must be between 1 and 65535")
+    MCP.settings.port = port
     MCP.run(transport="streamable-http")
 
 

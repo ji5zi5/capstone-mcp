@@ -27,6 +27,7 @@ from capstone_mcp.desktop import (
 )
 from capstone_mcp.models import Window
 from capstone_mcp.session import UnifiedSessionManager
+from tests.test_protocol import exercise_protocol
 
 if TYPE_CHECKING:
     from collections.abc import Generator
@@ -46,6 +47,12 @@ def _skip_if_capstone_running() -> None:
                 pytest.skip("An existing Capstone process must remain untouched")
         except psutil.Error:
             pass
+
+
+@pytest.mark.anyio
+async def test_real_capstone_observation_over_stdio(live_capstone_process: int) -> None:
+    """Exercise the wire against the exact application process owned by these tests."""
+    await exercise_protocol(process_id=live_capstone_process)
 
 
 @pytest.fixture(scope="module")
@@ -72,7 +79,7 @@ def live_capstone_process() -> Generator[int, None, None]:
             try:
                 windows = app.attach(process_id=process.pid)
                 titles = [window.title for window in windows]
-                if any(title and title != "PASCO Software Update" for title in titles):
+                if any(".cap" in title.casefold() for title in titles):
                     break
             except (AutomationError, OSError):
                 pass

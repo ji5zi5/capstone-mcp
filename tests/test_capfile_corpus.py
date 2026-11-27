@@ -16,6 +16,7 @@ from capstone_mcp.capfiles import (
     read_cap_dataset_page,
     read_cap_file,
 )
+from capstone_mcp.graphs.inspection import read_saved_graph
 from tests.golden_samples import GOLDEN_MASTER_DIR
 
 if TYPE_CHECKING:
@@ -53,6 +54,13 @@ def test_real_archive_arrays_match_native_metadata_without_modification(
     configuration = read_cap_configuration(path)
     with ZipFile(path) as archive:
         root = fromstring(archive.read("main.xml"))
+    graphs = root.findall(".//Workspace//WorkbookItem[@GUID='CSLineGraph']")
+    for index, item in enumerate(graphs):
+        graph = read_saved_graph(str(path), index)
+        assert graph.graph_count == len(graphs)
+        assert [s.renderer_id for s in graph.state.series] == [
+            r.attrib["ZTDDRUniqueId"] for r in item.iter("ZRSIndividualRenederer")
+        ]
     native_datasets = list(root.iter("DataSet"))
     assert len(cap.datasets) == len(native_datasets)
     assert cap.data_sources == configuration.data_sources
