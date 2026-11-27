@@ -41,31 +41,32 @@
 
 |우선순위|이 대조에서 남긴 작업과 수용 조건|
 |---|---|
-|P0|검사한 자료와 재현 환경에서 새로 확정되어 수정 대기 중인 P0는 `0건`이다. 기존 P0로 표시된 주장 중 파일 다중 세그먼트, Windows 경합, 실제 장비 중단은 #155·#156 실기 검증 체크리스트로 이관했다. [기존 P0별 재현 조건](P0_REMAINING_2026-11-16.md)|
-|P1|장비 출력·영점·기록 중단(#156)은 실기 체크리스트로 분리했다. 코드 백로그로는 회절 잡음 극값 구분 모델(`DEFECT-DIFF02`)을 [#153](https://github.com/ji5zi5/capstone-mcp/issues/153)에 남겼으며, 계측 불확도·GUM 전파(`DIFF14`, `DIFF15`)는 #148 결정으로 현 안정화 범위 외(차기 확장)로 분리했다.|
+|P0|검사한 자료와 재현 환경에서 새로 확정되어 수정 대기 중인 P0는 `0건`이다. 기존 P0로 표시된 주장 중 파일 다중 세그먼트·Windows 경합은 [#155](https://github.com/ji5zi5/capstone-mcp/issues/155)로 이관했고, 실제 장비 중단은 하드웨어 미보유로 [#156](https://github.com/ji5zi5/capstone-mcp/issues/156)(`wontfix`) 종결했다. [기존 P0별 재현 조건](P0_REMAINING_2026-11-16.md)|
+|P1|장비 출력·영점·기록 중단([#156](https://github.com/ji5zi5/capstone-mcp/issues/156))은 물리 하드웨어 미보유로 `wontfix` 종결했다(장비·재현 확보 시 재개). 코드 백로그로는 회절 잡음 극값 구분 모델(`DEFECT-DIFF02`)을 [#153](https://github.com/ji5zi5/capstone-mcp/issues/153)에 남겼으며, 계측 불확도·GUM 전파(`DIFF14`, `DIFF15`)는 #148 결정으로 현 안정화 범위 외(차기 확장)로 분리했다.|
 |P2|CSV ISO 벽시계 열 시간대·원점·원문 보존 계약(`P2-L10N14`)은 [#154](https://github.com/ji5zi5/capstone-mcp/issues/154)에 남겼다. 회절 부분 픽셀 보간·고차 극소·결손 차수·간격 분산(`DIFF03`, `DIFF12`, `DIFF13`, `DIFF16`)은 #148 결정으로 차기 확장(`Out of scope`)으로 분리했다.|
 |P3·확장|무명 보고서의 추가 레시피, 가중 피팅, 단열기체 온도·열량·자동 사이클 경계는 #148 결정으로 현 안정화 범위 외(차기 확장)로 분리했다. [수치 분석의 원문 및 근거](reconcile_recipes_numerics_reports.md)|
 
 조사한 설치본에서 근거가 확인되지 않은 `100 kHz` 벌크 표본, 장비 시계 다채널 동기화, 범용 센서 설정 RPC, 임의 `.cap` 직접 합성은 [ADR 0005](../adr/0005-exhaustive-live-stabilization.md)에 따라 **미지원(범위 외)**으로 확정했다(공급자 명세나 실물 입출력 근거 확보 시 별도 재검토). #148 결정에 따라 **Phase 5(30인 스웜) 전체 조사는 공식 종결**하며, 아래 실기 검증이나 실사용 중 새 재현이 발생할 때만 해당 하위 모듈을 핀포인트로 조사한다.
 
-### 잔여 백로그 및 실기 검증 이슈 (#153~#156)
+### 잔여 백로그 및 에이전트 E2E 검증 이슈 (#153~#155)
 
 - **코드 백로그 (`ready-for-agent`)**:
   - [[Backlog P1] 회절 잡음 환경 극값 구분 모델 도입 (DEFECT-DIFF02)](https://github.com/ji5zi5/capstone-mcp/issues/153)
   - [[Backlog P2] CSV ISO 벽시계 열 시간대·원점·원문 보존 계약 도입 (P2-L10N14)](https://github.com/ji5zi5/capstone-mcp/issues/154)
-- **무센서 앱·`.cap` 파일 실기 체크리스트 (`ready-for-human`)** — [[HITL] 무센서 Capstone 앱·.cap 파일 실기 검증 체크리스트](https://github.com/ji5zi5/capstone-mcp/issues/155):
-  - 별도 세션 미저장 그래프 `Copy Display`/OLE 지연 렌더링/중간 다른 앱 복사/혼합 DPI 이동 뒤 오래된 프레임 거부, 비영어 File 메뉴·회차 이름 변경·마지막 회차 삭제, 다중 세그먼트/미관측 `.cap` vs 네이티브 CSV 대조.
-- **물리 850/550·센서 HITL 게이트 (`ready-for-human`)** — [[HITL] PASCO 850/550·물리 센서 장비 실기 검증 게이트](https://github.com/ji5zi5/capstone-mcp/issues/156):
-  - 850/550·센서 ID/영점 전후 판독, 신호발생기 설정 vs 실출력, 수동 표본·기록 중 단선/재연결, 스마트 트리거, 장치 시계 vs 호스트 시계 대조(하드웨어 확보 시까지 별도 게이트로 유지).
+- **무센서 앱·`.cap` 파일 E2E 검증 (`ready-for-agent`)** — [[E2E] 무센서 Capstone 앱·.cap 파일 실기 검증](https://github.com/ji5zi5/capstone-mcp/issues/155):
+  - 로컬 설치 Capstone 2.5.0.10과 폐기 가능 워크북·일회용 클립보드로 에이전트가 직접 실행할 수 있는 `Copy Display`/OLE 지연 렌더링/중간 다른 복사/오래된 프레임 거부, File 메뉴·회차 관리, 계산기/디스플레이 판독 및 저장·내보내기 대조.
+- **물리 850/550·센서 검증 (`wontfix`, `CLOSED`)** — [#156](https://github.com/ji5zi5/capstone-mcp/issues/156):
+  - 물리 하드웨어 미보유로 현장 실기 검증을 수행할 수 없어 `wontfix`로 종결(장비 확보·현장 재현 시 재개).
 
 ### GitHub 이슈 동기화 결과
 
 |이슈|최종 상태|반영 내용|
 |---|---|---|
 |#139~#147|`CLOSED`|조사 보고서 8건·개정 ADR 0005 채택 및 PR #152 병합으로 완료 종결|
-|#148|`CLOSED`|HITL 결정 완료(백로그 2건 선별, 실기/장비 HITL 분리, Phase 5 종결, 구 이슈 안 A 재편)|
+|#148|`CLOSED`|백로그 2건 선별, 무센서/장비 분리, Phase 5 종결, 구 이슈 안 A 재편 합의|
 |#83|`CLOSED`|PR #150·#151·#152에서 공개 도구 22개·리소스 6개·가이드 정렬 반영 후 완료 종결|
-|#120|`CLOSED`|1~4차 감사·11/27 대조 완료, Phase 5 종결 및 잔여 항목 `#153`~`#156` 이관 후 종결|
+|#120|`CLOSED`|1~4차 감사·11/27 대조 완료, Phase 5 종결 및 잔여 항목 이관 후 종결|
 |#123~#130|`CLOSED`|각 에픽에 11/27 판정 요약 및 `#153`~`#156` 이관 링크 기록 후 일괄 종결(`안 A`)|
-|#153~#156|`OPEN`|실제 남은 작업만 분리한 현행 이슈 (`#153`·`#154` `ready-for-agent`, `#155`·`#156` `ready-for-human`)|
+|#156|`CLOSED` (`wontfix`)|물리 PASCO 850/550·센서 미보유로 현장 검증 불가 종결|
+|#153~#155|`OPEN` (`ready-for-agent`)|에이전트 실행 가능 후속 3건(`DIFF02`, `P2-L10N14`, 무센서 Capstone 앱 E2E)만 유지|
 |#138·#149|`CLOSED`|원장·트래커 동기화 완료 후 지도 및 정리 작업 최종 종결|
